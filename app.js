@@ -156,6 +156,16 @@ const App = {
     document.getElementById('input-width').value = order && order.widthCm ? order.widthCm : '';
     document.getElementById('input-height').value = order && order.heightCm ? order.heightCm : '';
     document.getElementById('input-title').textContent = order ? '発送情報入力' : '手動入力';
+    // 米国向けの場合、通関情報カードを表示
+    const tariffCard = document.getElementById('input-tariff-card');
+    if (order && order.country === 'US' && (order.customsName || order.hsCode)) {
+      tariffCard.classList.remove('hidden');
+      document.getElementById('t-customs-name').textContent = order.customsName || '—';
+      document.getElementById('t-hs-code').textContent = order.hsCode || '—';
+      document.getElementById('t-tariff-rate').textContent = order.tariffRate ? order.tariffRate.toFixed(1) + '%' : '0.0%';
+    } else {
+      tariffCard.classList.add('hidden');
+    }
     this.show('screen-input');
   },
  
@@ -228,6 +238,20 @@ const App = {
     });
     list.querySelector('.result-card').classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
+ 
+    // 米国向けの場合、関税概算を別表示
+    const order = this.state.currentOrder;
+    if (order && order.country === 'US' && order.tariffEstimateJpy > 0) {
+      const summary = document.createElement('div');
+      summary.className = 'tariff-summary';
+      summary.innerHTML = `
+        <div class="label">米国向け関税概算（送料とは別）</div>
+        <div>HS: ${escapeHtml(order.hsCode)} / 税率 ${order.tariffRate.toFixed(1)}%</div>
+        <div class="amount">¥${order.tariffEstimateJpy.toLocaleString()}</div>
+        <div class="label">※ 実際の関税は税関で決定。概算値です</div>
+      `;
+      list.appendChild(summary);
+    }
   },
  
   getCarrierColorClass(carrier) {
