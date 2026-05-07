@@ -36,6 +36,15 @@ const App = {
       this.bindAll();
       await this.loadAll();
     };
+    const clearBtn = document.getElementById('btn-clear-cache');
+    if (clearBtn) clearBtn.onclick = async () => {
+      API.clearMasterCache();
+      showToast('キャッシュをクリアしました');
+      if (API.config.url) {
+        this.bindAll();
+        await this.loadAll();
+      }
+    };
   },
  
   bindAll() {
