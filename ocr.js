@@ -1,30 +1,17 @@
 /**
- * カメラ＋OCRで eBay 注文ID を読み取る
+ * カメラ＋GPT-4o Vision で eBay 注文ID を読み取る
  *
- * 改善ポイント:
- *   A. 既知注文IDとの照合（Levenshtein距離 ≤2 で自動補正）
- *   B. 連続合致判定（2回連続で同じIDが出たら採用）
- *   C. 信頼度しきい値（tesseractの conf < 70 は破棄）
- *   穏やかな前処理（グレースケールのみ、二値化なし）
- *   ROIガイド（中央水平帯）
- *   バーコード自動検出
+ * 方式:
+ *   - 撮影ボタン押下で1枚だけキャプチャ → Apps Script経由でGPT-4o Visionに送信
+ *   - tesseract.js は使用しない（端末内処理を廃止）
+ *   - 結果は既知注文IDとLevenshtein距離で照合（誤読補正）
+ *   - バーコードは引き続き端末内で検出
  */
 const OCR = {
   stream: null,
   callback: null,
   knownOrderIds: [],
-  continuousTimer: null,
   busy: false,
-  // 連続合致判定用
-  lastCandidate: null,
-  consensusCount: 0,
-  totalAttempts: 0,
-  // 信頼度しきい値
-  CONFIDENCE_MIN: 70,
-  // 連続合致でこの数を超えたら採用
-  CONSENSUS_REQUIRED: 2,
-  // この回数だけ試行して見つからなければ警告
-  MAX_ATTEMPTS_BEFORE_WARN: 15,
  
   setKnownOrders(orders) {
     this.knownOrderIds = (orders || []).map(o => o.orderId).filter(Boolean);
@@ -32,9 +19,6 @@ const OCR = {
  
   async open(callback) {
     this.callback = callback || null;
-    this.lastCandidate = null;
-    this.consensusCount = 0;
-    this.totalAttempts = 0;
     document.getElementById('ocr-overlay').classList.remove('hidden');
     this._setStatus('カメラ準備中...');
  
@@ -50,10 +34,9 @@ const OCR = {
       const video = document.getElementById('ocr-video');
       video.srcObject = this.stream;
       await video.play();
-      this._setStatus('注文IDをガイド枠に合わせる（自動認識中）');
+      this._setStatus('注文IDをガイド枠に合わせて「撮影」をタップ');
       this._showROIGuide();
       this._tryBarcode();
-      this._startContinuousOCR();
     } catch (err) {
       this._setStatus('カメラを起動できません: ' + err.message);
     }
@@ -76,6 +59,9 @@ const OCR = {
     guide.classList.remove('hidden');
   },
  
+  /**
+   * バーコード検出（端末内・無料）：注文IDが12桁数字としてエンコードされている場合に検出
+   */
   async _tryBarcode() {
     if (!('BarcodeDetector' in window)) return;
     try {
@@ -86,8 +72,7 @@ const OCR = {
         try {
           const codes = await detector.detect(video);
           if (codes.length > 0) {
-            const text = codes[0].rawValue;
-            const matched = this._extractOrderId(text);
+            const matched = this._extractOrderIdLocal(codes[0].rawValue);
             if (matched) {
               const validated = this._validateAgainstKnown(matched);
               if (validated) {
@@ -101,115 +86,75 @@ const OCR = {
     } catch (_) {}
   },
  
-  _startContinuousOCR() {
-    // 1.8秒ごとに自動でOCR試行（処理が重なる場合はスキップ）
-    this.continuousTimer = setInterval(() => {
-      if (!this.stream || this.busy) return;
-      this.capture(true).catch(() => {});
-    }, 1800);
-  },
- 
-  async capture(silent) {
+  /**
+   * 撮影ボタン押下時：1枚だけ撮影してGPT-4o Visionに送信
+   */
+  async capture() {
     if (this.busy) return;
     this.busy = true;
     try {
+      this._setStatus('撮影 → AI解析中...（2〜4秒）');
+ 
       const video = document.getElementById('ocr-video');
       const canvas = document.getElementById('ocr-canvas');
-      // 中央水平帯をROIとして切り出し
+ 
+      // ROIで中央水平帯のみを切り出し（注文IDが含まれる領域）
       const fullW = video.videoWidth;
       const fullH = video.videoHeight;
-      const roiTop = Math.floor(fullH * 0.40);
-      const roiH = Math.floor(fullH * 0.20);
-      canvas.width = fullW;
-      canvas.height = roiH;
+      const roiTop = Math.floor(fullH * 0.30);
+      const roiH = Math.floor(fullH * 0.40);
+ 
+      // 解析対象の最大幅は800px に縮小（API送信量を抑える）
+      const targetW = Math.min(fullW, 800);
+      const scale = targetW / fullW;
+      canvas.width = targetW;
+      canvas.height = Math.floor(roiH * scale);
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, roiTop, fullW, roiH, 0, 0, fullW, roiH);
-      // 穏やかな前処理（グレースケールのみ）
-      this._toGrayscale(canvas);
+      ctx.drawImage(video, 0, roiTop, fullW, roiH, 0, 0, canvas.width, canvas.height);
  
-      this.totalAttempts++;
-      if (!silent) this._setStatus('読み取り中...');
+      // JPEG品質0.7でbase64エンコード
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const base64 = dataUrl.split(',')[1];
  
-      const result = await Tesseract.recognize(canvas, 'eng', {
-        tessedit_char_whitelist: '0123456789-',
-        tessedit_pageseg_mode: 7  // 単一行モード
-      });
+      // Apps Script経由でGPT-4o Visionに送信
+      const result = await API.extractOrderId(base64);
  
-      // C: 信頼度しきい値判定
-      const conf = result.data && result.data.confidence;
-      if (conf !== undefined && conf < this.CONFIDENCE_MIN) {
-        if (!silent) this._setStatus('信頼度低（' + Math.round(conf) + '%）...');
+      if (result.error) {
+        this._setStatus('エラー: ' + result.error);
         return;
       }
  
-      const candidate = this._extractOrderId(result.data.text);
-      if (!candidate) {
-        if (this.totalAttempts > this.MAX_ATTEMPTS_BEFORE_WARN && !silent) {
-          this._setStatus('注文IDが見つかりません。明るい場所でガイド枠に合わせてください');
-        }
+      if (!result.orderId) {
+        this._setStatus('注文IDが見つかりません: 「' + (result.raw || '判定なし') + '」');
         return;
       }
  
-      // A: 既知注文IDと突合
-      const validated = this._validateAgainstKnown(candidate);
+      // 既知注文IDと照合
+      const validated = this._validateAgainstKnown(result.orderId);
       if (!validated) {
-        if (this.totalAttempts > this.MAX_ATTEMPTS_BEFORE_WARN && !silent) {
-          this._setStatus('読み取りID「' + candidate + '」は既存注文と一致しません');
-        }
+        this._setStatus('読取ID「' + result.orderId + '」は既存注文と一致しません');
         return;
       }
  
-      // B: 連続合致判定
-      if (validated === this.lastCandidate) {
-        this.consensusCount++;
-        if (this.consensusCount >= this.CONSENSUS_REQUIRED) {
-          this._onResult(validated, 'OCR');
-          return;
-        }
-        this._setStatus('確認中... (' + this.consensusCount + '/' + this.CONSENSUS_REQUIRED + ')');
-      } else {
-        this.lastCandidate = validated;
-        this.consensusCount = 1;
-        this._setStatus('検出: ' + validated + '（再確認中...）');
-      }
+      this._onResult(validated, 'AI Vision');
     } catch (err) {
-      if (!silent) this._setStatus('エラー: ' + err.message);
+      this._setStatus('エラー: ' + err.message);
     } finally {
       this.busy = false;
     }
   },
  
-  /**
-   * 穏やかなグレースケール化のみ（二値化はしない）
-   */
-  _toGrayscale(canvas) {
-    const ctx = canvas.getContext('2d');
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-      d[i] = d[i+1] = d[i+2] = gray;
-    }
-    ctx.putImageData(img, 0, 0);
-  },
- 
-  /**
-   * 候補を既知注文IDと照合。Levenshtein距離 ≤2 なら最も近いIDを返す
-   */
   _validateAgainstKnown(candidate) {
-    if (!this.knownOrderIds.length) return candidate; // 既知リスト未登録なら素通り
+    if (!this.knownOrderIds.length) return candidate;
     let best = null, bestDist = 99;
     for (const known of this.knownOrderIds) {
+      if (known === candidate) return known;
       const d = this._levenshtein(candidate, known);
       if (d < bestDist) { bestDist = d; best = known; }
-      if (d === 0) return known;
     }
-    return bestDist <= 2 ? best : null;
+    return bestDist <= 1 ? best : null; // GPT-4oは精度高いため距離1で十分
   },
  
-  /**
-   * Levenshtein距離（編集距離）
-   */
   _levenshtein(a, b) {
     if (a === b) return 0;
     if (!a.length || !b.length) return Math.max(a.length, b.length);
@@ -224,17 +169,14 @@ const OCR = {
     return dp[a.length][b.length];
   },
  
-  _extractOrderId(text) {
+  /**
+   * バーコード文字列から注文ID形式を抽出（端末内処理用）
+   */
+  _extractOrderIdLocal(text) {
     if (!text) return null;
-    // 改行・空白を除去（Order:などの英字残骸はwhitelistで既に除外されている前提）
     const cleaned = String(text).replace(/\s+/g, '');
- 
-    // 厳密形式: NN-NNNNN-NNNNN（2桁-5桁-5桁・ハイフン2回・前後に数字が連続しない）
     let m = cleaned.match(/(?<!\d)(\d{2})-(\d{5})-(\d{5})(?!\d)/);
     if (m) return m[1] + '-' + m[2] + '-' + m[3];
- 
-    // 緩和形式: ちょうど12桁の連続数字（ハイフンがOCRで欠落した場合）
-    // 前後に数字が連続する場合は対象外（誤って14桁の一部を切り出すのを防止）
     m = cleaned.match(/(?<!\d)(\d{12})(?!\d)/);
     if (m) {
       const s = m[1];
@@ -250,10 +192,6 @@ const OCR = {
   },
  
   close() {
-    if (this.continuousTimer) {
-      clearInterval(this.continuousTimer);
-      this.continuousTimer = null;
-    }
     if (this.stream) {
       this.stream.getTracks().forEach(t => t.stop());
       this.stream = null;
