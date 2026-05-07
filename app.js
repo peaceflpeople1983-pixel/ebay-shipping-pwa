@@ -56,10 +56,16 @@ const App = {
     document.getElementById('btn-back-input').onclick = () => this.show('screen-input');
     document.getElementById('btn-calculate').onclick = () => this.calculate();
     document.getElementById('btn-confirm').onclick = () => this.confirmShipment();
-    document.getElementById('btn-ocr').onclick = () => OCR.open(orderId => {
-      document.getElementById('input-order-id').value = orderId;
-    });
-    document.getElementById('btn-scan-list').onclick = () => OCR.open(orderId => this.handleScanFromList(orderId));
+    document.getElementById('btn-ocr').onclick = () => {
+      OCR.setKnownOrders(this.state.orders);
+      OCR.open(orderId => {
+        document.getElementById('input-order-id').value = orderId;
+      });
+    };
+    document.getElementById('btn-scan-list').onclick = () => {
+      OCR.setKnownOrders(this.state.orders);
+      OCR.open(orderId => this.handleScanFromList(orderId));
+    };
     document.getElementById('btn-ocr-cancel').onclick = () => OCR.close();
     document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
   },
