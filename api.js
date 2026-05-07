@@ -64,6 +64,10 @@ const API = {
     return this._post({ action: 'writeShipment', secret: this.config.secret, data });
   },
  
+  async extractOrderId(base64Image) {
+    return this._post({ action: 'extractOrderId', secret: this.config.secret, image: base64Image });
+  },
+ 
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);
