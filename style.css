@@ -106,6 +106,22 @@ button.icon {
   align-items: center;
   justify-content: center;
 }
+button.scan-pill {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 18px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+}
+button.scan-pill:active { background: rgba(255,255,255,0.28); }
+.scan-pill-icon { font-size: 14px; }
+.scan-pill-label { font-size: 12px; }
 
 .hint {
   background: #FFF8E1;
@@ -174,17 +190,52 @@ button.icon {
   padding: 14px;
   margin-bottom: 10px;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: stretch;
+  gap: 12px;
   cursor: pointer;
 }
 .result-card.selected { border: 2px solid var(--primary); padding: 13px; }
 .result-card.recommend { border: 2px solid var(--accent); padding: 13px; }
+.carrier-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  align-self: center;
+}
+.carrier-circle.c-epacket { background: #E24B4A; }
+.carrier-circle.c-eco { background: #FFFFFF; border: 1.5px solid #888780; }
+.carrier-circle.c-dhl { background: #EF9F27; }
+.result-body {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
 .result-card .carrier { font-weight: 500; font-size: 15px; }
 .result-card .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 .result-card .price { font-size: 20px; font-weight: 600; color: var(--text); }
 .result-card .days { font-size: 11px; color: var(--text-tertiary); text-align: right; margin-top: 2px; }
 .result-card .recommend-badge { font-size: 11px; background: #EAF3DE; color: #3B6D11; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 4px; font-weight: 500; }
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+.legend-item {
+  background: var(--surface);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.legend-item .carrier-circle { width: 14px; height: 14px; border-width: 1px; }
 
 .empty {
   text-align: center;
