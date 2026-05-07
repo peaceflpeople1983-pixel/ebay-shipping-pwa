@@ -11,7 +11,7 @@ const App = {
     selectedCarrierIndex: 0,
     recentCountries: []
   },
-
+ 
   async init() {
     if (!API.loadConfig()) {
       this.show('screen-setup');
@@ -21,12 +21,12 @@ const App = {
     this.bindAll();
     await this.loadAll();
   },
-
+ 
   show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
   },
-
+ 
   bindSetup() {
     document.getElementById('btn-save-config').onclick = async () => {
       const url = document.getElementById('cfg-api-url').value.trim();
@@ -37,7 +37,7 @@ const App = {
       await this.loadAll();
     };
   },
-
+ 
   bindAll() {
     document.getElementById('btn-sync').onclick = () => this.sync();
     document.getElementById('btn-settings').onclick = () => this.show('screen-setup');
@@ -47,11 +47,24 @@ const App = {
     document.getElementById('btn-back-input').onclick = () => this.show('screen-input');
     document.getElementById('btn-calculate').onclick = () => this.calculate();
     document.getElementById('btn-confirm').onclick = () => this.confirmShipment();
-    document.getElementById('btn-ocr').onclick = () => OCR.open();
+    document.getElementById('btn-ocr').onclick = () => OCR.open(orderId => {
+      document.getElementById('input-order-id').value = orderId;
+    });
+    document.getElementById('btn-scan-list').onclick = () => OCR.open(orderId => this.handleScanFromList(orderId));
     document.getElementById('btn-ocr-cancel').onclick = () => OCR.close();
     document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
   },
-
+ 
+  handleScanFromList(orderId) {
+    const found = this.state.orders.find(o => o.orderId === orderId);
+    if (found) {
+      this.openInput(orderId);
+      showToast('注文を開きました：' + orderId);
+    } else {
+      showToast('注文ID ' + orderId + ' が見つかりません');
+    }
+  },
+ 
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
@@ -69,11 +82,11 @@ const App = {
       this.setLoader(false);
     }
   },
-
+ 
   setLoader(show) {
     document.getElementById('list-loader').classList.toggle('hidden', !show);
   },
-
+ 
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
@@ -101,12 +114,12 @@ const App = {
     });
     sel.appendChild(og2);
   },
-
+ 
   recordRecentCountry(code) {
     this.recentCountries = [code, ...this.recentCountries.filter(c => c !== code)].slice(0, 10);
     localStorage.setItem('recent_countries', JSON.stringify(this.recentCountries));
   },
-
+ 
   renderOrders() {
     const filter = document.getElementById('filter-account').value;
     const list = document.getElementById('order-list');
@@ -131,7 +144,7 @@ const App = {
       el.onclick = () => this.openInput(el.dataset.id);
     });
   },
-
+ 
   openInput(orderId) {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
@@ -145,7 +158,7 @@ const App = {
     document.getElementById('input-title').textContent = order ? '発送情報入力' : '手動入力';
     this.show('screen-input');
   },
-
+ 
   calculate() {
     const input = {
       country: document.getElementById('input-country').value,
@@ -165,34 +178,47 @@ const App = {
     this.renderResult(result);
     this.show('screen-result');
   },
-
+ 
   renderResult(result) {
     document.getElementById('m-actual').textContent = result.context.actualG + ' g';
     document.getElementById('m-vol8').textContent = result.context.vol8000G + ' g';
     document.getElementById('m-vol5').textContent = result.context.vol5000G + ' g';
     document.getElementById('m-country').textContent = result.context.country;
-
+ 
     const list = document.getElementById('result-list');
     if (result.candidates.length === 0) {
       list.innerHTML = '<div class="empty">利用可能な発送方法がありません<br>サイズ・重量を確認してください</div>';
       document.getElementById('btn-confirm').classList.add('hidden');
       return;
     }
-    list.innerHTML = result.candidates.map((c, i) => `
-      <div class="result-card${i === 0 ? ' recommend' : ''}" data-idx="${i}">
-        <div>
-          ${i === 0 ? '<div class="recommend-badge">最安・推奨</div>' : ''}
-          <div class="carrier">${escapeHtml(c.carrier)}</div>
-          <div class="meta">${escapeHtml(c.detail)} / 請求重量 ${c.billableG}g</div>
-          ${c.surcharge > 0 ? `<div class="meta">+ サーチャージ ¥${c.surcharge}（${(c.surchargeReasons||[]).join(', ')}）</div>` : ''}
-          <div class="meta">${c.tracking ? '追跡あり' : ''} ${c.insurance ? '/ 補償あり' : ''}</div>
-        </div>
-        <div>
-          <div class="price">¥${c.totalCost.toLocaleString()}</div>
-          <div class="days">${escapeHtml(c.estimatedDays)}</div>
-        </div>
+    const legendHtml = `
+      <div class="legend">
+        <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
+        <div class="legend-item"><span class="carrier-circle c-eco"></span>SpeedPAK Eco</div>
+        <div class="legend-item"><span class="carrier-circle c-dhl"></span>Ship via DHL</div>
       </div>
-    `).join('');
+    `;
+    list.innerHTML = legendHtml + result.candidates.map((c, i) => {
+      const colorClass = this.getCarrierColorClass(c.carrier);
+      return `
+        <div class="result-card${i === 0 ? ' recommend' : ''}" data-idx="${i}">
+          <span class="carrier-circle ${colorClass}"></span>
+          <div class="result-body">
+            <div>
+              ${i === 0 ? '<div class="recommend-badge">最安・推奨</div>' : ''}
+              <div class="carrier">${escapeHtml(c.carrier)}</div>
+              <div class="meta">${escapeHtml(c.detail)} / 請求重量 ${(c.billableG/1000).toFixed(2)}kg</div>
+              ${c.surcharge > 0 ? `<div class="meta">+ サーチャージ ¥${c.surcharge}（${(c.surchargeReasons||[]).join(', ')}）</div>` : ''}
+              <div class="meta">${c.tracking ? '追跡あり' : ''} ${c.insurance ? '/ 補償あり' : ''}</div>
+            </div>
+            <div>
+              <div class="price">¥${c.totalCost.toLocaleString()}</div>
+              <div class="days">${escapeHtml(c.estimatedDays)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
     list.querySelectorAll('.result-card').forEach(el => {
       el.onclick = () => {
         list.querySelectorAll('.result-card').forEach(x => x.classList.remove('selected'));
@@ -203,16 +229,25 @@ const App = {
     list.querySelector('.result-card').classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
   },
-
+ 
+  getCarrierColorClass(carrier) {
+    if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
+    if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
+    if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
+    return 'c-eco';
+  },
+ 
   async confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
     const orderId = document.getElementById('input-order-id').value.trim();
     if (!orderId) return showToast('注文IDを入力してください');
     const i = this.state.currentInput;
+    // Sheets記録時は重量をkgに変換（小数2桁）
+    const weightKg = Math.round((i.weightG / 1000) * 100) / 100;
     const data = {
       orderId,
-      weightG: i.weightG,
+      weightKg: weightKg,
       lengthCm: i.lengthCm,
       widthCm: i.widthCm,
       heightCm: i.heightCm,
@@ -232,7 +267,7 @@ const App = {
       document.getElementById('btn-confirm').disabled = false;
     }
   },
-
+ 
   async sync() {
     showToast('eBayから注文を取得中...');
     try {
@@ -244,7 +279,7 @@ const App = {
     }
   }
 };
-
+ 
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -253,14 +288,14 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
-
+ 
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-
+ 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-
+ 
 document.addEventListener('DOMContentLoaded', () => App.init());
