@@ -85,6 +85,22 @@
         <input type="number" id="input-height" inputmode="decimal" placeholder="高">
       </div>
  
+      <div class="card tariff-card hidden" id="input-tariff-card">
+        <div class="muted">通関情報（米国向け）</div>
+        <div class="tariff-row">
+          <span class="tariff-label">通関品名</span>
+          <span class="tariff-value" id="t-customs-name">—</span>
+        </div>
+        <div class="tariff-row">
+          <span class="tariff-label">HSコード</span>
+          <span class="tariff-value" id="t-hs-code">—</span>
+        </div>
+        <div class="tariff-row">
+          <span class="tariff-label">関税率</span>
+          <span class="tariff-value" id="t-tariff-rate">—</span>
+        </div>
+      </div>
+ 
       <button class="primary" id="btn-calculate">最適な発送方法を提案</button>
     </div>
   </section>
