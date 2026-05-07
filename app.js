@@ -170,12 +170,16 @@ const App = {
   },
  
   calculate() {
+    const order = this.state.currentOrder;
     const input = {
       country: document.getElementById('input-country').value,
       weightG: parseInt(document.getElementById('input-weight').value, 10),
       lengthCm: parseFloat(document.getElementById('input-length').value),
       widthCm: parseFloat(document.getElementById('input-width').value),
-      heightCm: parseFloat(document.getElementById('input-height').value)
+      heightCm: parseFloat(document.getElementById('input-height').value),
+      // 関税計算用（注文情報があれば付与）
+      itemPriceUSD: order ? order.itemPrice : 0,
+      tariffRate: order ? order.tariffRate : 0
     };
     if (!input.country) return showToast('発送先国を選択してください');
     if (!input.weightG || !input.lengthCm || !input.widthCm || !input.heightCm) {
@@ -210,21 +214,42 @@ const App = {
     `;
     list.innerHTML = legendHtml + result.candidates.map((c, i) => {
       const colorClass = this.getCarrierColorClass(c.carrier);
+      const carrierShort = this.shortenCarrier(c.carrier);
+      const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
+ 
+      // 内訳行（買い手負担あり/セラー負担で表示分岐）
+      let breakdownHtml = '';
+      if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
+        // ePacket：送料のみ + 買い手負担バッジ
+        breakdownHtml = `
+          <span>送料のみ</span>
+          <span class="buyer-badge">関税¥${c.tariffBuyer.toLocaleString()} 買い手負担</span>
+        `;
+      } else {
+        // Eco/DHL：送料 + 関税 + 通関費を3カラムで表示
+        const parts = [`送料 ¥${c.basicCost.toLocaleString()}`];
+        if (c.tariffSeller > 0) parts.push(`+ 関税 ¥${c.tariffSeller.toLocaleString()}`);
+        if (c.usFees > 0) parts.push(`+ 通関費 ¥${c.usFees.toLocaleString()}`);
+        if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
+        breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
+      }
+ 
       return `
         <div class="result-card${i === 0 ? ' recommend' : ''}" data-idx="${i}">
-          <span class="carrier-circle ${colorClass}"></span>
-          <div class="result-body">
-            <div>
-              ${i === 0 ? '<div class="recommend-badge">最安・推奨</div>' : ''}
-              <div class="carrier">${escapeHtml(c.carrier)}</div>
-              <div class="meta">${escapeHtml(c.detail)} / 請求重量 ${(c.billableG/1000).toFixed(2)}kg</div>
-              ${c.surcharge > 0 ? `<div class="meta">+ サーチャージ ¥${c.surcharge}（${(c.surchargeReasons||[]).join(', ')}）</div>` : ''}
-              <div class="meta">${c.tracking ? '追跡あり' : ''} ${c.insurance ? '/ 補償あり' : ''}</div>
+          <div class="card-header">
+            <span class="carrier-circle ${colorClass}"></span>
+            <span class="carrier-name">${escapeHtml(carrierShort)}</span>
+            ${i === 0 ? '<span class="recommend-badge">最安</span>' : ''}
+          </div>
+          <div class="card-main">
+            <div class="card-info">
+              ${escapeHtml(c.detail)}・${(c.billableG/1000).toFixed(2)}kg<br>
+              ${escapeHtml(c.estimatedDays)}${trackingNote ? '・' + escapeHtml(trackingNote) : ''}
             </div>
-            <div>
-              <div class="price">¥${c.totalCost.toLocaleString()}</div>
-              <div class="days">${escapeHtml(c.estimatedDays)}</div>
-            </div>
+            <div class="card-price-big">¥${c.totalCost.toLocaleString()}</div>
+          </div>
+          <div class="card-breakdown">
+            ${breakdownHtml}
           </div>
         </div>
       `;
@@ -239,16 +264,19 @@ const App = {
     list.querySelector('.result-card').classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
  
-    // 米国向けの場合、関税概算を別表示
-    const order = this.state.currentOrder;
-    if (order && order.country === 'US' && order.tariffEstimateJpy > 0) {
+    // 米国向けの場合、関税情報サマリーを表示
+    if (result.context.tariffJPY > 0) {
+      const order = this.state.currentOrder;
+      const hsCode = order ? order.hsCode : '';
+      const itemPrice = order ? order.itemPrice : 0;
       const summary = document.createElement('div');
       summary.className = 'tariff-summary';
       summary.innerHTML = `
-        <div class="label">米国向け関税概算（送料とは別）</div>
-        <div>HS: ${escapeHtml(order.hsCode)} / 税率 ${order.tariffRate.toFixed(1)}%</div>
-        <div class="amount">¥${order.tariffEstimateJpy.toLocaleString()}</div>
-        <div class="label">※ 実際の関税は税関で決定。概算値です</div>
+        <div class="left">
+          <div class="label">米国関税概算</div>
+          <div class="detail">HS ${escapeHtml(hsCode || '?')} / 税率 ${result.context.tariffRate.toFixed(1)}% / 価格 $${itemPrice}</div>
+        </div>
+        <div class="right">¥${result.context.tariffJPY.toLocaleString()}</div>
       `;
       list.appendChild(summary);
     }
@@ -259,6 +287,14 @@ const App = {
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
+  },
+ 
+  // 候補カードの carrier 名を画面で見やすく短縮
+  shortenCarrier(carrier) {
+    if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
+    if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
+    if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
+    return carrier;
   },
  
   async confirmShipment() {
