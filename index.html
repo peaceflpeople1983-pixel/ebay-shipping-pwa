@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="eBay Ship">
+<meta name="theme-color" content="#1F3864">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>eBay Ship Optimizer</title>
+</head>
+<body>
+<div id="app">
+  <!-- 設定画面（初回のみ） -->
+  <section id="screen-setup" class="screen">
+    <header class="head"><h1>初期設定</h1></header>
+    <div class="content">
+      <p class="hint">最初にApps Script Web App URLと共有シークレットを登録します。一度入力すれば以降は不要です。</p>
+      <label>Apps Script Web App URL</label>
+      <input type="url" id="cfg-api-url" placeholder="https://script.google.com/macros/s/.../exec">
+      <label>共有シークレット (任意)</label>
+      <input type="text" id="cfg-secret" placeholder="setupSharedSecretで生成したUUID">
+      <button class="primary" id="btn-save-config">保存して開始</button>
+    </div>
+  </section>
+
+  <!-- 注文一覧画面 -->
+  <section id="screen-list" class="screen hidden">
+    <header class="head">
+      <h1>未発送の注文</h1>
+      <div class="head-actions">
+        <button class="icon" id="btn-sync" title="同期">⟳</button>
+        <button class="icon" id="btn-settings" title="設定">⚙</button>
+      </div>
+    </header>
+    <div class="filter-bar">
+      <select id="filter-account">
+        <option value="">すべてのアカウント</option>
+        <option value="good_market39">good_market39</option>
+        <option value="gifts_fromnippon">gifts_fromnippon</option>
+      </select>
+      <button class="secondary" id="btn-new">+ 手動入力</button>
+    </div>
+    <div id="order-list" class="content"></div>
+    <div class="loader hidden" id="list-loader">読み込み中...</div>
+  </section>
+
+  <!-- 入力画面 -->
+  <section id="screen-input" class="screen hidden">
+    <header class="head">
+      <button class="icon" id="btn-back-list">←</button>
+      <h1 id="input-title">発送情報入力</h1>
+    </header>
+    <div class="content">
+      <div class="card account-card" id="input-account-card">
+        <div class="muted">アカウント</div>
+        <div class="big" id="input-account">—</div>
+      </div>
+
+      <label>注文ID</label>
+      <div class="input-with-action">
+        <input type="text" id="input-order-id" placeholder="14-12345-67890">
+        <button class="icon" id="btn-ocr" title="撮影で取り込み">📷</button>
+      </div>
+
+      <label>発送先国</label>
+      <select id="input-country"></select>
+
+      <label>梱包後重量 (g)</label>
+      <input type="number" id="input-weight" inputmode="numeric" placeholder="例: 850">
+
+      <label>サイズ (cm)</label>
+      <div class="dim-row">
+        <input type="number" id="input-length" inputmode="decimal" placeholder="長">
+        <span class="dim-sep">×</span>
+        <input type="number" id="input-width" inputmode="decimal" placeholder="幅">
+        <span class="dim-sep">×</span>
+        <input type="number" id="input-height" inputmode="decimal" placeholder="高">
+      </div>
+
+      <button class="primary" id="btn-calculate">最適な発送方法を提案</button>
+    </div>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="screen-result" class="screen hidden">
+    <header class="head">
+      <button class="icon" id="btn-back-input">←</button>
+      <h1>提案結果</h1>
+    </header>
+    <div class="content">
+      <div class="metrics">
+        <div class="metric"><div class="muted">実重量</div><div id="m-actual">—</div></div>
+        <div class="metric"><div class="muted">容積÷8000</div><div id="m-vol8">—</div></div>
+        <div class="metric"><div class="muted">容積÷5000</div><div id="m-vol5">—</div></div>
+        <div class="metric"><div class="muted">国</div><div id="m-country">—</div></div>
+      </div>
+      <div id="result-list"></div>
+      <button class="primary hidden" id="btn-confirm">この発送方法で確定</button>
+    </div>
+  </section>
+
+  <!-- カメラ／OCRオーバーレイ -->
+  <section id="ocr-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <video id="ocr-video" playsinline autoplay></video>
+      <canvas id="ocr-canvas" class="hidden"></canvas>
+      <div class="ocr-status" id="ocr-status">カメラ準備中...</div>
+      <div class="ocr-buttons">
+        <button class="secondary" id="btn-ocr-cancel">キャンセル</button>
+        <button class="primary" id="btn-ocr-capture">撮影</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- トースト -->
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" crossorigin="anonymous"></script>
+<script src="api.js"></script>
+<script src="calculator.js"></script>
+<script src="ocr.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
