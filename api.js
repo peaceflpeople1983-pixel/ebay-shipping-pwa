@@ -19,10 +19,18 @@ const API = {
   async getMasterData(forceRefresh) {
     if (!forceRefresh) {
       const cached = this._loadCache('master_data', this.MASTER_CACHE_TTL);
-      if (cached) return cached;
+      // キャッシュが有効性を満たすか確認（countries が10件以上あること）
+      if (cached && Array.isArray(cached.countries) && cached.countries.length >= 10) {
+        return cached;
+      }
+      // 不完全なキャッシュは破棄
+      this.clearMasterCache();
     }
     const data = await this._get('?action=getMasterData');
-    this._saveCache('master_data', data);
+    // 取得結果が正常な場合のみキャッシュ保存
+    if (data && Array.isArray(data.countries) && data.countries.length >= 10) {
+      this._saveCache('master_data', data);
+    }
     return data;
   },
  
