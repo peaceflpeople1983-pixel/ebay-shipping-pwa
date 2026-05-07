@@ -86,6 +86,12 @@ const App = {
     try {
       this.recentCountries = JSON.parse(localStorage.getItem('recent_countries') || '[]');
       this.state.masterData = await API.getMasterData();
+      // 防御：countriesが空ならキャッシュ破棄して強制再取得
+      if (!this.state.masterData || !Array.isArray(this.state.masterData.countries) || this.state.masterData.countries.length < 10) {
+        showToast('マスタデータ不完全。再取得します...');
+        API.clearMasterCache();
+        this.state.masterData = await API.getMasterData(true);
+      }
       Calculator.setMaster(this.state.masterData);
       const data = await API.getOrders();
       this.state.orders = data.orders || [];
@@ -105,7 +111,13 @@ const App = {
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
-    const all = this.state.masterData.countries;
+    const all = (this.state.masterData && this.state.masterData.countries) || [];
+    if (!all.length) {
+      const o = document.createElement('option');
+      o.value = ''; o.textContent = '国マスタが読み込めません';
+      sel.appendChild(o);
+      return;
+    }
     const recent = this.recentCountries
       .map(c => all.find(a => a.code === c))
       .filter(Boolean)
