@@ -26,12 +26,16 @@
       <button class="primary" id="btn-save-config">保存して開始</button>
     </div>
   </section>
-
+ 
   <!-- 注文一覧画面 -->
   <section id="screen-list" class="screen hidden">
     <header class="head">
       <h1>未発送の注文</h1>
       <div class="head-actions">
+        <button class="scan-pill" id="btn-scan-list" title="スキャンして開く">
+          <span class="scan-pill-icon">📷</span>
+          <span class="scan-pill-label">スキャン</span>
+        </button>
         <button class="icon" id="btn-sync" title="同期">⟳</button>
         <button class="icon" id="btn-settings" title="設定">⚙</button>
       </div>
@@ -47,7 +51,7 @@
     <div id="order-list" class="content"></div>
     <div class="loader hidden" id="list-loader">読み込み中...</div>
   </section>
-
+ 
   <!-- 入力画面 -->
   <section id="screen-input" class="screen hidden">
     <header class="head">
@@ -59,19 +63,19 @@
         <div class="muted">アカウント</div>
         <div class="big" id="input-account">—</div>
       </div>
-
+ 
       <label>注文ID</label>
       <div class="input-with-action">
         <input type="text" id="input-order-id" placeholder="14-12345-67890">
         <button class="icon" id="btn-ocr" title="撮影で取り込み">📷</button>
       </div>
-
+ 
       <label>発送先国</label>
       <select id="input-country"></select>
-
+ 
       <label>梱包後重量 (g)</label>
       <input type="number" id="input-weight" inputmode="numeric" placeholder="例: 850">
-
+ 
       <label>サイズ (cm)</label>
       <div class="dim-row">
         <input type="number" id="input-length" inputmode="decimal" placeholder="長">
@@ -80,11 +84,11 @@
         <span class="dim-sep">×</span>
         <input type="number" id="input-height" inputmode="decimal" placeholder="高">
       </div>
-
+ 
       <button class="primary" id="btn-calculate">最適な発送方法を提案</button>
     </div>
   </section>
-
+ 
   <!-- 結果画面 -->
   <section id="screen-result" class="screen hidden">
     <header class="head">
@@ -102,7 +106,7 @@
       <button class="primary hidden" id="btn-confirm">この発送方法で確定</button>
     </div>
   </section>
-
+ 
   <!-- カメラ／OCRオーバーレイ -->
   <section id="ocr-overlay" class="overlay hidden">
     <div class="overlay-content">
@@ -115,11 +119,11 @@
       </div>
     </div>
   </section>
-
+ 
   <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
 </div>
-
+ 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" crossorigin="anonymous"></script>
 <script src="api.js"></script>
 <script src="calculator.js"></script>
