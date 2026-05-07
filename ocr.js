@@ -5,8 +5,10 @@
  */
 const OCR = {
   stream: null,
-
-  async open() {
+  callback: null,
+ 
+  async open(callback) {
+    this.callback = callback || null;
     document.getElementById('ocr-overlay').classList.remove('hidden');
     document.getElementById('ocr-status').textContent = 'カメラ準備中...';
     try {
@@ -23,7 +25,7 @@ const OCR = {
       document.getElementById('ocr-status').textContent = 'カメラを起動できません: ' + err.message;
     }
   },
-
+ 
   async _tryBarcode() {
     if (!('BarcodeDetector' in window)) return;
     try {
@@ -45,7 +47,7 @@ const OCR = {
       }, 500);
     } catch (_) {}
   },
-
+ 
   async capture() {
     const video = document.getElementById('ocr-video');
     const canvas = document.getElementById('ocr-canvas');
@@ -53,7 +55,7 @@ const OCR = {
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     document.getElementById('ocr-status').textContent = '読み取り中...';
-
+ 
     try {
       const result = await Tesseract.recognize(canvas, 'eng', {
         tessedit_char_whitelist: '0123456789-'
@@ -69,7 +71,7 @@ const OCR = {
       document.getElementById('ocr-status').textContent = 'エラー: ' + err.message;
     }
   },
-
+ 
   _extractOrderId(text) {
     // eBay注文ID形式：12-34567-89012 もしくは類似のハイフン区切り数字
     const m = text.replace(/\s+/g, '').match(/\d{2}-\d{5}-\d{5}/);
@@ -82,13 +84,19 @@ const OCR = {
     }
     return null;
   },
-
+ 
   _onResult(orderId, source) {
-    document.getElementById('input-order-id').value = orderId;
     this.close();
     showToast('読み取り成功（' + source + '）: ' + orderId);
+    if (this.callback) {
+      this.callback(orderId);
+    } else {
+      // フォールバック：入力欄に転記
+      const el = document.getElementById('input-order-id');
+      if (el) el.value = orderId;
+    }
   },
-
+ 
   close() {
     if (this.stream) {
       this.stream.getTracks().forEach(t => t.stop());
