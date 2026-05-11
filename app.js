@@ -1,10 +1,11 @@
 /**
- * メインのUIロジック (v3.1)
+ * メインのUIロジック (v3.5)
  *
- * v3.1 修正:
- *  - 寸法/重量バリデーションを改善：どの項目が未入力かを明示
- *  - 全角数字・カンマ・空白を自動的に半角・除去して受け付ける
- *  - コンソールに実値ログを出力（デバッグ用）
+ * v3.5 追加機能:
+ *  - 数値入力フィールドの自動フォーカス移動（重量→長→幅→高→計算）
+ *  - フォーカス時の既存値自動全選択
+ *  - 入力画面のアカウントカードに商品サムネ表示
+ *  - 同期時の新規注文に Browse API で画像URL自動付与（バックエンド側）
  */
 const App = {
   state: {
@@ -102,6 +103,40 @@ const App = {
       this.renderOrders();
     };
     document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
+ 
+    // 数値入力の自動フォーカス移動（重量→長→幅→高→計算）
+    this.bindAutoFocusChain();
+  },
+ 
+  /**
+   * 数値フィールドのEnter/「次へ」キー押下で次のフィールドに自動フォーカス。
+   * 最終フィールド(高)で「最適な発送方法を提案」を実行。
+   * フォーカス時に既存値を全選択して書き換えがスムーズになる。
+   */
+  bindAutoFocusChain() {
+    const chain = ['input-weight', 'input-length', 'input-width', 'input-height'];
+    chain.forEach((id, idx) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (idx < chain.length - 1) {
+            const next = document.getElementById(chain[idx + 1]);
+            if (next) {
+              next.focus();
+              try { next.select(); } catch (_) {}
+            }
+          } else {
+            el.blur();
+            this.calculate();
+          }
+        }
+      });
+      el.addEventListener('focus', () => {
+        setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
+      });
+    });
   },
  
   goHome() {
@@ -248,7 +283,8 @@ const App = {
  
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
-      const thumbHtml = o.imageUrl
+      const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
+      const thumbHtml = hasUrl
         ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`
         : `<div class="order-thumb-placeholder">&#128230;</div>`;
       return `
@@ -283,7 +319,8 @@ const App = {
     // サムネ画像＋商品名
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
-    if (order && order.imageUrl) {
+    const hasUrl = order && order.imageUrl && String(order.imageUrl).indexOf('http') === 0;
+    if (hasUrl) {
       thumbWrap.innerHTML = `<img src="${escapeAttr(order.imageUrl)}" alt="" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`;
     } else {
       thumbWrap.innerHTML = '<div class="order-thumb-placeholder">&#128230;</div>';
@@ -309,12 +346,9 @@ const App = {
     this.show('screen-input');
   },
  
-  /** 数値フィールドを堅牢に読み取る（全角→半角、カンマ・空白除去） */
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
-    // 全角数字＆全角ピリオドを半角に
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
-    // カンマ・空白除去
     raw = raw.replace(/[,\s]/g, '');
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
@@ -330,18 +364,13 @@ const App = {
  
     if (!country) return showToast('発送先国を選択してください');
  
-    // どのフィールドが未入力/不正かを具体的に表示
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
     if (!lengthCm || lengthCm <= 0) missing.push('長');
     if (!widthCm || widthCm <= 0) missing.push('幅');
     if (!heightCm || heightCm <= 0) missing.push('高');
     if (missing.length) {
-      console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm,
-        rawWeight: document.getElementById('input-weight').value,
-        rawLength: document.getElementById('input-length').value,
-        rawWidth: document.getElementById('input-width').value,
-        rawHeight: document.getElementById('input-height').value });
+      console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm });
       return showToast(missing.join('・') + ' が未入力または0です');
     }
  
@@ -512,6 +541,38 @@ const App = {
     showToast('eBayから注文を取得中...');
     try {
       await API.syncOrders();
+      await this.loadAll();
+      showToast('同期完了');
+    } catch (err) {
+      showToast('同期失敗: ' + err.message);
+    }
+  }
+};
+ 
+function showToast(message) {
+  const t = document.getElementById('toast');
+  t.textContent = message;
+  t.classList.remove('hidden');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
+}
+ 
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+ 
+function escapeAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+ 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+ 
+document.addEventListener('DOMContentLoaded', () => App.init());
       await this.loadAll();
       showToast('同期完了');
     } catch (err) {
