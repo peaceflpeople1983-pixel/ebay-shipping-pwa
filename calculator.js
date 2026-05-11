@@ -39,6 +39,9 @@ const Calculator = {
     const dhl = this._dhl(input, country, dims, vol5000, tariffJPY);
     if (dhl) candidates.push(dhl);
  
+    const fedex = this._fedex(input, country, dims, vol5000, tariffJPY);
+    if (fedex) candidates.push(fedex);
+ 
     candidates.sort((a, b) => a.totalCost - b.totalCost);
     return {
       candidates,
@@ -189,6 +192,70 @@ const Calculator = {
       totalCost,
       billableG: Math.ceil(billableKg * 1000),
       estimatedDays: '1〜5営業日',
+      tracking: true,
+      insurance: true
+    };
+  },
+ 
+  _fedex(input, country, dims, vol5000, tariffJPY) {
+    // FedEx FICP用ゾーン取得（fedexZonesマップから）
+    const fedexZone = (this.master.fedexZones || {})[country.code];
+    if (!fedexZone) return null;
+    // 寸法制限：長さ≤274cm、長さ+周囲≤330cm（周囲=2*(幅+高さ)）
+    if (dims[0] > 274) return null;
+    const girth = 2 * (dims[1] + dims[2]);
+    if (dims[0] + girth > 330) return null;
+    // 重量制限：68kg
+    const billableKg = Math.max(input.weightG / 1000, vol5000);
+    if (billableKg > 68) return null;
+ 
+    // 料金検索：重量を切り上げて該当行を取得
+    const fedexRates = this.master.rates.fedex || [];
+    const tier = fedexRates.find(r => r.weight >= billableKg);
+    if (!tier) return null;
+    const cost = tier.zones[fedexZone];
+    if (!cost) return null;
+ 
+    let surcharge = 0;
+    const surchargeReasons = [];
+    const sc = this.master.surcharges.fedex || {};
+    // オーバーサイズ：長さ243cm超 or 長さ+胴回り330cm超
+    if (dims[0] > 243 || (dims[0] + girth) > 330) {
+      surcharge += sc.oversizeFlat || 8800;
+      surchargeReasons.push('オーバーサイズ');
+    } else if (dims[0] > 121 || dims[1] > 76 || (dims[0] + girth) > 266) {
+      // 特別取扱料金（寸法）：長さ121cm超 or 二番目76cm超 or 長さ+胴回り266cm超
+      surcharge += sc.specialHandlingDimFlat || 3390;
+      surchargeReasons.push('特別取扱料金(寸法)');
+    }
+    if (input.weightG / 1000 > 25) {
+      surcharge += sc.specialHandlingWeightFlat || 3390;
+      surchargeReasons.push('特別取扱料金(重量)');
+    }
+ 
+    // 米国向け関税：FICPは米国輸入手続き手数料が無料、関税転送も無料
+    let tariffSeller = 0;
+    let usFees = 0;
+    if (country.code === 'US') {
+      tariffSeller = tariffJPY;
+      // 関税処理手数料 2.1% のみ加算（FICPは他の通関手数料が無料）
+      usFees = Math.round(tariffJPY * (sc.usDutyProcessRate || 0.021));
+      if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
+    }
+ 
+    const totalCost = cost + surcharge + tariffSeller + usFees;
+ 
+    return {
+      carrier: 'eBay SpeedPAK Ship via FedEx',
+      detail: 'FICP Zone ' + fedexZone,
+      basicCost: cost,
+      surcharge,
+      surchargeReasons,
+      tariffSeller,
+      usFees,
+      totalCost,
+      billableG: Math.ceil(billableKg * 1000),
+      estimatedDays: '2〜3営業日',
       tracking: true,
       insurance: true
     };
