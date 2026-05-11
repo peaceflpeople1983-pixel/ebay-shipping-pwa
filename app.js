@@ -21,9 +21,10 @@ const App = {
   },
  
   async init() {
+    // 設定画面のボタンは常にバインド（後で歯車アイコンから設定変更したい時のため）
+    this.bindSetup();
     if (!API.loadConfig()) {
       this.show('screen-setup');
-      this.bindSetup();
       return;
     }
     this.bindAll();
@@ -618,4 +619,5 @@ serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
  
-docume
+document.addEventListener('DOMContentLoaded', () => App.init());
+ 
