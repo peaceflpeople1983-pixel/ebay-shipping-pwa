@@ -55,57 +55,64 @@ const App = {
     };
   },
  
+  /** 要素が存在する場合のみハンドラを設定（防御） */
+  _bind(id, eventName, handler) {
+    const el = document.getElementById(id);
+    if (el) el[eventName] = handler;
+  },
+ 
   bindAll() {
-    document.getElementById('btn-sync').onclick = () => this.sync();
-    document.getElementById('btn-settings').onclick = () => this.show('screen-setup');
-    document.getElementById('btn-new').onclick = () => this.openInput(null);
-    document.getElementById('filter-account').onchange = () => this.renderOrders();
-    document.getElementById('filter-hide-done').onchange = () => this.renderOrders();
+    try {
+      this._bind('btn-sync', 'onclick', () => this.sync());
+      this._bind('btn-settings', 'onclick', () => this.show('screen-setup'));
+      this._bind('btn-new', 'onclick', () => this.openInput(null));
+      this._bind('filter-account', 'onchange', () => this.renderOrders());
+      this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
  
-    document.getElementById('btn-back-list').onclick = () => this.goHome();
-    document.getElementById('btn-back-input').onclick = () => this.show('screen-input');
+      this._bind('btn-back-list', 'onclick', () => this.goHome());
+      this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
+      this._bind('btn-home-input', 'onclick', () => this.goHome());
+      this._bind('btn-home-result', 'onclick', () => this.goHome());
  
-    const homeInput = document.getElementById('btn-home-input');
-    if (homeInput) homeInput.onclick = () => this.goHome();
-    const homeResult = document.getElementById('btn-home-result');
-    if (homeResult) homeResult.onclick = () => this.goHome();
+      this._bind('btn-calculate', 'onclick', () => this.calculate());
+      this._bind('btn-confirm', 'onclick', () => this.confirmShipment());
  
-    document.getElementById('btn-calculate').onclick = () => this.calculate();
-    document.getElementById('btn-confirm').onclick = () => this.confirmShipment();
- 
-    document.getElementById('btn-ocr').onclick = () => {
-      OCR.setKnownOrders(this.state.orders);
-      OCR.open(orderId => {
-        document.getElementById('input-order-id').value = orderId;
+      this._bind('btn-ocr', 'onclick', () => {
+        OCR.setKnownOrders(this.state.orders);
+        OCR.open(orderId => {
+          const el = document.getElementById('input-order-id');
+          if (el) el.value = orderId;
+        });
       });
-    };
-    document.getElementById('btn-scan-list').onclick = () => {
-      this.state.batchScanActive = false;
-      OCR.setKnownOrders(this.state.orders);
-      OCR.open(orderId => this.handleScanFromList(orderId));
-    };
+      this._bind('btn-scan-list', 'onclick', () => {
+        this.state.batchScanActive = false;
+        OCR.setKnownOrders(this.state.orders);
+        OCR.open(orderId => this.handleScanFromList(orderId));
+      });
  
-    const batchBtn = document.getElementById('btn-batch-scan');
-    if (batchBtn) batchBtn.onclick = () => this.startBatchScan();
-    const clearTodayBtn = document.getElementById('btn-today-clear');
-    if (clearTodayBtn) clearTodayBtn.onclick = () => {
-      if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
-        TodayGroup.clear();
+      this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
+      this._bind('btn-today-clear', 'onclick', () => {
+        if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
+          TodayGroup.clear();
+          this.renderOrders();
+          showToast('本日グループをクリアしました');
+        }
+      });
+ 
+      this._bind('btn-ocr-cancel', 'onclick', () => {
+        this.state.batchScanActive = false;
+        OCR.keepOpen = false;
+        OCR.close();
         this.renderOrders();
-        showToast('本日グループをクリアしました');
-      }
-    };
+      });
+      this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
  
-    document.getElementById('btn-ocr-cancel').onclick = () => {
-      this.state.batchScanActive = false;
-      OCR.keepOpen = false;
-      OCR.close();
-      this.renderOrders();
-    };
-    document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
- 
-    // 数値入力の自動フォーカス移動（重量→長→幅→高→計算）
-    this.bindAutoFocusChain();
+      // 数値入力の自動フォーカス移動（重量→長→幅→高→計算）
+      this.bindAutoFocusChain();
+    } catch (err) {
+      console.error('bindAll error:', err);
+      showToast('初期化エラー: ' + err.message);
+    }
   },
  
   /**
@@ -316,16 +323,18 @@ const App = {
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
  
-    // サムネ画像＋商品名
+    // サムネ画像＋商品名（index.htmlが旧版なら要素なし→スキップ）
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
     const hasUrl = order && order.imageUrl && String(order.imageUrl).indexOf('http') === 0;
-    if (hasUrl) {
-      thumbWrap.innerHTML = `<img src="${escapeAttr(order.imageUrl)}" alt="" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`;
-    } else {
-      thumbWrap.innerHTML = '<div class="order-thumb-placeholder">&#128230;</div>';
+    if (thumbWrap) {
+      if (hasUrl) {
+        thumbWrap.innerHTML = `<img src="${escapeAttr(order.imageUrl)}" alt="" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`;
+      } else {
+        thumbWrap.innerHTML = '<div class="order-thumb-placeholder">&#128230;</div>';
+      }
     }
-    titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
+    if (titleEl) titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
  
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
@@ -605,4 +614,8 @@ if ('serviceWorker' in navigator) {
 }
  
 document.addEventListener('DOMContentLoaded', () => App.init());
+serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
  
+docume
