@@ -278,7 +278,39 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   padding: 14px;
   margin-bottom: 12px;
 }
-.card.account-card .big { font-size: 16px; font-weight: 500; margin-top: 4px; }
+.card.account-card { display: flex; align-items: center; gap: 14px; }
+.card.account-card .account-thumb-wrap {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #EFEFEF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card.account-card .account-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.card.account-card .account-thumb-wrap .order-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  font-size: 26px;
+}
+.card.account-card .account-info { flex: 1; min-width: 0; }
+.card.account-card .big { font-size: 16px; font-weight: 500; margin-top: 2px; }
+.card.account-card .account-title {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card.tariff-card { background: #FFF8E1; border-color: #FAC775; }
 .tariff-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
 .tariff-label { color: #5F5E5A; }
@@ -474,4 +506,3 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   from { opacity: 0; transform: translate(-50%, 20px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
- 
