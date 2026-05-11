@@ -2,8 +2,8 @@
  * Service Worker - 静的ファイル & eBay商品画像のオフラインキャッシュ
  * バージョンを変更すると古いキャッシュが破棄され、強制的に最新のJS/CSSを取得する
  */
-const STATIC_CACHE = 'ebay-ship-v3';
-const IMAGE_CACHE = 'ebay-ship-images-v1';
+const STATIC_CACHE = 'ebay-ship-v3-2'; // バージョン更新で旧キャッシュ強制破棄
+const IMAGE_CACHE = 'ebay-ship-images-v2'; // 画像キャッシュも刷新
 const IMAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30日
  
 const STATIC_FILES = [
@@ -82,3 +82,4 @@ async function handleImageRequest(request) {
     throw err;
   }
 }
+ 
