@@ -41,12 +41,20 @@
         <button class="icon" id="btn-settings" title="設定">⚙</button>
       </div>
     </header>
+    <div class="today-bar hidden" id="today-bar">
+      <span class="today-bar-label">📋 本日の作業：<b id="today-count">0件</b></span>
+      <button class="today-bar-btn" id="btn-batch-scan">📷 連続スキャン</button>
+      <button class="today-bar-btn secondary" id="btn-today-clear" title="本日グループをクリア">クリア</button>
+    </div>
     <div class="filter-bar">
       <select id="filter-account">
         <option value="">すべてのアカウント</option>
         <option value="good_market39">good_market39</option>
         <option value="gifts_fromnippon">gifts_fromnippon</option>
       </select>
+      <label class="filter-toggle">
+        <input type="checkbox" id="filter-hide-done" checked> 入力済を隠す
+      </label>
       <button class="secondary" id="btn-new">+ 手動入力</button>
     </div>
     <div id="order-list" class="content"></div>
@@ -56,6 +64,7 @@
   <!-- 入力画面 -->
   <section id="screen-input" class="screen hidden">
     <header class="head">
+      <button class="icon" id="btn-home-input" title="ホームへ戻る">🏠</button>
       <button class="icon" id="btn-back-list">←</button>
       <h1 id="input-title">発送情報入力</h1>
     </header>
@@ -109,6 +118,7 @@
   <!-- 結果画面 -->
   <section id="screen-result" class="screen hidden">
     <header class="head">
+      <button class="icon" id="btn-home-result" title="ホームへ戻る">🏠</button>
       <button class="icon" id="btn-back-input">←</button>
       <h1>提案結果</h1>
     </header>
