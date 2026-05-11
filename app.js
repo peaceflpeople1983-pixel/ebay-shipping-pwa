@@ -1,15 +1,10 @@
 /**
- * メインのUIロジック (v3)
+ * メインのUIロジック (v3.1)
  *
- * v3 で追加された主な機能:
- *  - 第4キャリア FedEx (eBay SpeedPAK Ship via FedEx)
- *  - 各ページに「🏠 ホーム」ボタン（Sheets書込みは裏で継続）
- *  - 本日の作業グループ（持ち越し可能、複数日も統合管理可）
- *  - 連続スキャン（撮影→開く→ホームへ→次撮影 のループ）
- *  - 商品サムネイル + Service Worker による画像キャッシュ（30日）
- *  - 直近15日の注文のみ取得
- *  - 入力済(確定済)を初期非表示
- *  - 選択カードのみハイライト（オレンジ枠は外す）
+ * v3.1 修正:
+ *  - 寸法/重量バリデーションを改善：どの項目が未入力かを明示
+ *  - 全角数字・カンマ・空白を自動的に半角・除去して受け付ける
+ *  - コンソールに実値ログを出力（デバッグ用）
  */
 const App = {
   state: {
@@ -20,8 +15,8 @@ const App = {
     currentResult: null,
     selectedCarrierIndex: 0,
     recentCountries: [],
-    pendingWrites: 0,        // バックグラウンド書込みの未了件数
-    batchScanActive: false   // 連続スキャンモードか
+    pendingWrites: 0,
+    batchScanActive: false
   },
  
   async init() {
@@ -66,11 +61,9 @@ const App = {
     document.getElementById('filter-account').onchange = () => this.renderOrders();
     document.getElementById('filter-hide-done').onchange = () => this.renderOrders();
  
-    // 戻る系
     document.getElementById('btn-back-list').onclick = () => this.goHome();
     document.getElementById('btn-back-input').onclick = () => this.show('screen-input');
  
-    // ホームボタン（裏側のSheets書込みは継続）
     const homeInput = document.getElementById('btn-home-input');
     if (homeInput) homeInput.onclick = () => this.goHome();
     const homeResult = document.getElementById('btn-home-result');
@@ -91,7 +84,6 @@ const App = {
       OCR.open(orderId => this.handleScanFromList(orderId));
     };
  
-    // 連続スキャン（本日バー）
     const batchBtn = document.getElementById('btn-batch-scan');
     if (batchBtn) batchBtn.onclick = () => this.startBatchScan();
     const clearTodayBtn = document.getElementById('btn-today-clear');
@@ -107,13 +99,11 @@ const App = {
       this.state.batchScanActive = false;
       OCR.keepOpen = false;
       OCR.close();
-      // 連続スキャン後、本日グループが増えていれば一覧を更新
       this.renderOrders();
     };
     document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
   },
  
-  /** ホームに戻る。バックグラウンドの書込みは中断しない */
   goHome() {
     this.show('screen-list');
     this.renderOrders();
@@ -125,9 +115,7 @@ const App = {
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
-      // 本日の作業グループに自動追加
       TodayGroup.add(orderId);
-      // 連続スキャン中なら即入力画面、それ以外も入力画面
       this.openInput(orderId);
       showToast('注文を開きました：' + orderId);
     } else {
@@ -135,7 +123,6 @@ const App = {
     }
   },
  
-  /** 連続スキャンモード開始（撮影 → 本日グループへ追加 → カメラ維持 → 次撮影） */
   startBatchScan() {
     this.state.batchScanActive = true;
     OCR.setKnownOrders(this.state.orders);
@@ -147,7 +134,6 @@ const App = {
       } else {
         showToast('未マッチID：' + orderId);
       }
-      // 一覧を裏で更新（カメラは開いたまま）
       this.renderOrders();
     }, { keepOpen: true });
   },
@@ -164,10 +150,8 @@ const App = {
         this.state.masterData = await API.getMasterData(true);
       }
       Calculator.setMaster(this.state.masterData);
-      // 直近15日 + 各アカウント分を一括取得
       const data = await API.getOrders(undefined, undefined, API.DEFAULT_DAYS_BACK);
       this.state.orders = data.orders || [];
-      // 本日グループから消えるべきもの（発送済になったもの）を反映
       this.pruneTodayGroup();
       this.populateCountrySelect();
       this.renderOrders();
@@ -178,7 +162,6 @@ const App = {
     }
   },
  
-  /** 発送確定済みの注文を本日グループから除外する */
   pruneTodayGroup() {
     const g = TodayGroup.load();
     if (!g.ids.length) return;
@@ -242,10 +225,9 @@ const App = {
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
  
-    // 本日バーの表示制御
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
-    if (todayCount > 0 || todayBar.classList.contains('forced-show')) {
+    if (todayCount > 0) {
       todayBar.classList.remove('hidden');
       document.getElementById('today-count').textContent = todayCount + '件';
     } else {
@@ -257,21 +239,18 @@ const App = {
       return;
     }
  
-    // 本日グループの注文を先頭に
     const todaySet = new Set(TodayGroup.load().ids);
     const sortedOrders = orders.slice().sort((a, b) => {
       const ta = todaySet.has(a.orderId) ? 0 : 1;
       const tb = todaySet.has(b.orderId) ? 0 : 1;
-      if (ta !== tb) return ta - tb;
-      // 同区分内では新しい順（配列末尾 = 新しい想定で逆順）
-      return 0;
+      return ta - tb;
     });
  
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
       const thumbHtml = o.imageUrl
-        ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>📦</div>'">`
-        : `<div class="order-thumb-placeholder">📦</div>`;
+        ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`
+        : `<div class="order-thumb-placeholder">&#128230;</div>`;
       return `
       <div class="order-item${inToday ? ' in-today' : ''}" data-id="${escapeAttr(o.orderId)}">
         ${thumbHtml}
@@ -319,21 +298,51 @@ const App = {
     this.show('screen-input');
   },
  
+  /** 数値フィールドを堅牢に読み取る（全角→半角、カンマ・空白除去） */
+  _readNum(id) {
+    let raw = String(document.getElementById(id).value || '').trim();
+    // 全角数字＆全角ピリオドを半角に
+    raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    // カンマ・空白除去
+    raw = raw.replace(/[,\s]/g, '');
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  },
+ 
   calculate() {
     const order = this.state.currentOrder;
+    const country = document.getElementById('input-country').value;
+    const weightG = this._readNum('input-weight');
+    const lengthCm = this._readNum('input-length');
+    const widthCm = this._readNum('input-width');
+    const heightCm = this._readNum('input-height');
+ 
+    if (!country) return showToast('発送先国を選択してください');
+ 
+    // どのフィールドが未入力/不正かを具体的に表示
+    const missing = [];
+    if (!weightG || weightG <= 0) missing.push('重量');
+    if (!lengthCm || lengthCm <= 0) missing.push('長');
+    if (!widthCm || widthCm <= 0) missing.push('幅');
+    if (!heightCm || heightCm <= 0) missing.push('高');
+    if (missing.length) {
+      console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm,
+        rawWeight: document.getElementById('input-weight').value,
+        rawLength: document.getElementById('input-length').value,
+        rawWidth: document.getElementById('input-width').value,
+        rawHeight: document.getElementById('input-height').value });
+      return showToast(missing.join('・') + ' が未入力または0です');
+    }
+ 
     const input = {
-      country: document.getElementById('input-country').value,
-      weightG: parseInt(document.getElementById('input-weight').value, 10),
-      lengthCm: parseFloat(document.getElementById('input-length').value),
-      widthCm: parseFloat(document.getElementById('input-width').value),
-      heightCm: parseFloat(document.getElementById('input-height').value),
+      country: country,
+      weightG: Math.round(weightG),
+      lengthCm: lengthCm,
+      widthCm: widthCm,
+      heightCm: heightCm,
       itemPriceUSD: order ? order.itemPrice : 0,
       tariffRate: order ? order.tariffRate : 0
     };
-    if (!input.country) return showToast('発送先国を選択してください');
-    if (!input.weightG || !input.lengthCm || !input.widthCm || !input.heightCm) {
-      return showToast('重量・寸法を入力してください');
-    }
     this.state.currentInput = input;
     const result = Calculator.calculate(input);
     this.state.currentResult = result;
@@ -409,7 +418,6 @@ const App = {
         this.state.selectedCarrierIndex = parseInt(el.dataset.idx, 10);
       };
     });
-    // 初期は最安(=index 0)を選択ハイライト
     const first = list.querySelector('.result-card');
     if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
@@ -447,10 +455,6 @@ const App = {
     return carrier;
   },
  
-  /**
-   * 発送確定。Sheets書込みはバックグラウンドで実行し、画面はすぐホームへ。
-   * 書込み完了/失敗は toast で通知。
-   */
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -468,9 +472,7 @@ const App = {
       cost: c.totalCost,
       alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
     };
-    // 楽観的UI: 即座に本日グループから除外しホームへ
     TodayGroup.remove(orderId);
-    // ローカル状態を即時更新（再ロード前でも一覧に反映）
     const localOrder = this.state.orders.find(o => o.orderId === orderId);
     if (localOrder) {
       localOrder.selectedCarrier = c.carrier;
@@ -480,14 +482,13 @@ const App = {
     this.state.pendingWrites++;
     this.goHome();
  
-    // バックグラウンドでPOST
     API.writeShipment(data)
       .then(res => {
         this.state.pendingWrites--;
         if (res && res.error) {
           showToast('書込み失敗: ' + res.error);
         } else {
-          showToast('Sheetsに書込みました：' + orderId);
+          showToast('書込み完了：' + orderId);
         }
       })
       .catch(err => {
