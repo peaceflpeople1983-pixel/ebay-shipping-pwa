@@ -1,5 +1,15 @@
 /**
- * メインのUIロジック
+ * メインのUIロジック (v3)
+ *
+ * v3 で追加された主な機能:
+ *  - 第4キャリア FedEx (eBay SpeedPAK Ship via FedEx)
+ *  - 各ページに「🏠 ホーム」ボタン（Sheets書込みは裏で継続）
+ *  - 本日の作業グループ（持ち越し可能、複数日も統合管理可）
+ *  - 連続スキャン（撮影→開く→ホームへ→次撮影 のループ）
+ *  - 商品サムネイル + Service Worker による画像キャッシュ（30日）
+ *  - 直近15日の注文のみ取得
+ *  - 入力済(確定済)を初期非表示
+ *  - 選択カードのみハイライト（オレンジ枠は外す）
  */
 const App = {
   state: {
@@ -9,7 +19,9 @@ const App = {
     currentInput: null,
     currentResult: null,
     selectedCarrierIndex: 0,
-    recentCountries: []
+    recentCountries: [],
+    pendingWrites: 0,        // バックグラウンド書込みの未了件数
+    batchScanActive: false   // 連続スキャンモードか
   },
  
   async init() {
@@ -52,10 +64,21 @@ const App = {
     document.getElementById('btn-settings').onclick = () => this.show('screen-setup');
     document.getElementById('btn-new').onclick = () => this.openInput(null);
     document.getElementById('filter-account').onchange = () => this.renderOrders();
-    document.getElementById('btn-back-list').onclick = () => this.show('screen-list');
+    document.getElementById('filter-hide-done').onchange = () => this.renderOrders();
+ 
+    // 戻る系
+    document.getElementById('btn-back-list').onclick = () => this.goHome();
     document.getElementById('btn-back-input').onclick = () => this.show('screen-input');
+ 
+    // ホームボタン（裏側のSheets書込みは継続）
+    const homeInput = document.getElementById('btn-home-input');
+    if (homeInput) homeInput.onclick = () => this.goHome();
+    const homeResult = document.getElementById('btn-home-result');
+    if (homeResult) homeResult.onclick = () => this.goHome();
+ 
     document.getElementById('btn-calculate').onclick = () => this.calculate();
     document.getElementById('btn-confirm').onclick = () => this.confirmShipment();
+ 
     document.getElementById('btn-ocr').onclick = () => {
       OCR.setKnownOrders(this.state.orders);
       OCR.open(orderId => {
@@ -63,21 +86,70 @@ const App = {
       });
     };
     document.getElementById('btn-scan-list').onclick = () => {
+      this.state.batchScanActive = false;
       OCR.setKnownOrders(this.state.orders);
       OCR.open(orderId => this.handleScanFromList(orderId));
     };
-    document.getElementById('btn-ocr-cancel').onclick = () => OCR.close();
+ 
+    // 連続スキャン（本日バー）
+    const batchBtn = document.getElementById('btn-batch-scan');
+    if (batchBtn) batchBtn.onclick = () => this.startBatchScan();
+    const clearTodayBtn = document.getElementById('btn-today-clear');
+    if (clearTodayBtn) clearTodayBtn.onclick = () => {
+      if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
+        TodayGroup.clear();
+        this.renderOrders();
+        showToast('本日グループをクリアしました');
+      }
+    };
+ 
+    document.getElementById('btn-ocr-cancel').onclick = () => {
+      this.state.batchScanActive = false;
+      OCR.keepOpen = false;
+      OCR.close();
+      // 連続スキャン後、本日グループが増えていれば一覧を更新
+      this.renderOrders();
+    };
     document.getElementById('btn-ocr-capture').onclick = () => OCR.capture();
+  },
+ 
+  /** ホームに戻る。バックグラウンドの書込みは中断しない */
+  goHome() {
+    this.show('screen-list');
+    this.renderOrders();
+    if (this.state.pendingWrites > 0) {
+      showToast('Sheetsへ書込み中... (' + this.state.pendingWrites + '件)');
+    }
   },
  
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
+      // 本日の作業グループに自動追加
+      TodayGroup.add(orderId);
+      // 連続スキャン中なら即入力画面、それ以外も入力画面
       this.openInput(orderId);
       showToast('注文を開きました：' + orderId);
     } else {
       showToast('注文ID ' + orderId + ' が見つかりません');
     }
+  },
+ 
+  /** 連続スキャンモード開始（撮影 → 本日グループへ追加 → カメラ維持 → 次撮影） */
+  startBatchScan() {
+    this.state.batchScanActive = true;
+    OCR.setKnownOrders(this.state.orders);
+    showToast('連続スキャン開始：撮影 → 自動で次へ。完了したら「キャンセル」で終了');
+    OCR.open(orderId => {
+      const found = this.state.orders.find(o => o.orderId === orderId);
+      if (found) {
+        TodayGroup.add(orderId);
+      } else {
+        showToast('未マッチID：' + orderId);
+      }
+      // 一覧を裏で更新（カメラは開いたまま）
+      this.renderOrders();
+    }, { keepOpen: true });
   },
  
   async loadAll() {
@@ -86,15 +158,17 @@ const App = {
     try {
       this.recentCountries = JSON.parse(localStorage.getItem('recent_countries') || '[]');
       this.state.masterData = await API.getMasterData();
-      // 防御：countriesが空ならキャッシュ破棄して強制再取得
       if (!this.state.masterData || !Array.isArray(this.state.masterData.countries) || this.state.masterData.countries.length < 10) {
         showToast('マスタデータ不完全。再取得します...');
         API.clearMasterCache();
         this.state.masterData = await API.getMasterData(true);
       }
       Calculator.setMaster(this.state.masterData);
-      const data = await API.getOrders();
+      // 直近15日 + 各アカウント分を一括取得
+      const data = await API.getOrders(undefined, undefined, API.DEFAULT_DAYS_BACK);
       this.state.orders = data.orders || [];
+      // 本日グループから消えるべきもの（発送済になったもの）を反映
+      this.pruneTodayGroup();
       this.populateCountrySelect();
       this.renderOrders();
     } catch (err) {
@@ -102,6 +176,18 @@ const App = {
     } finally {
       this.setLoader(false);
     }
+  },
+ 
+  /** 発送確定済みの注文を本日グループから除外する */
+  pruneTodayGroup() {
+    const g = TodayGroup.load();
+    if (!g.ids.length) return;
+    const done = new Set(this.state.orders.filter(o => o.selectedCarrier).map(o => o.orderId));
+    let removed = 0;
+    g.ids.forEach(id => {
+      if (done.has(id)) { TodayGroup.remove(id); removed++; }
+    });
+    if (removed > 0) showToast(removed + '件の発送完了を本日グループから除外しました');
   },
  
   setLoader(show) {
@@ -148,27 +234,65 @@ const App = {
   },
  
   renderOrders() {
-    const filter = document.getElementById('filter-account').value;
+    const filterAcc = document.getElementById('filter-account').value;
+    const hideDone = document.getElementById('filter-hide-done').checked;
     const list = document.getElementById('order-list');
+ 
     let orders = this.state.orders;
-    if (filter) orders = orders.filter(o => o.account === filter);
+    if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
+    if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
+ 
+    // 本日バーの表示制御
+    const todayBar = document.getElementById('today-bar');
+    const todayCount = TodayGroup.count();
+    if (todayCount > 0 || todayBar.classList.contains('forced-show')) {
+      todayBar.classList.remove('hidden');
+      document.getElementById('today-count').textContent = todayCount + '件';
+    } else {
+      todayBar.classList.add('hidden');
+    }
+ 
     if (orders.length === 0) {
-      list.innerHTML = '<div class="empty">注文が登録されていません<br>右上の⟳で同期するか、+で手動入力してください</div>';
+      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す）</span></div>';
       return;
     }
-    list.innerHTML = orders.slice().reverse().map(o => `
-      <div class="order-item" data-id="${escapeHtml(o.orderId)}">
-        <div class="order-head">
-          <span class="badge acc-${escapeHtml(o.account)}">${escapeHtml(o.account)}</span>
-          ${o.selectedCarrier ? '<span class="badge done">確定</span>' : ''}
+ 
+    // 本日グループの注文を先頭に
+    const todaySet = new Set(TodayGroup.load().ids);
+    const sortedOrders = orders.slice().sort((a, b) => {
+      const ta = todaySet.has(a.orderId) ? 0 : 1;
+      const tb = todaySet.has(b.orderId) ? 0 : 1;
+      if (ta !== tb) return ta - tb;
+      // 同区分内では新しい順（配列末尾 = 新しい想定で逆順）
+      return 0;
+    });
+ 
+    list.innerHTML = sortedOrders.slice().reverse().map(o => {
+      const inToday = todaySet.has(o.orderId);
+      const thumbHtml = o.imageUrl
+        ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>📦</div>'">`
+        : `<div class="order-thumb-placeholder">📦</div>`;
+      return `
+      <div class="order-item${inToday ? ' in-today' : ''}" data-id="${escapeAttr(o.orderId)}">
+        ${thumbHtml}
+        <div class="order-body">
+          <div class="order-head">
+            <span class="badge acc-${escapeAttr(o.account)}">${escapeHtml(o.account)}</span>
+            ${inToday ? '<span class="today-tag">本日</span>' : ''}
+            ${o.selectedCarrier ? '<span class="badge done">確定</span>' : ''}
+          </div>
+          <div class="order-id">${escapeHtml(o.orderId)}</div>
+          <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
+          ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
         </div>
-        <div class="order-id">${escapeHtml(o.orderId)}</div>
-        <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
-        ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+ 
     list.querySelectorAll('.order-item').forEach(el => {
-      el.onclick = () => this.openInput(el.dataset.id);
+      el.onclick = () => {
+        TodayGroup.add(el.dataset.id);
+        this.openInput(el.dataset.id);
+      };
     });
   },
  
@@ -183,7 +307,6 @@ const App = {
     document.getElementById('input-width').value = order && order.widthCm ? order.widthCm : '';
     document.getElementById('input-height').value = order && order.heightCm ? order.heightCm : '';
     document.getElementById('input-title').textContent = order ? '発送情報入力' : '手動入力';
-    // 米国向けの場合、通関情報カードを表示
     const tariffCard = document.getElementById('input-tariff-card');
     if (order && order.country === 'US' && (order.customsName || order.hsCode)) {
       tariffCard.classList.remove('hidden');
@@ -204,7 +327,6 @@ const App = {
       lengthCm: parseFloat(document.getElementById('input-length').value),
       widthCm: parseFloat(document.getElementById('input-width').value),
       heightCm: parseFloat(document.getElementById('input-height').value),
-      // 関税計算用（注文情報があれば付与）
       itemPriceUSD: order ? order.itemPrice : 0,
       tariffRate: order ? order.tariffRate : 0
     };
@@ -215,6 +337,7 @@ const App = {
     this.state.currentInput = input;
     const result = Calculator.calculate(input);
     this.state.currentResult = result;
+    this.state.selectedCarrierIndex = 0;
     this.recordRecentCountry(input.country);
     this.renderResult(result);
     this.show('screen-result');
@@ -237,6 +360,7 @@ const App = {
         <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
         <div class="legend-item"><span class="carrier-circle c-eco"></span>SpeedPAK Eco</div>
         <div class="legend-item"><span class="carrier-circle c-dhl"></span>Ship via DHL</div>
+        <div class="legend-item"><span class="carrier-circle c-fedex"></span>Ship via FedEx</div>
       </div>
     `;
     list.innerHTML = legendHtml + result.candidates.map((c, i) => {
@@ -244,16 +368,13 @@ const App = {
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
  
-      // 内訳行（買い手負担あり/セラー負担で表示分岐）
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
-        // ePacket：送料のみ + 買い手負担バッジ
         breakdownHtml = `
           <span>送料のみ</span>
           <span class="buyer-badge">関税¥${c.tariffBuyer.toLocaleString()} 買い手負担</span>
         `;
       } else {
-        // Eco/DHL：送料 + 関税 + 通関費を3カラムで表示
         const parts = [`送料 ¥${c.basicCost.toLocaleString()}`];
         if (c.tariffSeller > 0) parts.push(`+ 関税 ¥${c.tariffSeller.toLocaleString()}`);
         if (c.usFees > 0) parts.push(`+ 通関費 ¥${c.usFees.toLocaleString()}`);
@@ -262,7 +383,7 @@ const App = {
       }
  
       return `
-        <div class="result-card${i === 0 ? ' recommend' : ''}" data-idx="${i}">
+        <div class="result-card" data-idx="${i}">
           <div class="card-header">
             <span class="carrier-circle ${colorClass}"></span>
             <span class="carrier-name">${escapeHtml(carrierShort)}</span>
@@ -288,10 +409,11 @@ const App = {
         this.state.selectedCarrierIndex = parseInt(el.dataset.idx, 10);
       };
     });
-    list.querySelector('.result-card').classList.add('selected');
+    // 初期は最安(=index 0)を選択ハイライト
+    const first = list.querySelector('.result-card');
+    if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
  
-    // 米国向けの場合、関税情報サマリーを表示
     if (result.context.tariffJPY > 0) {
       const order = this.state.currentOrder;
       const hsCode = order ? order.hsCode : '';
@@ -312,25 +434,29 @@ const App = {
   getCarrierColorClass(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
+    if (carrier.indexOf('Ship via FedEx') !== -1) return 'c-fedex';
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
   },
  
-  // 候補カードの carrier 名を画面で見やすく短縮
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
+    if (carrier.indexOf('Ship via FedEx') !== -1) return 'Ship via FedEx';
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
     return carrier;
   },
  
-  async confirmShipment() {
+  /**
+   * 発送確定。Sheets書込みはバックグラウンドで実行し、画面はすぐホームへ。
+   * 書込み完了/失敗は toast で通知。
+   */
+  confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
     const orderId = document.getElementById('input-order-id').value.trim();
     if (!orderId) return showToast('注文IDを入力してください');
     const i = this.state.currentInput;
-    // Sheets記録時は重量をkgに変換（小数2桁）
     const weightKg = Math.round((i.weightG / 1000) * 100) / 100;
     const data = {
       orderId,
@@ -342,17 +468,32 @@ const App = {
       cost: c.totalCost,
       alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
     };
-    document.getElementById('btn-confirm').disabled = true;
-    try {
-      const res = await API.writeShipment(data);
-      if (res.error) throw new Error(res.error);
-      showToast('Sheetsに書込みました');
-      await this.loadAll();
-    } catch (err) {
-      showToast('書込み失敗: ' + err.message);
-    } finally {
-      document.getElementById('btn-confirm').disabled = false;
+    // 楽観的UI: 即座に本日グループから除外しホームへ
+    TodayGroup.remove(orderId);
+    // ローカル状態を即時更新（再ロード前でも一覧に反映）
+    const localOrder = this.state.orders.find(o => o.orderId === orderId);
+    if (localOrder) {
+      localOrder.selectedCarrier = c.carrier;
+      localOrder.shippingCost = c.totalCost;
     }
+    showToast('Sheetsへ書込み中... ホームへ戻ります');
+    this.state.pendingWrites++;
+    this.goHome();
+ 
+    // バックグラウンドでPOST
+    API.writeShipment(data)
+      .then(res => {
+        this.state.pendingWrites--;
+        if (res && res.error) {
+          showToast('書込み失敗: ' + res.error);
+        } else {
+          showToast('Sheetsに書込みました：' + orderId);
+        }
+      })
+      .catch(err => {
+        this.state.pendingWrites--;
+        showToast('書込み失敗: ' + err.message);
+      });
   },
  
   async sync() {
@@ -377,6 +518,11 @@ function showToast(message) {
 }
  
 function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+ 
+function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
