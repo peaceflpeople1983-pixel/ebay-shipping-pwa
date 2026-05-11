@@ -12,13 +12,19 @@ const OCR = {
   callback: null,
   knownOrderIds: [],
   busy: false,
+  keepOpen: false,    // 連続スキャンモード：trueなら結果通知後もカメラを開いたままにする
  
   setKnownOrders(orders) {
     this.knownOrderIds = (orders || []).map(o => o.orderId).filter(Boolean);
   },
  
-  async open(callback) {
+  /**
+   * @param {Function} callback (orderId) => void
+   * @param {Object} options { keepOpen: boolean } 連続スキャン用
+   */
+  async open(callback, options) {
     this.callback = callback || null;
+    this.keepOpen = !!(options && options.keepOpen);
     document.getElementById('ocr-overlay').classList.remove('hidden');
     this._setStatus('カメラ準備中...');
  
@@ -186,9 +192,16 @@ const OCR = {
   },
  
   _onResult(orderId, source) {
-    this.close();
     showToast('読み取り成功（' + source + '）: ' + orderId);
     if (this.callback) this.callback(orderId);
+    if (this.keepOpen) {
+      // 連続モード：カメラは維持。ステータスだけ更新して次の撮影を待つ
+      this._setStatus('読取済: ' + orderId + ' / 次の注文IDをガイド枠に');
+      // バーコード検出も再開
+      this._tryBarcode();
+    } else {
+      this.close();
+    }
   },
  
   close() {
