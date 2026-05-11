@@ -3,7 +3,7 @@
  * v3.3: eBay画像インターセプトを撤廃（iOS Safari互換性のため）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる
  */
-const STATIC_CACHE = 'ebay-ship-v3-3';
+const STATIC_CACHE = 'ebay-ship-v3-4'; // 入力画面にサムネ追加
  
 const STATIC_FILES = [
   './',
@@ -47,3 +47,4 @@ self.addEventListener('fetch', e => {
   // 静的ファイルはキャッシュ優先
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
+ 
