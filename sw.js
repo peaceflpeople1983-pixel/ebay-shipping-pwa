@@ -1,9 +1,9 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3.3: eBay画像インターセプトを撤廃（iOS Safari互換性のため）
- * 商品画像はブラウザ標準のHTTPキャッシュに任せる
+ * v3-5: 自動フォーカス・自動画像取得対応
+ * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const STATIC_CACHE = 'ebay-ship-v3-4'; // 入力画面にサムネ追加
+const STATIC_CACHE = 'ebay-ship-v3-5';
  
 const STATIC_FILES = [
   './',
@@ -22,7 +22,6 @@ self.addEventListener('install', e => {
 });
  
 self.addEventListener('activate', e => {
-  // 古いキャッシュを全削除（画像キャッシュ含む）
   e.waitUntil(caches.keys().then(keys =>
     Promise.all(keys.filter(k => k !== STATIC_CACHE).map(k => caches.delete(k)))
   ));
@@ -32,10 +31,9 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
  
-  // eBay画像CDN: SWで一切触らない → ブラウザ標準処理
-  // i.ebayimg.com / thumbs.ebaystatic.com / pics.ebaystatic.com
+  // eBay画像CDN: SWで一切触らない（ブラウザ標準処理）
   if (url.hostname.indexOf('ebay') !== -1 || url.hostname.indexOf('ebaystatic') !== -1) {
-    return; // ブラウザネイティブ処理に委ねる
+    return;
   }
  
   // Apps Script API・CDNはネットワーク優先
