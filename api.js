@@ -4,6 +4,7 @@
 const API = {
   config: { url: '', secret: '' },
   MASTER_CACHE_TTL: 24 * 60 * 60 * 1000, // 24時間
+  DEFAULT_DAYS_BACK: 15,                  // 直近15日分のみ表示
  
   loadConfig() {
     const saved = localStorage.getItem('app_config');
@@ -19,15 +20,12 @@ const API = {
   async getMasterData(forceRefresh) {
     if (!forceRefresh) {
       const cached = this._loadCache('master_data', this.MASTER_CACHE_TTL);
-      // キャッシュが有効性を満たすか確認（countries が10件以上あること）
       if (cached && Array.isArray(cached.countries) && cached.countries.length >= 10) {
         return cached;
       }
-      // 不完全なキャッシュは破棄
       this.clearMasterCache();
     }
     const data = await this._get('?action=getMasterData');
-    // 取得結果が正常な場合のみキャッシュ保存
     if (data && Array.isArray(data.countries) && data.countries.length >= 10) {
       this._saveCache('master_data', data);
     }
@@ -57,10 +55,12 @@ const API = {
     localStorage.removeItem('cache_master_data');
   },
  
-  async getOrders(account, limit) {
+  async getOrders(account, limit, daysBack) {
     let q = '?action=getOrders';
     if (account) q += '&account=' + encodeURIComponent(account);
     if (limit) q += '&limit=' + limit;
+    const days = (daysBack == null) ? this.DEFAULT_DAYS_BACK : daysBack;
+    if (days) q += '&daysBack=' + days;
     return this._get(q);
   },
  
@@ -68,6 +68,11 @@ const API = {
     return this._get('?action=syncOrders');
   },
  
+  /**
+   * Sheets書込み（バックグラウンド）。
+   * 戻り値の Promise を await しなくても処理は継続する。
+   * UI を返してから resolve されるまで保持する場合は呼び出し側で .then() を使う。
+   */
   async writeShipment(data) {
     return this._post({ action: 'writeShipment', secret: this.config.secret, data });
   },
@@ -90,5 +95,55 @@ const API = {
     });
     if (!res.ok) throw new Error('API error: ' + res.status);
     return res.json();
+  }
+};
+ 
+/**
+ * 本日の作業グループ：localStorageに永続化
+ *  形式: { ids: ['14-...','14-...'], createdAt: timestamp }
+ *  全件発送済みになるか、ユーザーがクリアするまで保持。
+ */
+const TodayGroup = {
+  KEY: 'today_group',
+ 
+  load() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (!raw) return { ids: [], createdAt: 0 };
+      const obj = JSON.parse(raw);
+      return { ids: obj.ids || [], createdAt: obj.createdAt || 0 };
+    } catch (e) { return { ids: [], createdAt: 0 }; }
+  },
+ 
+  save(group) {
+    localStorage.setItem(this.KEY, JSON.stringify(group));
+  },
+ 
+  add(orderId) {
+    const g = this.load();
+    if (!g.ids.includes(orderId)) {
+      g.ids.push(orderId);
+      if (!g.createdAt) g.createdAt = Date.now();
+      this.save(g);
+    }
+  },
+ 
+  remove(orderId) {
+    const g = this.load();
+    g.ids = g.ids.filter(id => id !== orderId);
+    if (g.ids.length === 0) g.createdAt = 0;
+    this.save(g);
+  },
+ 
+  clear() {
+    localStorage.removeItem(this.KEY);
+  },
+ 
+  has(orderId) {
+    return this.load().ids.includes(orderId);
+  },
+ 
+  count() {
+    return this.load().ids.length;
   }
 };
