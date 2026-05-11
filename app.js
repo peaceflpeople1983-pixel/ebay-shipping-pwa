@@ -279,6 +279,17 @@ const App = {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
+ 
+    // サムネ画像＋商品名
+    const thumbWrap = document.getElementById('input-thumb-wrap');
+    const titleEl = document.getElementById('input-item-title');
+    if (order && order.imageUrl) {
+      thumbWrap.innerHTML = `<img src="${escapeAttr(order.imageUrl)}" alt="" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`;
+    } else {
+      thumbWrap.innerHTML = '<div class="order-thumb-placeholder">&#128230;</div>';
+    }
+    titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
+ 
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
     document.getElementById('input-weight').value = order && order.weightG ? order.weightG : '';
@@ -533,3 +544,4 @@ if ('serviceWorker' in navigator) {
 }
  
 document.addEventListener('DOMContentLoaded', () => App.init());
+ 
