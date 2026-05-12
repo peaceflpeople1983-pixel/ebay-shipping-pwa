@@ -1,9 +1,9 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-7: フローティング数値キーボードツールバー対応
+ * v3-8: ツールバー位置を VisualViewport 連動でキーボード上に固定
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const STATIC_CACHE = 'ebay-ship-v3-7';
+const STATIC_CACHE = 'ebay-ship-v3-8';
 
 const STATIC_FILES = [
   './',

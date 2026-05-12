@@ -163,6 +163,33 @@ const App = {
     if (!toolbar || !prevBtn || !nextBtn || !doneBtn) return;
     const chain = this.NUMERIC_CHAIN;
 
+    // ===== ツールバーをキーボードの真上に固定するための VisualViewport 連動 =====
+    // iOS Safari は position:fixed bottom:0 がキーボード裏に隠れるため、
+    // 見えている領域（visualViewport）の下端に合わせて動的に top を設定する
+    const syncPosition = () => {
+      const vv = window.visualViewport;
+      if (!vv) {
+        // 古いブラウザ向けフォールバック（CSS の bottom:0 任せ）
+        toolbar.style.top = '';
+        toolbar.style.bottom = '0';
+        toolbar.style.width = '';
+        toolbar.style.left = '';
+        return;
+      }
+      const tbHeight = toolbar.offsetHeight || 60;
+      toolbar.style.top = (vv.offsetTop + vv.height - tbHeight) + 'px';
+      toolbar.style.bottom = 'auto';
+      toolbar.style.left = vv.offsetLeft + 'px';
+      toolbar.style.width = vv.width + 'px';
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncPosition);
+      window.visualViewport.addEventListener('scroll', syncPosition);
+    }
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('orientationchange', () => setTimeout(syncPosition, 100));
+
     const updateToolbar = () => {
       const active = document.activeElement;
       const idx = active ? chain.indexOf(active.id) : -1;
@@ -178,6 +205,11 @@ const App = {
       } else {
         nextBtn.textContent = '次へ ▶';
       }
+      // 表示直後に位置を強制再計算（キーボード展開アニメーション中も追従）
+      requestAnimationFrame(syncPosition);
+      setTimeout(syncPosition, 100);
+      setTimeout(syncPosition, 300);
+      setTimeout(syncPosition, 600);
     };
 
     const focusByIndex = (idx) => {
