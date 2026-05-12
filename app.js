@@ -1,8 +1,13 @@
 /**
- * メインのUIロジック (v3.5)
+ * メインのUIロジック (v3.7)
  *
- * v3.5 追加機能:
- *  - 数値入力フィールドの自動フォーカス移動（重量→長→幅→高→計算）
+ * v3.7 追加機能:
+ *  - 数値入力用フローティングツールバー（◀前へ／次へ▶／完了）
+ *    iPhone数値キーパッドの「次へ」キー欠如を補い、キーボード上にカスタムバー表示
+ *  - 入力画面を開いた時、重量フィールドへ自動フォーカス
+ *  - 最終フィールド(高)で「次へ▶」が「完了▶」に切り替わる
+ *
+ * v3.5 機能（継続）:
  *  - フォーカス時の既存値自動全選択
  *  - 入力画面のアカウントカードに商品サムネ表示
  *  - 同期時の新規注文に Browse API で画像URL自動付与（バックエンド側）
@@ -132,42 +137,115 @@ const App = {
       });
       this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
 
-      // 数値入力の自動フォーカス移動（重量→長→幅→高→計算）
-      this.bindAutoFocusChain();
+      // 数値入力用フローティングツールバー（重量→長→幅→高、最終フィールドで完了）
+      this.bindNumericToolbar();
     } catch (err) {
       console.error('bindAll error:', err);
       showToast('初期化エラー: ' + err.message);
     }
   },
 
+  NUMERIC_CHAIN: ['input-weight', 'input-length', 'input-width', 'input-height'],
+
   /**
-   * 数値フィールドのEnter/「次へ」キー押下で次のフィールドに自動フォーカス。
-   * 最終フィールド(高)で「最適な発送方法を提案」を実行。
-   * フォーカス時に既存値を全選択して書き換えがスムーズになる。
+   * 数値入力用フローティングツールバーをバインド。
+   * iPhone数値キーパッドには「次へ」キーが構造的に無いため、
+   * キーボードの上にカスタムバー[◀前へ][次へ▶][完了]を表示する。
+   * - 最終フィールド(高)では[次へ▶]が[完了▶]に変化し、計算を実行
+   * - PCではEnterキーでも同じ挙動
+   * - フォーカス時に既存値を全選択
    */
-  bindAutoFocusChain() {
-    const chain = ['input-weight', 'input-length', 'input-width', 'input-height'];
-    chain.forEach((id, idx) => {
+  bindNumericToolbar() {
+    const toolbar = document.getElementById('kb-toolbar');
+    const prevBtn = document.getElementById('kb-prev');
+    const nextBtn = document.getElementById('kb-next');
+    const doneBtn = document.getElementById('kb-done');
+    if (!toolbar || !prevBtn || !nextBtn || !doneBtn) return;
+    const chain = this.NUMERIC_CHAIN;
+
+    const updateToolbar = () => {
+      const active = document.activeElement;
+      const idx = active ? chain.indexOf(active.id) : -1;
+      if (idx === -1) {
+        toolbar.classList.add('hidden');
+        return;
+      }
+      toolbar.classList.remove('hidden');
+      prevBtn.disabled = (idx === 0);
+      // 最終フィールドでは「次へ」→「完了」に切り替え
+      if (idx === chain.length - 1) {
+        nextBtn.textContent = '完了 ▶';
+      } else {
+        nextBtn.textContent = '次へ ▶';
+      }
+    };
+
+    const focusByIndex = (idx) => {
+      if (idx < 0 || idx >= chain.length) return;
+      const el = document.getElementById(chain[idx]);
+      if (!el) return;
+      el.focus();
+      try { el.select(); } catch (_) {}
+    };
+
+    // 各数値フィールドのフォーカス/ブラー監視
+    chain.forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
+      el.addEventListener('focus', () => {
+        setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
+        updateToolbar();
+      });
+      el.addEventListener('blur', () => {
+        // ボタンタップの判定を待ってから非表示判断
+        setTimeout(updateToolbar, 200);
+      });
+      // PCでのEnterキーフォールバック
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (idx < chain.length - 1) {
-            const next = document.getElementById(chain[idx + 1]);
-            if (next) {
-              next.focus();
-              try { next.select(); } catch (_) {}
-            }
-          } else {
+          const idx = chain.indexOf(id);
+          if (idx === chain.length - 1) {
             el.blur();
             this.calculate();
+          } else {
+            focusByIndex(idx + 1);
           }
         }
       });
-      el.addEventListener('focus', () => {
-        setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
-      });
+    });
+
+    // ボタンタップ時にフォーカスを失わないよう mousedown/touchstart で preventDefault
+    const preventBlur = (btn) => {
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    };
+    preventBlur(prevBtn);
+    preventBlur(nextBtn);
+    preventBlur(doneBtn);
+
+    prevBtn.addEventListener('click', () => {
+      const active = document.activeElement;
+      const idx = active ? chain.indexOf(active.id) : -1;
+      if (idx > 0) focusByIndex(idx - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      const active = document.activeElement;
+      const idx = active ? chain.indexOf(active.id) : -1;
+      if (idx === -1) return;
+      if (idx === chain.length - 1) {
+        active.blur();
+        this.calculate();
+      } else {
+        focusByIndex(idx + 1);
+      }
+    });
+
+    doneBtn.addEventListener('click', () => {
+      const active = document.activeElement;
+      if (active && chain.indexOf(active.id) !== -1) active.blur();
+      this.calculate();
     });
   },
 
@@ -378,6 +456,14 @@ const App = {
       tariffCard.classList.add('hidden');
     }
     this.show('screen-input');
+    // 重量フィールドへ自動フォーカス（既存値があれば全選択でそのまま上書き可能）
+    const wf = document.getElementById('input-weight');
+    if (wf) {
+      try {
+        wf.focus();
+        wf.select();
+      } catch (_) {}
+    }
   },
 
   _readNum(id) {
