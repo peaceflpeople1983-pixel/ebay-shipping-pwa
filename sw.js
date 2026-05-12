@@ -1,9 +1,9 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-5: 自動フォーカス・自動画像取得対応
+ * v3-6: index.html script タグ修正・SWキャッシュ再構築
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const STATIC_CACHE = 'ebay-ship-v3-5';
+const STATIC_CACHE = 'ebay-ship-v3-6';
  
 const STATIC_FILES = [
   './',
