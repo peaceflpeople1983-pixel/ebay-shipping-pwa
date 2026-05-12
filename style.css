@@ -260,8 +260,36 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .badge.acc-good_market39 { background: #E1F5EE; color: #0F6E56; }
 .badge.acc-gifts_fromnippon { background: #FAECE7; color: #993C1D; }
 .badge.done { background: #EAF3DE; color: #3B6D11; }
+/* v3.13: 発送済（追跡番号取得済）バッジ */
+.badge.shipped { background: var(--accent); color: #fff; }
 .order-item .order-meta { font-size: 12px; color: var(--text-secondary); }
 .order-item .order-cost { font-size: 13px; color: var(--accent); margin-top: 4px; }
+
+/* v3.13: 発送済カードの強調と発送情報行 */
+#order-list .order-item.shipped {
+  background: #F4FAF7;
+  border-left: 4px solid var(--accent);
+}
+.order-item .order-shipping-info {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.order-item .order-shipping-info .ship-date {
+  color: var(--accent);
+  font-weight: 500;
+}
+.order-item .order-shipping-info .ship-tracking {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  word-break: break-all;
+  white-space: normal;
+}
 
 .input-with-action { display: flex; gap: 8px; }
 .input-with-action input { flex: 1; }

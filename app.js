@@ -98,6 +98,7 @@ const App = {
       this._bind('btn-new', 'onclick', () => this.openInput(null));
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
+      this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
 
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
@@ -415,11 +416,15 @@ const App = {
   renderOrders() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
+    // v3.13: 発送済（追跡番号あり）を隠すトグル。要素が無い古い HTML には防御的に対応
+    const hideShippedEl = document.getElementById('filter-hide-shipped');
+    const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
     const list = document.getElementById('order-list');
 
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
+    if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
 
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
@@ -431,7 +436,7 @@ const App = {
     }
 
     if (orders.length === 0) {
-      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す）</span></div>';
+      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す／発送済を隠す）</span></div>';
       return;
     }
 
@@ -448,18 +453,28 @@ const App = {
       const thumbHtml = hasUrl
         ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`
         : `<div class="order-thumb-placeholder">&#128230;</div>`;
+      // v3.13: 発送済情報の組み立て
+      const isShipped = !!o.trackingNumber;
+      const shippedBadge = isShipped ? '<span class="badge shipped">✓ 発送済</span>' : '';
+      const shippingInfoHtml = isShipped ? `
+          <div class="order-shipping-info">
+            <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
+            <div class="ship-tracking">${escapeHtml(o.trackingNumber)}</div>
+          </div>` : '';
       return `
-      <div class="order-item${inToday ? ' in-today' : ''}" data-id="${escapeAttr(o.orderId)}">
+      <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}" data-id="${escapeAttr(o.orderId)}">
         ${thumbHtml}
         <div class="order-body">
           <div class="order-head">
             <span class="badge acc-${escapeAttr(o.account)}">${escapeHtml(o.account)}</span>
             ${inToday ? '<span class="today-tag">本日</span>' : ''}
             ${o.selectedCarrier ? '<span class="badge done">確定</span>' : ''}
+            ${shippedBadge}
           </div>
           <div class="order-id">${escapeHtml(o.orderId)}</div>
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
+          ${shippingInfoHtml}
         </div>
       </div>`;
     }).join('');
@@ -720,6 +735,17 @@ const App = {
     if (types.indexOf('dhl') !== -1 && c.indexOf('Ship via DHL') !== -1) return true;
     if (types.indexOf('fedex') !== -1 && c.indexOf('Ship via FedEx') !== -1) return true;
     return false;
+  },
+
+  /**
+   * v3.13: 発送日 "YYYY-MM-DD" → "M/D" 形式に整形
+   * 不正な値や空はそのまま返す（カードで表示しないかは呼び出し元判断）
+   */
+  formatShippedAt(s) {
+    if (!s) return '';
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(s);
+    return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
   },
 
   shortenCarrier(carrier) {
