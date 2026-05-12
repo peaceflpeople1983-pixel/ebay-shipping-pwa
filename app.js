@@ -492,7 +492,14 @@ const App = {
 
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
-    document.getElementById('input-weight').value = order && order.weightG ? order.weightG : '';
+    // v3.12: order.weightG は実際は kg 単位（Apps Script の getOrders が I列=weightKg を weightG 名で返している）
+    // 入力欄は g 単位なので kg→g 変換。1未満なら kg と判断して1000倍、それ以上ならそのまま g として扱う
+    const wRaw = order && order.weightG;
+    let wG = '';
+    if (typeof wRaw === 'number' && wRaw > 0) {
+      wG = (wRaw < 10) ? Math.round(wRaw * 1000) : Math.round(wRaw);
+    }
+    document.getElementById('input-weight').value = wG;
     document.getElementById('input-length').value = order && order.lengthCm ? order.lengthCm : '';
     document.getElementById('input-width').value = order && order.widthCm ? order.widthCm : '';
     document.getElementById('input-height').value = order && order.heightCm ? order.heightCm : '';
@@ -528,12 +535,21 @@ const App = {
   calculate() {
     const order = this.state.currentOrder;
     const country = document.getElementById('input-country').value;
-    const weightG = this._readNum('input-weight');
+    let weightG = this._readNum('input-weight');
     const lengthCm = this._readNum('input-length');
     const widthCm = this._readNum('input-width');
     const heightCm = this._readNum('input-height');
 
     if (!country) return showToast('発送先国を選択してください');
+
+    // v3.12: 重量が極端に小さい（< 10g）場合は kg 入力と判断して救済
+    if (weightG !== null && weightG > 0 && weightG < 10) {
+      const corrected = Math.round(weightG * 1000);
+      if (confirm(`重量「${weightG}」は kg 単位の入力ですか？\nOK で ${corrected}g に補正して計算します。`)) {
+        weightG = corrected;
+        document.getElementById('input-weight').value = weightG;
+      }
+    }
 
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
