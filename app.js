@@ -19,7 +19,7 @@ const App = {
     pendingWrites: 0,
     batchScanActive: false
   },
- 
+
   async init() {
     // 設定画面のボタンは常にバインド（後で歯車アイコンから設定変更したい時のため）
     this.bindSetup();
@@ -30,12 +30,12 @@ const App = {
     this.bindAll();
     await this.loadAll();
   },
- 
+
   show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
   },
- 
+
   bindSetup() {
     const saveBtn = document.getElementById('btn-save-config');
     if (saveBtn) {
@@ -59,7 +59,7 @@ const App = {
         saveBtn.style.opacity = '1';
       }, { passive: true });
     }
- 
+
     const clearBtn = document.getElementById('btn-clear-cache');
     if (clearBtn) {
       clearBtn.textContent = '✓ マスタキャッシュをクリア';
@@ -79,13 +79,13 @@ const App = {
       }, { passive: true });
     }
   },
- 
+
   /** 要素が存在する場合のみハンドラを設定（防御） */
   _bind(id, eventName, handler) {
     const el = document.getElementById(id);
     if (el) el[eventName] = handler;
   },
- 
+
   bindAll() {
     try {
       this._bind('btn-sync', 'onclick', () => this.sync());
@@ -93,15 +93,15 @@ const App = {
       this._bind('btn-new', 'onclick', () => this.openInput(null));
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
- 
+
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
       this._bind('btn-home-input', 'onclick', () => this.goHome());
       this._bind('btn-home-result', 'onclick', () => this.goHome());
- 
+
       this._bind('btn-calculate', 'onclick', () => this.calculate());
       this._bind('btn-confirm', 'onclick', () => this.confirmShipment());
- 
+
       this._bind('btn-ocr', 'onclick', () => {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => {
@@ -114,7 +114,7 @@ const App = {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => this.handleScanFromList(orderId));
       });
- 
+
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
         if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
@@ -123,7 +123,7 @@ const App = {
           showToast('本日グループをクリアしました');
         }
       });
- 
+
       this._bind('btn-ocr-cancel', 'onclick', () => {
         this.state.batchScanActive = false;
         OCR.keepOpen = false;
@@ -131,7 +131,7 @@ const App = {
         this.renderOrders();
       });
       this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
- 
+
       // 数値入力の自動フォーカス移動（重量→長→幅→高→計算）
       this.bindAutoFocusChain();
     } catch (err) {
@@ -139,7 +139,7 @@ const App = {
       showToast('初期化エラー: ' + err.message);
     }
   },
- 
+
   /**
    * 数値フィールドのEnter/「次へ」キー押下で次のフィールドに自動フォーカス。
    * 最終フィールド(高)で「最適な発送方法を提案」を実行。
@@ -170,7 +170,7 @@ const App = {
       });
     });
   },
- 
+
   goHome() {
     this.show('screen-list');
     this.renderOrders();
@@ -178,7 +178,7 @@ const App = {
       showToast('Sheetsへ書込み中... (' + this.state.pendingWrites + '件)');
     }
   },
- 
+
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
@@ -189,7 +189,7 @@ const App = {
       showToast('注文ID ' + orderId + ' が見つかりません');
     }
   },
- 
+
   startBatchScan() {
     this.state.batchScanActive = true;
     OCR.setKnownOrders(this.state.orders);
@@ -204,7 +204,7 @@ const App = {
       this.renderOrders();
     }, { keepOpen: true });
   },
- 
+
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
@@ -228,7 +228,7 @@ const App = {
       this.setLoader(false);
     }
   },
- 
+
   pruneTodayGroup() {
     const g = TodayGroup.load();
     if (!g.ids.length) return;
@@ -239,11 +239,11 @@ const App = {
     });
     if (removed > 0) showToast(removed + '件の発送完了を本日グループから除外しました');
   },
- 
+
   setLoader(show) {
     document.getElementById('list-loader').classList.toggle('hidden', !show);
   },
- 
+
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
@@ -277,21 +277,21 @@ const App = {
     });
     sel.appendChild(og2);
   },
- 
+
   recordRecentCountry(code) {
     this.recentCountries = [code, ...this.recentCountries.filter(c => c !== code)].slice(0, 10);
     localStorage.setItem('recent_countries', JSON.stringify(this.recentCountries));
   },
- 
+
   renderOrders() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
     const list = document.getElementById('order-list');
- 
+
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
- 
+
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
     if (todayCount > 0) {
@@ -300,19 +300,19 @@ const App = {
     } else {
       todayBar.classList.add('hidden');
     }
- 
+
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す）</span></div>';
       return;
     }
- 
+
     const todaySet = new Set(TodayGroup.load().ids);
     const sortedOrders = orders.slice().sort((a, b) => {
       const ta = todaySet.has(a.orderId) ? 0 : 1;
       const tb = todaySet.has(b.orderId) ? 0 : 1;
       return ta - tb;
     });
- 
+
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
       const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
@@ -334,7 +334,7 @@ const App = {
         </div>
       </div>`;
     }).join('');
- 
+
     list.querySelectorAll('.order-item').forEach(el => {
       el.onclick = () => {
         TodayGroup.add(el.dataset.id);
@@ -342,12 +342,12 @@ const App = {
       };
     });
   },
- 
+
   openInput(orderId) {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
- 
+
     // サムネ画像＋商品名（index.htmlが旧版なら要素なし→スキップ）
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
@@ -360,7 +360,7 @@ const App = {
       }
     }
     if (titleEl) titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
- 
+
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
     document.getElementById('input-weight').value = order && order.weightG ? order.weightG : '';
@@ -379,7 +379,7 @@ const App = {
     }
     this.show('screen-input');
   },
- 
+
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -387,7 +387,7 @@ const App = {
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
   },
- 
+
   calculate() {
     const order = this.state.currentOrder;
     const country = document.getElementById('input-country').value;
@@ -395,9 +395,9 @@ const App = {
     const lengthCm = this._readNum('input-length');
     const widthCm = this._readNum('input-width');
     const heightCm = this._readNum('input-height');
- 
+
     if (!country) return showToast('発送先国を選択してください');
- 
+
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
     if (!lengthCm || lengthCm <= 0) missing.push('長');
@@ -407,7 +407,7 @@ const App = {
       console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm });
       return showToast(missing.join('・') + ' が未入力または0です');
     }
- 
+
     const input = {
       country: country,
       weightG: Math.round(weightG),
@@ -425,13 +425,13 @@ const App = {
     this.renderResult(result);
     this.show('screen-result');
   },
- 
+
   renderResult(result) {
     document.getElementById('m-actual').textContent = result.context.actualG + ' g';
     document.getElementById('m-vol8').textContent = result.context.vol8000G + ' g';
     document.getElementById('m-vol5').textContent = result.context.vol5000G + ' g';
     document.getElementById('m-country').textContent = result.context.country;
- 
+
     const list = document.getElementById('result-list');
     if (result.candidates.length === 0) {
       list.innerHTML = '<div class="empty">利用可能な発送方法がありません<br>サイズ・重量を確認してください</div>';
@@ -450,7 +450,7 @@ const App = {
       const colorClass = this.getCarrierColorClass(c.carrier);
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
- 
+
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
         breakdownHtml = `
@@ -464,7 +464,7 @@ const App = {
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
       }
- 
+
       return `
         <div class="result-card" data-idx="${i}">
           <div class="card-header">
@@ -495,7 +495,7 @@ const App = {
     const first = list.querySelector('.result-card');
     if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
- 
+
     if (result.context.tariffJPY > 0) {
       const order = this.state.currentOrder;
       const hsCode = order ? order.hsCode : '';
@@ -512,7 +512,7 @@ const App = {
       list.appendChild(summary);
     }
   },
- 
+
   getCarrierColorClass(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
@@ -520,7 +520,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
   },
- 
+
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -528,7 +528,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
     return carrier;
   },
- 
+
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -555,7 +555,7 @@ const App = {
     showToast('Sheetsへ書込み中... ホームへ戻ります');
     this.state.pendingWrites++;
     this.goHome();
- 
+
     API.writeShipment(data)
       .then(res => {
         this.state.pendingWrites--;
@@ -570,7 +570,7 @@ const App = {
         showToast('書込み失敗: ' + err.message);
       });
   },
- 
+
   async sync() {
     showToast('eBayから注文を取得中...');
     try {
@@ -582,7 +582,7 @@ const App = {
     }
   }
 };
- 
+
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -591,21 +591,21 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
- 
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 document.addEventListener('DOMContentLoaded', () => App.init());
       await this.loadAll();
       showToast('同期完了');
@@ -614,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => App.init());
     }
   }
 };
- 
+
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -623,33 +623,33 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
- 
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 document.addEventListener('DOMContentLoaded', () => App.init());
 serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 document.addEventListener('DOMContentLoaded', () => App.init());
       .catch(err => {
         this.state.pendingWrites--;
         showToast('書込み失敗: ' + err.message);
       });
   },
- 
+
   async sync() {
     showToast('eBayから注文を取得中...');
     try {
@@ -661,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => App.init());
     }
   }
 };
- 
+
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -670,19 +670,19 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
- 
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 document.addEventListener('DOMContentLoaded', () => App.init());
