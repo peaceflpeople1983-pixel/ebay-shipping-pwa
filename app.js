@@ -37,23 +37,47 @@ const App = {
   },
  
   bindSetup() {
-    document.getElementById('btn-save-config').onclick = async () => {
-      const url = document.getElementById('cfg-api-url').value.trim();
-      const secret = document.getElementById('cfg-secret').value.trim();
-      if (!url) return showToast('Web App URLを入力してください');
-      API.saveConfig(url, secret);
-      this.bindAll();
-      await this.loadAll();
-    };
-    const clearBtn = document.getElementById('btn-clear-cache');
-    if (clearBtn) clearBtn.onclick = async () => {
-      API.clearMasterCache();
-      showToast('キャッシュをクリアしました');
-      if (API.config.url) {
+    const saveBtn = document.getElementById('btn-save-config');
+    if (saveBtn) {
+      // 視覚的バインド完了マーカー（緑色に変更でハンドラ設定済みと判別可能）
+      saveBtn.style.background = '#0F6E56';
+      saveBtn.textContent = '✓ 保存して開始';
+      saveBtn.onclick = async () => {
+        showToast('保存処理を開始しています...');
+        const url = document.getElementById('cfg-api-url').value.trim();
+        const secret = document.getElementById('cfg-secret').value.trim();
+        if (!url) return showToast('Web App URLを入力してください');
+        API.saveConfig(url, secret);
         this.bindAll();
         await this.loadAll();
-      }
-    };
+      };
+      // touchstart で iOS Safari の :active を確実に動かす + フォールバック
+      saveBtn.addEventListener('touchstart', () => {
+        saveBtn.style.opacity = '0.7';
+      }, { passive: true });
+      saveBtn.addEventListener('touchend', () => {
+        saveBtn.style.opacity = '1';
+      }, { passive: true });
+    }
+ 
+    const clearBtn = document.getElementById('btn-clear-cache');
+    if (clearBtn) {
+      clearBtn.textContent = '✓ マスタキャッシュをクリア';
+      clearBtn.onclick = async () => {
+        API.clearMasterCache();
+        showToast('キャッシュをクリアしました');
+        if (API.config.url) {
+          this.bindAll();
+          await this.loadAll();
+        }
+      };
+      clearBtn.addEventListener('touchstart', () => {
+        clearBtn.style.opacity = '0.7';
+      }, { passive: true });
+      clearBtn.addEventListener('touchend', () => {
+        clearBtn.style.opacity = '1';
+      }, { passive: true });
+    }
   },
  
   /** 要素が存在する場合のみハンドラを設定（防御） */
@@ -620,4 +644,45 @@ serviceWorker' in navigator) {
 }
  
 document.addEventListener('DOMContentLoaded', () => App.init());
+      .catch(err => {
+        this.state.pendingWrites--;
+        showToast('書込み失敗: ' + err.message);
+      });
+  },
  
+  async sync() {
+    showToast('eBayから注文を取得中...');
+    try {
+      await API.syncOrders();
+      await this.loadAll();
+      showToast('同期完了');
+    } catch (err) {
+      showToast('同期失敗: ' + err.message);
+    }
+  }
+};
+ 
+function showToast(message) {
+  const t = document.getElementById('toast');
+  t.textContent = message;
+  t.classList.remove('hidden');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
+}
+ 
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+ 
+function escapeAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+ 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+ 
+document.addEventListener('DOMContentLoaded', () => App.init());
