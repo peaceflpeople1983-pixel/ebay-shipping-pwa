@@ -190,17 +190,23 @@ const App = {
     window.addEventListener('resize', syncPosition);
     window.addEventListener('orientationchange', () => setTimeout(syncPosition, 100));
 
+    // 最後にフォーカスされていた数値フィールドのインデックスを保持
+    // （ボタンタップ時に activeElement が body 等になるため、これを信頼ソースに使う）
+    let lastFocusedIdx = -1;
+
     const updateToolbar = () => {
       const active = document.activeElement;
       const idx = active ? chain.indexOf(active.id) : -1;
-      if (idx === -1) {
+      if (idx !== -1) lastFocusedIdx = idx;
+      const effectiveIdx = (idx !== -1) ? idx : lastFocusedIdx;
+      if (effectiveIdx === -1) {
         toolbar.classList.add('hidden');
         return;
       }
       toolbar.classList.remove('hidden');
-      prevBtn.disabled = (idx === 0);
+      prevBtn.disabled = (effectiveIdx === 0);
       // 最終フィールドでは「次へ」→「完了」に切り替え
-      if (idx === chain.length - 1) {
+      if (effectiveIdx === chain.length - 1) {
         nextBtn.textContent = '完了 ▶';
       } else {
         nextBtn.textContent = '次へ ▶';
@@ -209,34 +215,31 @@ const App = {
       requestAnimationFrame(syncPosition);
       setTimeout(syncPosition, 100);
       setTimeout(syncPosition, 300);
-      setTimeout(syncPosition, 600);
     };
 
     const focusByIndex = (idx) => {
       if (idx < 0 || idx >= chain.length) return;
       const el = document.getElementById(chain[idx]);
       if (!el) return;
+      lastFocusedIdx = idx;
       el.focus();
       try { el.select(); } catch (_) {}
+      updateToolbar();
     };
 
     // 各数値フィールドのフォーカス/ブラー監視
-    chain.forEach((id) => {
+    chain.forEach((id, idx) => {
       const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('focus', () => {
+        lastFocusedIdx = idx;
         setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
         updateToolbar();
-      });
-      el.addEventListener('blur', () => {
-        // ボタンタップの判定を待ってから非表示判断
-        setTimeout(updateToolbar, 200);
       });
       // PCでのEnterキーフォールバック
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          const idx = chain.indexOf(id);
           if (idx === chain.length - 1) {
             el.blur();
             this.calculate();
@@ -247,36 +250,52 @@ const App = {
       });
     });
 
-    // ボタンタップ時にフォーカスを失わないよう mousedown/touchstart で preventDefault
-    const preventBlur = (btn) => {
-      btn.addEventListener('mousedown', (e) => e.preventDefault());
-      btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    // 共通ボタンハンドラ。
+    // iOS では touchstart で preventDefault するとクリックも止まるので、
+    // touchstart で直接アクションを起こし、その後の click 重複発火はフラグでブロック。
+    const wireButton = (btn, action) => {
+      let touchHandled = false;
+      btn.addEventListener('touchstart', (e) => {
+        // フォーカスを失わせず、即時アクション実行
+        e.preventDefault();
+        touchHandled = true;
+        action();
+      }, { passive: false });
+      btn.addEventListener('click', () => {
+        if (touchHandled) {
+          touchHandled = false;
+          return;
+        }
+        action();
+      });
     };
-    preventBlur(prevBtn);
-    preventBlur(nextBtn);
-    preventBlur(doneBtn);
 
-    prevBtn.addEventListener('click', () => {
-      const active = document.activeElement;
-      const idx = active ? chain.indexOf(active.id) : -1;
-      if (idx > 0) focusByIndex(idx - 1);
+    wireButton(prevBtn, () => {
+      if (lastFocusedIdx > 0) focusByIndex(lastFocusedIdx - 1);
     });
 
-    nextBtn.addEventListener('click', () => {
-      const active = document.activeElement;
-      const idx = active ? chain.indexOf(active.id) : -1;
-      if (idx === -1) return;
-      if (idx === chain.length - 1) {
-        active.blur();
+    wireButton(nextBtn, () => {
+      if (lastFocusedIdx === -1) return;
+      if (lastFocusedIdx === chain.length - 1) {
+        // 最終フィールド → 計算実行
+        const el = document.getElementById(chain[lastFocusedIdx]);
+        if (el) el.blur();
+        toolbar.classList.add('hidden');
+        lastFocusedIdx = -1;
         this.calculate();
       } else {
-        focusByIndex(idx + 1);
+        focusByIndex(lastFocusedIdx + 1);
       }
     });
 
-    doneBtn.addEventListener('click', () => {
-      const active = document.activeElement;
-      if (active && chain.indexOf(active.id) !== -1) active.blur();
+    wireButton(doneBtn, () => {
+      const idx = (lastFocusedIdx !== -1) ? lastFocusedIdx : (document.activeElement ? chain.indexOf(document.activeElement.id) : -1);
+      if (idx !== -1) {
+        const el = document.getElementById(chain[idx]);
+        if (el) el.blur();
+      }
+      toolbar.classList.add('hidden');
+      lastFocusedIdx = -1;
       this.calculate();
     });
   },
