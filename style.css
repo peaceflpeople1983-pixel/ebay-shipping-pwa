@@ -432,6 +432,21 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .tariff-summary .left .detail { font-size: 12px; color: #633806; margin-top: 2px; }
 .tariff-summary .right { font-size: 22px; font-weight: 600; color: #633806; }
 
+/* v3.11: 候補外配送会社の理由表示（デバッグ可視化） */
+.excluded-info {
+  background: #F5F5F7;
+  border-left: 3px solid #B4B2A9;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #444441;
+  line-height: 1.5;
+}
+.excluded-info .excluded-title { font-weight: 600; margin-bottom: 4px; color: #5F5E5A; }
+.excluded-info .excluded-row { padding: 1px 0; }
+.excluded-info b { font-weight: 600; }
+
 /* v3.10: ゴールド推奨案内バー（提案結果画面のカードリスト上部に表示） */
 .shipping-hint {
   background: #FFE066;

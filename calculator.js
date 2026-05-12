@@ -8,43 +8,48 @@
 const Calculator = {
   master: null,
   setMaster(m) { this.master = m; },
- 
+
   // 為替レート（USD→JPY、概算）。実運用で必要があればAI設定で外出し可
   exchangeRate: 150,
- 
+
   calculate(input) {
     if (!this.master) throw new Error('Master data not loaded');
     const country = this.master.countries.find(c => c.code === input.country);
     if (!country) return { candidates: [], context: { error: 'Unknown country' } };
- 
+
     const dims = [input.lengthCm, input.widthCm, input.heightCm].sort((a, b) => b - a);
     const vol8000 = (input.lengthCm * input.widthCm * input.heightCm) / 8000;
     const vol5000 = (input.lengthCm * input.widthCm * input.heightCm) / 5000;
- 
+
     // 米国向けの関税概算（円）
     const tariffJPY = (country.code === 'US' && input.itemPriceUSD && input.tariffRate)
       ? Math.round(input.itemPriceUSD * input.tariffRate / 100 * this.exchangeRate)
       : 0;
- 
+
     const candidates = [];
- 
+    const excluded = []; // v3.11: 除外された配送会社と理由を画面表示用に集める
+
     const ep = this._epacket(input, country, dims, tariffJPY);
-    if (ep) candidates.push(ep);
- 
+    if (ep && ep._excluded) excluded.push(ep);
+    else if (ep) candidates.push(ep);
+
     if (country.ecoSupported) {
       const eco = this._eco(input, country, dims, vol8000, tariffJPY);
       if (eco) candidates.push(eco);
+    } else {
+      excluded.push({ _excluded: true, name: 'SpeedPAK Economy', reason: '国マスタでSpeedPAK Eco未対応' });
     }
- 
+
     const dhl = this._dhl(input, country, dims, vol5000, tariffJPY);
     if (dhl) candidates.push(dhl);
- 
+
     const fedex = this._fedex(input, country, dims, vol5000, tariffJPY);
     if (fedex) candidates.push(fedex);
- 
+
     candidates.sort((a, b) => a.totalCost - b.totalCost);
     return {
       candidates,
+      excluded, // v3.11
       context: {
         actualG: input.weightG,
         vol8000G: Math.ceil(vol8000 * 1000),
@@ -55,21 +60,26 @@ const Calculator = {
       }
     };
   },
- 
+
   _epacket(input, country, dims, tariffJPY) {
-    if (!country.epacketZone) return null;
-    if (input.weightG > 2000) return null;
-    if (dims[0] > 60) return null;
-    if (dims[0] + dims[1] + dims[2] > 90) return null;
-    if (dims[0] < 14.8 || dims[1] < 10.5) return null;
- 
+    // v3.11: 除外時に理由を画面表示できるよう { _excluded:true, name, reason } を返す
+    const NAME = 'ePacketライト';
+    const ex = (reason) => ({ _excluded: true, name: NAME, reason });
+
+    if (!country.epacketZone) return ex(`国マスタに ePacket 地帯が未設定（${country.code}）`);
+    if (input.weightG > 2000) return ex(`重量 ${input.weightG}g が 2000g 超`);
+    if (dims[0] > 60) return ex(`最大辺 ${dims[0]}cm が 60cm 超`);
+    if (dims[0] + dims[1] + dims[2] > 90) return ex(`三辺合計 ${(dims[0]+dims[1]+dims[2]).toFixed(1)}cm が 90cm 超`);
+    if (dims[0] < 14.8 || dims[1] < 10.5) return ex(`最小サイズ未満（最大辺=${dims[0]}cm, 2番目=${dims[1]}cm。基準: 14.8×10.5）`);
+
     const w100 = Math.ceil(input.weightG / 100) * 100;
     const row = this.master.rates.epacket.find(r => r[0] === w100);
-    if (!row) return null;
+    if (!row) return ex(`料金表に ${w100}g 行が見つからない`);
     const cost = row[country.epacketZone];
- 
+    if (cost == null || cost === '' || cost === 0) return ex(`料金表 ${w100}g × 第${country.epacketZone}地帯 の値が空（row=${JSON.stringify(row)}）`);
+
     return {
-      carrier: 'ePacketライト',
+      carrier: NAME,
       detail: '第' + country.epacketZone + '地帯',
       basicCost: cost,
       surcharge: 0,
@@ -83,26 +93,26 @@ const Calculator = {
       tariffNote: tariffJPY > 0 ? '関税は買い手が現地で負担' : null
     };
   },
- 
+
   _eco(input, country, dims, vol8000, tariffJPY) {
     if (!this._ecoSizeOk(input, country, dims)) return null;
     const billableKg = Math.max(input.weightG / 1000, vol8000);
     if (billableKg > 25) return null;
     if (country.code === 'GB' && input.weightG / 1000 > 15) return null;
     if (country.code === 'AU' && input.weightG / 1000 > 22) return null;
- 
+
     const table = this._ecoTable(country.code);
     if (!table) return null;
     const row = table.find(r => r[0] >= billableKg);
     if (!row) return null;
- 
+
     let surcharge = 0;
     const surchargeReasons = [];
     if (dims[0] > 55.88 || (input.lengthCm * input.widthCm * input.heightCm) > 55000) {
       surcharge += this.master.surcharges.eco.oversizeFlat;
       surchargeReasons.push('規定外寸法');
     }
- 
+
     // 米国向け関税＋通関手数料（Orange Connex経由はセラー負担）
     let usFees = 0;
     let tariffSeller = 0;
@@ -112,9 +122,9 @@ const Calculator = {
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
       if (usFees > 0) surchargeReasons.push('米国通関手数料');
     }
- 
+
     const totalCost = row[1] + surcharge + tariffSeller + usFees;
- 
+
     return {
       carrier: 'eBay SpeedPAK Economy',
       detail: country.name,
@@ -130,7 +140,7 @@ const Calculator = {
       insurance: true
     };
   },
- 
+
   _ecoTable(code) {
     if (code === 'US') return this.master.rates.ecoUSA48;
     if (code === 'GB') return this.master.rates.ecoUK;
@@ -138,7 +148,7 @@ const Calculator = {
     if (code === 'AU') return this.master.rates.ecoAU;
     return null;
   },
- 
+
   _ecoSizeOk(input, country, dims) {
     const c = country.code;
     if (c === 'US') return dims[0] <= 66 && (dims[0] + 2 * (dims[1] + dims[2])) <= 274;
@@ -147,18 +157,18 @@ const Calculator = {
     if (c === 'AU') return dims[0] <= 105 && (input.lengthCm * input.widthCm * input.heightCm) <= 250000;
     return false;
   },
- 
+
   _dhl(input, country, dims, vol5000, tariffJPY) {
     if (!country.dhlZone) return null;
     if (dims[0] > 120 || dims[1] > 80 || dims[2] > 80) return null;
     const billableKg = Math.max(input.weightG / 1000, vol5000);
     if (billableKg > 70) return null;
- 
+
     const tier = this.master.rates.dhl.find(r => r.weight >= billableKg);
     if (!tier) return null;
     const cost = tier.zones[country.dhlZone];
     if (!cost) return null;
- 
+
     let surcharge = 0;
     const surchargeReasons = [];
     if (dims[0] > 100) {
@@ -169,7 +179,7 @@ const Calculator = {
       surcharge += this.master.surcharges.dhl.specialHandlingFlat;
       surchargeReasons.push('特別貨物取扱料');
     }
- 
+
     // 米国向け関税（Orange Connex経由はセラー負担、関税処理手数料2.1%含む）
     let tariffSeller = 0;
     let usFees = 0;
@@ -178,9 +188,9 @@ const Calculator = {
       usFees = Math.round(tariffJPY * 0.021); // 関税処理手数料2.1%（DHLは通関手数料は別途）
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
     }
- 
+
     const totalCost = cost + surcharge + tariffSeller + usFees;
- 
+
     return {
       carrier: 'eBay SpeedPAK Ship via DHL',
       detail: 'Zone ' + country.dhlZone,
@@ -196,7 +206,7 @@ const Calculator = {
       insurance: true
     };
   },
- 
+
   _fedex(input, country, dims, vol5000, tariffJPY) {
     // FedEx FICP用ゾーン取得（fedexZonesマップから）
     const fedexZone = (this.master.fedexZones || {})[country.code];
@@ -208,14 +218,14 @@ const Calculator = {
     // 重量制限：68kg
     const billableKg = Math.max(input.weightG / 1000, vol5000);
     if (billableKg > 68) return null;
- 
+
     // 料金検索：重量を切り上げて該当行を取得
     const fedexRates = this.master.rates.fedex || [];
     const tier = fedexRates.find(r => r.weight >= billableKg);
     if (!tier) return null;
     const cost = tier.zones[fedexZone];
     if (!cost) return null;
- 
+
     let surcharge = 0;
     const surchargeReasons = [];
     const sc = this.master.surcharges.fedex || {};
@@ -232,7 +242,7 @@ const Calculator = {
       surcharge += sc.specialHandlingWeightFlat || 3390;
       surchargeReasons.push('特別取扱料金(重量)');
     }
- 
+
     // 米国向け関税：FICPは米国輸入手続き手数料が無料、関税転送も無料
     let tariffSeller = 0;
     let usFees = 0;
@@ -242,9 +252,9 @@ const Calculator = {
       usFees = Math.round(tariffJPY * (sc.usDutyProcessRate || 0.021));
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
     }
- 
+
     const totalCost = cost + surcharge + tariffSeller + usFees;
- 
+
     return {
       carrier: 'eBay SpeedPAK Ship via FedEx',
       detail: 'FICP Zone ' + fedexZone,
@@ -261,4 +271,3 @@ const Calculator = {
     };
   }
 };
- 

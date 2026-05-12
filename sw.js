@@ -1,10 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-11: 候補外配送会社の理由を画面表示（ePacket除外原因切り分け）
  * v3-10: shipping policy に応じた推奨配送会社ハイライト（ゴールド塗りつぶし）
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const STATIC_CACHE = 'ebay-ship-v3-10';
+const STATIC_CACHE = 'ebay-ship-v3-11';
 
 const STATIC_FILES = [
   './',

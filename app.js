@@ -657,6 +657,17 @@ const App = {
       `;
       list.appendChild(summary);
     }
+
+    // v3.11: 除外された配送会社と理由を末尾に表示（デバッグ可視化）
+    if (result.excluded && result.excluded.length > 0) {
+      const exDiv = document.createElement('div');
+      exDiv.className = 'excluded-info';
+      exDiv.innerHTML = '<div class="excluded-title">候補外（理由）</div>' +
+        result.excluded.map(e =>
+          `<div class="excluded-row">・<b>${escapeHtml(e.name)}</b>: ${escapeHtml(e.reason)}</div>`
+        ).join('');
+      list.appendChild(exDiv);
+    }
   },
 
   getCarrierColorClass(carrier) {
