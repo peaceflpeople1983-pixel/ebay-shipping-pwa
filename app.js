@@ -575,6 +575,14 @@ const App = {
       document.getElementById('btn-confirm').classList.add('hidden');
       return;
     }
+    // v3.10: shipping policy に応じた推奨ハイライトの算出
+    const order = this.state.currentOrder;
+    const shippingPolicy = order ? order.shippingPolicy : '';
+    const recommendedTypes = this.getRecommendedCarrierTypes(shippingPolicy);
+    const hintHtml = (recommendedTypes.length > 0)
+      ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
+      : '';
+
     const legendHtml = `
       <div class="legend">
         <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
@@ -583,10 +591,11 @@ const App = {
         <div class="legend-item"><span class="carrier-circle c-fedex"></span>Ship via FedEx</div>
       </div>
     `;
-    list.innerHTML = legendHtml + result.candidates.map((c, i) => {
+    list.innerHTML = hintHtml + legendHtml + result.candidates.map((c, i) => {
       const colorClass = this.getCarrierColorClass(c.carrier);
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
+      const isRecommended = this.isRecommendedCarrier(c.carrier, recommendedTypes);
 
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
@@ -603,7 +612,7 @@ const App = {
       }
 
       return `
-        <div class="result-card" data-idx="${i}">
+        <div class="result-card${isRecommended ? ' recommended' : ''}" data-idx="${i}">
           <div class="card-header">
             <span class="carrier-circle ${colorClass}"></span>
             <span class="carrier-name">${escapeHtml(carrierShort)}</span>
@@ -656,6 +665,34 @@ const App = {
     if (carrier.indexOf('Ship via FedEx') !== -1) return 'c-fedex';
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
+  },
+
+  /**
+   * v3.10: shipping policy から推奨する配送会社タイプ群を返す
+   * 戻り値:
+   *   ['speedpak']      → eBay SpeedPAK Economy
+   *   ['dhl','fedex']   → Expedited International Shipping / eBay SpeedPAK Expedited
+   *   ['epacket']       → Economy International Shipping
+   *   []                → policy 不明・未定義 → ハイライトしない
+   * 判定順序: SpeedPAK Economy（完全一致）→ Expedited（含む）→ Economy（含む）
+   */
+  getRecommendedCarrierTypes(shippingPolicy) {
+    const policy = String(shippingPolicy || '');
+    if (policy === 'eBay SpeedPAK Economy') return ['speedpak'];
+    if (policy.indexOf('Expedited') !== -1) return ['dhl', 'fedex'];
+    if (policy.indexOf('Economy') !== -1) return ['epacket'];
+    return [];
+  },
+
+  /** v3.10: carrier 名と推奨タイプ群から、ハイライト対象か判定 */
+  isRecommendedCarrier(carrier, types) {
+    if (!types || types.length === 0) return false;
+    const c = String(carrier || '');
+    if (types.indexOf('epacket') !== -1 && c.indexOf('ePacket') !== -1) return true;
+    if (types.indexOf('speedpak') !== -1 && c.indexOf('SpeedPAK Economy') !== -1) return true;
+    if (types.indexOf('dhl') !== -1 && c.indexOf('Ship via DHL') !== -1) return true;
+    if (types.indexOf('fedex') !== -1 && c.indexOf('Ship via FedEx') !== -1) return true;
+    return false;
   },
 
   shortenCarrier(carrier) {

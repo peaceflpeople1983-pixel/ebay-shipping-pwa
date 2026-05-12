@@ -343,6 +343,9 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 }
 .result-card.selected { border: 2px solid var(--primary); padding: 13px; }
 .result-card.recommend { border: 2px solid var(--accent); padding: 13px; }
+/* v3.10: shipping policy に応じた推奨ハイライト（ゴールド塗りつぶし） */
+.result-card.recommended { background: #FFE066; border: 1px solid #F0B400; }
+.result-card.recommended.selected { border: 2px solid var(--primary); padding: 13px; }
 .carrier-circle {
   width: 22px;
   height: 22px;
@@ -428,6 +431,19 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .tariff-summary .left .label { font-size: 11px; color: #5F5E5A; }
 .tariff-summary .left .detail { font-size: 12px; color: #633806; margin-top: 2px; }
 .tariff-summary .right { font-size: 22px; font-weight: 600; color: #633806; }
+
+/* v3.10: ゴールド推奨案内バー（提案結果画面のカードリスト上部に表示） */
+.shipping-hint {
+  background: #FFE066;
+  border-left: 3px solid #F0B400;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #5A4400;
+  line-height: 1.5;
+}
+.shipping-hint b { font-weight: 600; }
 
 .legend {
   display: grid;
