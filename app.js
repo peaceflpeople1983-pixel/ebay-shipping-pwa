@@ -513,6 +513,19 @@ const App = {
  
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
+ 
+    // v3.14: CPaSS パッケージ番号 (発送先国と梱包後重量の間に表示)
+    const cpassRow = document.getElementById('input-cpass-row');
+    const cpassNo = document.getElementById('input-cpass-no');
+    if (cpassRow && cpassNo) {
+      if (order && order.cpass && order.cpass.package_no) {
+        cpassNo.textContent = order.cpass.package_no;
+        cpassRow.classList.remove('hidden');
+      } else {
+        cpassRow.classList.add('hidden');
+      }
+    }
+ 
     // v3.12: order.weightG は実際は kg 単位（Apps Script の getOrders が I列=weightKg を weightG 名で返している）
     // 入力欄は g 単位なので kg→g 変換。1未満なら kg と判断して1000倍、それ以上ならそのまま g として扱う
     const wRaw = order && order.weightG;
