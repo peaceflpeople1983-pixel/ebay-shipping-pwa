@@ -29,7 +29,7 @@
       <button class="secondary" id="btn-clear-cache" style="margin-top: 12px; width: 100%;">マスタキャッシュをクリア（強制再取得）</button>
     </div>
   </section>
-
+ 
   <!-- 注文一覧画面 -->
   <section id="screen-list" class="screen hidden">
     <header class="head">
@@ -65,7 +65,7 @@
     <div id="order-list" class="content"></div>
     <div class="loader hidden" id="list-loader">読み込み中...</div>
   </section>
-
+ 
   <!-- 入力画面 -->
   <section id="screen-input" class="screen hidden">
     <header class="head">
@@ -84,19 +84,26 @@
           <div class="account-title" id="input-item-title"></div>
         </div>
       </div>
-
+ 
       <label>注文ID</label>
       <div class="input-with-action">
         <input type="text" id="input-order-id" placeholder="14-12345-67890">
         <button class="icon" id="btn-ocr" title="撮影で取り込み">📷</button>
       </div>
-
+ 
       <label>発送先国</label>
       <select id="input-country"></select>
-
+ 
+      <!-- v3.14: CPaSS パッケージ番号表示 (該当データがある時だけ表示) -->
+      <div class="input-cpass-row hidden" id="input-cpass-row">
+        <span class="input-cpass-icon">📦</span>
+        <span class="input-cpass-label">CPaSS #</span>
+        <span class="input-cpass-no" id="input-cpass-no">—</span>
+      </div>
+ 
       <label>梱包後重量 (g)</label>
       <input type="number" id="input-weight" inputmode="numeric" enterkeyhint="next" placeholder="例: 850">
-
+ 
       <label>サイズ (cm)</label>
       <div class="dim-row">
         <input type="number" id="input-length" inputmode="decimal" enterkeyhint="next" placeholder="長">
@@ -105,7 +112,7 @@
         <span class="dim-sep">×</span>
         <input type="number" id="input-height" inputmode="decimal" enterkeyhint="go" placeholder="高">
       </div>
-
+ 
       <div class="card tariff-card hidden" id="input-tariff-card">
         <div class="muted">通関情報（米国向け）</div>
         <div class="tariff-row">
@@ -121,11 +128,11 @@
           <span class="tariff-value" id="t-tariff-rate">—</span>
         </div>
       </div>
-
+ 
       <button class="primary" id="btn-calculate">最適な発送方法を提案</button>
     </div>
   </section>
-
+ 
   <!-- 結果画面 -->
   <section id="screen-result" class="screen hidden">
     <header class="head">
@@ -144,7 +151,7 @@
       <button class="primary hidden" id="btn-confirm">この発送方法で確定</button>
     </div>
   </section>
-
+ 
   <!-- カメラ／OCRオーバーレイ -->
   <section id="ocr-overlay" class="overlay hidden">
     <div class="overlay-content">
@@ -157,10 +164,10 @@
       </div>
     </div>
   </section>
-
+ 
   <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
-
+ 
   <!-- 数値入力用フローティングツールバー（キーボード上に表示） -->
   <div id="kb-toolbar" class="kb-toolbar hidden">
     <button class="kb-btn" id="kb-prev">◀ 前へ</button>
@@ -168,10 +175,11 @@
     <button class="kb-btn" id="kb-done">完了</button>
   </div>
 </div>
-
+ 
 <script src="api.js"></script>
 <script src="calculator.js"></script>
 <script src="ocr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
+ 
