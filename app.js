@@ -1,5 +1,10 @@
 /**
- * メインのUIロジック (v3.7)
+ * メインのUIロジック (v3.14)
+ *
+ * v3.14 追加機能:
+ *  - CPaSS パッケージ番号 / ASIN の表示
+ *    注文カードに 📦 CPaSS#xxxx と 🛒 Amazon.co.jp 直リンクを追加
+ *    Apps Script の getOrders が返す order.cpass を使用
  *
  * v3.7 追加機能:
  *  - 数値入力用フローティングツールバー（◀前へ／次へ▶／完了）
@@ -24,7 +29,7 @@ const App = {
     pendingWrites: 0,
     batchScanActive: false
   },
-
+ 
   async init() {
     // 設定画面のボタンは常にバインド（後で歯車アイコンから設定変更したい時のため）
     this.bindSetup();
@@ -35,12 +40,12 @@ const App = {
     this.bindAll();
     await this.loadAll();
   },
-
+ 
   show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
   },
-
+ 
   bindSetup() {
     const saveBtn = document.getElementById('btn-save-config');
     if (saveBtn) {
@@ -64,7 +69,7 @@ const App = {
         saveBtn.style.opacity = '1';
       }, { passive: true });
     }
-
+ 
     const clearBtn = document.getElementById('btn-clear-cache');
     if (clearBtn) {
       clearBtn.textContent = '✓ マスタキャッシュをクリア';
@@ -84,13 +89,13 @@ const App = {
       }, { passive: true });
     }
   },
-
+ 
   /** 要素が存在する場合のみハンドラを設定（防御） */
   _bind(id, eventName, handler) {
     const el = document.getElementById(id);
     if (el) el[eventName] = handler;
   },
-
+ 
   bindAll() {
     try {
       this._bind('btn-sync', 'onclick', () => this.sync());
@@ -99,15 +104,15 @@ const App = {
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
-
+ 
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
       this._bind('btn-home-input', 'onclick', () => this.goHome());
       this._bind('btn-home-result', 'onclick', () => this.goHome());
-
+ 
       this._bind('btn-calculate', 'onclick', () => this.calculate());
       this._bind('btn-confirm', 'onclick', () => this.confirmShipment());
-
+ 
       this._bind('btn-ocr', 'onclick', () => {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => {
@@ -120,7 +125,7 @@ const App = {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => this.handleScanFromList(orderId));
       });
-
+ 
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
         if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
@@ -129,7 +134,7 @@ const App = {
           showToast('本日グループをクリアしました');
         }
       });
-
+ 
       this._bind('btn-ocr-cancel', 'onclick', () => {
         this.state.batchScanActive = false;
         OCR.keepOpen = false;
@@ -137,7 +142,7 @@ const App = {
         this.renderOrders();
       });
       this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
-
+ 
       // 数値入力用フローティングツールバー（重量→長→幅→高、最終フィールドで完了）
       this.bindNumericToolbar();
     } catch (err) {
@@ -145,9 +150,9 @@ const App = {
       showToast('初期化エラー: ' + err.message);
     }
   },
-
+ 
   NUMERIC_CHAIN: ['input-weight', 'input-length', 'input-width', 'input-height'],
-
+ 
   /**
    * 数値入力用フローティングツールバーをバインド。
    * iPhone数値キーパッドには「次へ」キーが構造的に無いため、
@@ -163,7 +168,7 @@ const App = {
     const doneBtn = document.getElementById('kb-done');
     if (!toolbar || !prevBtn || !nextBtn || !doneBtn) return;
     const chain = this.NUMERIC_CHAIN;
-
+ 
     // ===== ツールバーをキーボードの真上に固定するための VisualViewport 連動 =====
     // iOS Safari は position:fixed bottom:0 がキーボード裏に隠れるため、
     // 見えている領域（visualViewport）の下端に合わせて動的に top を設定する
@@ -183,18 +188,18 @@ const App = {
       toolbar.style.left = vv.offsetLeft + 'px';
       toolbar.style.width = vv.width + 'px';
     };
-
+ 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', syncPosition);
       window.visualViewport.addEventListener('scroll', syncPosition);
     }
     window.addEventListener('resize', syncPosition);
     window.addEventListener('orientationchange', () => setTimeout(syncPosition, 100));
-
+ 
     // 最後にフォーカスされていた数値フィールドのインデックスを保持
     // （ボタンタップ時に activeElement が body 等になるため、これを信頼ソースに使う）
     let lastFocusedIdx = -1;
-
+ 
     const updateToolbar = () => {
       const active = document.activeElement;
       const idx = active ? chain.indexOf(active.id) : -1;
@@ -217,7 +222,7 @@ const App = {
       setTimeout(syncPosition, 100);
       setTimeout(syncPosition, 300);
     };
-
+ 
     const focusByIndex = (idx) => {
       if (idx < 0 || idx >= chain.length) return;
       const el = document.getElementById(chain[idx]);
@@ -227,7 +232,7 @@ const App = {
       try { el.select(); } catch (_) {}
       updateToolbar();
     };
-
+ 
     // 各数値フィールドのフォーカス/ブラー監視
     chain.forEach((id, idx) => {
       const el = document.getElementById(id);
@@ -250,7 +255,7 @@ const App = {
         }
       });
     });
-
+ 
     // 共通ボタンハンドラ。
     // iOS では touchstart で preventDefault するとクリックも止まるので、
     // touchstart で直接アクションを起こし、その後の click 重複発火はフラグでブロック。
@@ -270,11 +275,11 @@ const App = {
         action();
       });
     };
-
+ 
     wireButton(prevBtn, () => {
       if (lastFocusedIdx > 0) focusByIndex(lastFocusedIdx - 1);
     });
-
+ 
     wireButton(nextBtn, () => {
       if (lastFocusedIdx === -1) return;
       if (lastFocusedIdx === chain.length - 1) {
@@ -288,7 +293,7 @@ const App = {
         focusByIndex(lastFocusedIdx + 1);
       }
     });
-
+ 
     wireButton(doneBtn, () => {
       const idx = (lastFocusedIdx !== -1) ? lastFocusedIdx : (document.activeElement ? chain.indexOf(document.activeElement.id) : -1);
       if (idx !== -1) {
@@ -300,7 +305,7 @@ const App = {
       this.calculate();
     });
   },
-
+ 
   goHome() {
     this.show('screen-list');
     this.renderOrders();
@@ -308,7 +313,7 @@ const App = {
       showToast('Sheetsへ書込み中... (' + this.state.pendingWrites + '件)');
     }
   },
-
+ 
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
@@ -319,7 +324,7 @@ const App = {
       showToast('注文ID ' + orderId + ' が見つかりません');
     }
   },
-
+ 
   startBatchScan() {
     this.state.batchScanActive = true;
     OCR.setKnownOrders(this.state.orders);
@@ -334,7 +339,7 @@ const App = {
       this.renderOrders();
     }, { keepOpen: true });
   },
-
+ 
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
@@ -358,7 +363,7 @@ const App = {
       this.setLoader(false);
     }
   },
-
+ 
   pruneTodayGroup() {
     const g = TodayGroup.load();
     if (!g.ids.length) return;
@@ -369,11 +374,11 @@ const App = {
     });
     if (removed > 0) showToast(removed + '件の発送完了を本日グループから除外しました');
   },
-
+ 
   setLoader(show) {
     document.getElementById('list-loader').classList.toggle('hidden', !show);
   },
-
+ 
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
@@ -407,12 +412,12 @@ const App = {
     });
     sel.appendChild(og2);
   },
-
+ 
   recordRecentCountry(code) {
     this.recentCountries = [code, ...this.recentCountries.filter(c => c !== code)].slice(0, 10);
     localStorage.setItem('recent_countries', JSON.stringify(this.recentCountries));
   },
-
+ 
   renderOrders() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
@@ -420,12 +425,12 @@ const App = {
     const hideShippedEl = document.getElementById('filter-hide-shipped');
     const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
     const list = document.getElementById('order-list');
-
+ 
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
-
+ 
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
     if (todayCount > 0) {
@@ -434,19 +439,19 @@ const App = {
     } else {
       todayBar.classList.add('hidden');
     }
-
+ 
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す／発送済を隠す）</span></div>';
       return;
     }
-
+ 
     const todaySet = new Set(TodayGroup.load().ids);
     const sortedOrders = orders.slice().sort((a, b) => {
       const ta = todaySet.has(a.orderId) ? 0 : 1;
       const tb = todaySet.has(b.orderId) ? 0 : 1;
       return ta - tb;
     });
-
+ 
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
       const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
@@ -475,10 +480,11 @@ const App = {
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
           ${shippingInfoHtml}
+          ${this.renderCpassInfo(o.cpass)}
         </div>
       </div>`;
     }).join('');
-
+ 
     list.querySelectorAll('.order-item').forEach(el => {
       el.onclick = () => {
         TodayGroup.add(el.dataset.id);
@@ -486,12 +492,12 @@ const App = {
       };
     });
   },
-
+ 
   openInput(orderId) {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
-
+ 
     // サムネ画像＋商品名（index.htmlが旧版なら要素なし→スキップ）
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
@@ -504,7 +510,7 @@ const App = {
       }
     }
     if (titleEl) titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
-
+ 
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
     // v3.12: order.weightG は実際は kg 単位（Apps Script の getOrders が I列=weightKg を weightG 名で返している）
@@ -538,7 +544,7 @@ const App = {
       } catch (_) {}
     }
   },
-
+ 
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -546,7 +552,7 @@ const App = {
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
   },
-
+ 
   calculate() {
     const order = this.state.currentOrder;
     const country = document.getElementById('input-country').value;
@@ -554,9 +560,9 @@ const App = {
     const lengthCm = this._readNum('input-length');
     const widthCm = this._readNum('input-width');
     const heightCm = this._readNum('input-height');
-
+ 
     if (!country) return showToast('発送先国を選択してください');
-
+ 
     // v3.12: 重量が極端に小さい（< 10g）場合は kg 入力と判断して救済
     if (weightG !== null && weightG > 0 && weightG < 10) {
       const corrected = Math.round(weightG * 1000);
@@ -565,7 +571,7 @@ const App = {
         document.getElementById('input-weight').value = weightG;
       }
     }
-
+ 
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
     if (!lengthCm || lengthCm <= 0) missing.push('長');
@@ -575,7 +581,7 @@ const App = {
       console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm });
       return showToast(missing.join('・') + ' が未入力または0です');
     }
-
+ 
     const input = {
       country: country,
       weightG: Math.round(weightG),
@@ -593,13 +599,13 @@ const App = {
     this.renderResult(result);
     this.show('screen-result');
   },
-
+ 
   renderResult(result) {
     document.getElementById('m-actual').textContent = result.context.actualG + ' g';
     document.getElementById('m-vol8').textContent = result.context.vol8000G + ' g';
     document.getElementById('m-vol5').textContent = result.context.vol5000G + ' g';
     document.getElementById('m-country').textContent = result.context.country;
-
+ 
     const list = document.getElementById('result-list');
     if (result.candidates.length === 0) {
       list.innerHTML = '<div class="empty">利用可能な発送方法がありません<br>サイズ・重量を確認してください</div>';
@@ -613,7 +619,7 @@ const App = {
     const hintHtml = (recommendedTypes.length > 0)
       ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
       : '';
-
+ 
     const legendHtml = `
       <div class="legend">
         <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
@@ -627,7 +633,7 @@ const App = {
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
       const isRecommended = this.isRecommendedCarrier(c.carrier, recommendedTypes);
-
+ 
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
         breakdownHtml = `
@@ -641,7 +647,7 @@ const App = {
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
       }
-
+ 
       return `
         <div class="result-card${isRecommended ? ' recommended' : ''}" data-idx="${i}">
           <div class="card-header">
@@ -672,7 +678,7 @@ const App = {
     const first = list.querySelector('.result-card');
     if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
-
+ 
     if (result.context.tariffJPY > 0) {
       const order = this.state.currentOrder;
       const hsCode = order ? order.hsCode : '';
@@ -688,7 +694,7 @@ const App = {
       `;
       list.appendChild(summary);
     }
-
+ 
     // v3.11: 除外された配送会社と理由を末尾に表示（デバッグ可視化）
     if (result.excluded && result.excluded.length > 0) {
       const exDiv = document.createElement('div');
@@ -700,7 +706,7 @@ const App = {
       list.appendChild(exDiv);
     }
   },
-
+ 
   getCarrierColorClass(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
@@ -708,7 +714,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
   },
-
+ 
   /**
    * v3.10: shipping policy から推奨する配送会社タイプ群を返す
    * 戻り値:
@@ -725,7 +731,7 @@ const App = {
     if (policy.indexOf('Economy') !== -1) return ['epacket'];
     return [];
   },
-
+ 
   /** v3.10: carrier 名と推奨タイプ群から、ハイライト対象か判定 */
   isRecommendedCarrier(carrier, types) {
     if (!types || types.length === 0) return false;
@@ -736,7 +742,7 @@ const App = {
     if (types.indexOf('fedex') !== -1 && c.indexOf('Ship via FedEx') !== -1) return true;
     return false;
   },
-
+ 
   /**
    * v3.13: 発送日 "YYYY-MM-DD" → "M/D" 形式に整形
    * 不正な値や空はそのまま返す（カードで表示しないかは呼び出し元判断）
@@ -747,7 +753,7 @@ const App = {
     if (!m) return String(s);
     return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
   },
-
+ 
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -755,44 +761,46 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
     return carrier;
   },
-
-/**
-     * v3.14: CPaSS パッケージ番号 / ASIN を描画
-     */
-    renderCpassInfo(cpass) {
-      if (!cpass) return '';
-      const parts = [];
-
-      if (cpass.package_no) {
-        const sibling = cpass.sibling_count > 0
-          ? '<span class="sibling-badge">同梱 +' + cpass.sibling_count + '</span>'
-          : '';
-        parts.push(
-          '<div class="cpass-package">' +
-            '<span class="pkg-icon">📦</span>' +
-            '<span>CPaSS #</span>' +
-            '<span class="pkg-no">' + this.escapeHtml(cpass.package_no) + '</span>' +
-            sibling +
-          '</div>'
-        );
-      }
-
-      if (cpass.asin && cpass.amazon_jp_url) {
-        parts.push(
-          '<div class="cpass-asin">' +
-            '<span class="asin-icon">🛒</span>' +
-            '<span>Amazon.co.jp:</span>' +
-            '<a href="' + this.escapeHtml(cpass.amazon_jp_url) + '" target="_blank" rel="noopener">' +
-              this.escapeHtml(cpass.asin) +
-            '</a>' +
-          '</div>'
-        );
-      }
-
-      if (parts.length === 0) return '';
-      return '<div class="order-cpass-info">' + parts.join('') + '</div>';
-    },
-  
+ 
+  /**
+   * v3.14: CPaSS パッケージ番号 / ASIN を注文カードに描画
+   * 引数: order.cpass オブジェクト (Apps Script の getOrders が JOIN して返す)
+   * cpass が null/undefined の場合は空文字を返す (既存カードは壊さない)
+   */
+  renderCpassInfo(cpass) {
+    if (!cpass) return '';
+    const parts = [];
+ 
+    if (cpass.package_no) {
+      const sibling = cpass.sibling_count > 0
+        ? '<span class="sibling-badge">同梱 +' + cpass.sibling_count + '</span>'
+        : '';
+      parts.push(
+        '<div class="cpass-package">' +
+          '<span class="pkg-icon">📦</span>' +
+          '<span>CPaSS #</span>' +
+          '<span class="pkg-no">' + escapeHtml(cpass.package_no) + '</span>' +
+          sibling +
+        '</div>'
+      );
+    }
+ 
+    if (cpass.asin && cpass.amazon_jp_url) {
+      parts.push(
+        '<div class="cpass-asin">' +
+          '<span class="asin-icon">🛒</span>' +
+          '<span>Amazon.co.jp:</span>' +
+          '<a href="' + escapeHtml(cpass.amazon_jp_url) + '" target="_blank" rel="noopener">' +
+            escapeHtml(cpass.asin) +
+          '</a>' +
+        '</div>'
+      );
+    }
+ 
+    if (parts.length === 0) return '';
+    return '<div class="order-cpass-info">' + parts.join('') + '</div>';
+  },
+ 
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -819,7 +827,7 @@ const App = {
     showToast('Sheetsへ書込み中... ホームへ戻ります');
     this.state.pendingWrites++;
     this.goHome();
-
+ 
     API.writeShipment(data)
       .then(res => {
         this.state.pendingWrites--;
@@ -834,7 +842,7 @@ const App = {
         showToast('書込み失敗: ' + err.message);
       });
   },
-
+ 
   async sync() {
     showToast('eBayから注文を取得中...');
     try {
@@ -846,7 +854,7 @@ const App = {
     }
   }
 };
-
+ 
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -855,19 +863,20 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
-
+ 
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-
+ 
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-
+ 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-
+ 
 document.addEventListener('DOMContentLoaded', () => App.init());
+ 
