@@ -7,7 +7,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const STATIC_CACHE = 'ebay-ship-v3-13';
+const CACHE_NAME = 'ebay-ship-v3-14';
 
 const STATIC_FILES = [
   './',
