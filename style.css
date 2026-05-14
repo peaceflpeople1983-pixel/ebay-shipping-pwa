@@ -605,3 +605,63 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border: 0;
   font-weight: 600;
 }
+
+/* ============ v3.14: CPaSS 情報表示 ============ */
+
+.order-cpass-info {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(30, 42, 74, 0.04);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.cpass-package {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1e2a4a;
+}
+
+.cpass-package .pkg-icon {
+  font-size: 14px;
+}
+
+.cpass-package .pkg-no {
+  font-weight: 500;
+}
+
+.cpass-package .sibling-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  background: #faeeda;
+  color: #854f0b;
+  border-radius: 8px;
+  margin-left: 4px;
+}
+
+.cpass-asin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.cpass-asin .asin-icon {
+  font-size: 13px;
+}
+
+.cpass-asin a {
+  color: #185fa5;
+  text-decoration: none;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.cpass-asin a:hover {
+  text-decoration: underline;
+}
