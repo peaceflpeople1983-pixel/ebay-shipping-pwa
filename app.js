@@ -756,6 +756,43 @@ const App = {
     return carrier;
   },
 
+/**
+     * v3.14: CPaSS パッケージ番号 / ASIN を描画
+     */
+    renderCpassInfo(cpass) {
+      if (!cpass) return '';
+      const parts = [];
+
+      if (cpass.package_no) {
+        const sibling = cpass.sibling_count > 0
+          ? '<span class="sibling-badge">同梱 +' + cpass.sibling_count + '</span>'
+          : '';
+        parts.push(
+          '<div class="cpass-package">' +
+            '<span class="pkg-icon">📦</span>' +
+            '<span>CPaSS #</span>' +
+            '<span class="pkg-no">' + this.escapeHtml(cpass.package_no) + '</span>' +
+            sibling +
+          '</div>'
+        );
+      }
+
+      if (cpass.asin && cpass.amazon_jp_url) {
+        parts.push(
+          '<div class="cpass-asin">' +
+            '<span class="asin-icon">🛒</span>' +
+            '<span>Amazon.co.jp:</span>' +
+            '<a href="' + this.escapeHtml(cpass.amazon_jp_url) + '" target="_blank" rel="noopener">' +
+              this.escapeHtml(cpass.asin) +
+            '</a>' +
+          '</div>'
+        );
+      }
+
+      if (parts.length === 0) return '';
+      return '<div class="order-cpass-info">' + parts.join('') + '</div>';
+    },
+  
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
