@@ -5,18 +5,18 @@ const API = {
   config: { url: '', secret: '' },
   MASTER_CACHE_TTL: 24 * 60 * 60 * 1000, // 24時間
   DEFAULT_DAYS_BACK: 15,                  // 直近15日分のみ表示
- 
+
   loadConfig() {
     const saved = localStorage.getItem('app_config');
     if (saved) this.config = JSON.parse(saved);
     return !!this.config.url;
   },
- 
+
   saveConfig(url, secret) {
     this.config = { url, secret };
     localStorage.setItem('app_config', JSON.stringify(this.config));
   },
- 
+
   async getMasterData(forceRefresh) {
     if (!forceRefresh) {
       const cached = this._loadCache('master_data', this.MASTER_CACHE_TTL);
@@ -31,7 +31,7 @@ const API = {
     }
     return data;
   },
- 
+
   _loadCache(key, ttlMs) {
     try {
       const raw = localStorage.getItem('cache_' + key);
@@ -41,7 +41,7 @@ const API = {
       return obj.data;
     } catch (e) { return null; }
   },
- 
+
   _saveCache(key, data) {
     try {
       localStorage.setItem('cache_' + key, JSON.stringify({
@@ -50,11 +50,11 @@ const API = {
       }));
     } catch (e) {}
   },
- 
+
   clearMasterCache() {
     localStorage.removeItem('cache_master_data');
   },
- 
+
   async getOrders(account, limit, daysBack) {
     let q = '?action=getOrders';
     if (account) q += '&account=' + encodeURIComponent(account);
@@ -63,11 +63,28 @@ const API = {
     if (days) q += '&daysBack=' + days;
     return this._get(q);
   },
- 
+
   async syncOrders() {
     return this._get('?action=syncOrders');
   },
- 
+
+  /**
+   * v3.15: CPaSS Inbox の取込実行
+   * Apps Script の scanInboxFolder() を呼んで Drive Inbox 内の xlsx を取込
+   * 戻り値: { files_processed: N }
+   */
+  async runCpassImport() {
+    return this._get('?action=cpassRunImport');
+  },
+
+  /**
+   * v3.15: CPaSS ステータス取得 (Inbox + 未取込数)
+   * 通常は getOrders に同梱されるので個別呼出は不要だが、保険として用意
+   */
+  async getCpassStatus() {
+    return this._get('?action=cpassStatus');
+  },
+
   /**
    * Sheets書込み（バックグラウンド）。
    * 戻り値の Promise を await しなくても処理は継続する。
@@ -76,17 +93,17 @@ const API = {
   async writeShipment(data) {
     return this._post({ action: 'writeShipment', secret: this.config.secret, data });
   },
- 
+
   async extractOrderId(base64Image) {
     return this._post({ action: 'extractOrderId', secret: this.config.secret, image: base64Image });
   },
- 
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);
     return res.json();
   },
- 
+
   async _post(body) {
     const res = await fetch(this.config.url, {
       method: 'POST',
@@ -97,7 +114,7 @@ const API = {
     return res.json();
   }
 };
- 
+
 /**
  * 本日の作業グループ：localStorageに永続化
  *  形式: { ids: ['14-...','14-...'], createdAt: timestamp }
@@ -105,7 +122,7 @@ const API = {
  */
 const TodayGroup = {
   KEY: 'today_group',
- 
+
   load() {
     try {
       const raw = localStorage.getItem(this.KEY);
@@ -114,11 +131,11 @@ const TodayGroup = {
       return { ids: obj.ids || [], createdAt: obj.createdAt || 0 };
     } catch (e) { return { ids: [], createdAt: 0 }; }
   },
- 
+
   save(group) {
     localStorage.setItem(this.KEY, JSON.stringify(group));
   },
- 
+
   add(orderId) {
     const g = this.load();
     if (!g.ids.includes(orderId)) {
@@ -127,24 +144,23 @@ const TodayGroup = {
       this.save(g);
     }
   },
- 
+
   remove(orderId) {
     const g = this.load();
     g.ids = g.ids.filter(id => id !== orderId);
     if (g.ids.length === 0) g.createdAt = 0;
     this.save(g);
   },
- 
+
   clear() {
     localStorage.removeItem(this.KEY);
   },
- 
+
   has(orderId) {
     return this.load().ids.includes(orderId);
   },
- 
+
   count() {
     return this.load().ids.length;
   }
 };
- 

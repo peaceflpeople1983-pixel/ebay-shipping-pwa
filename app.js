@@ -1,5 +1,12 @@
 /**
- * メインのUIロジック (v3.14)
+ * メインのUIロジック (v3.15)
+ *
+ * v3.15 追加機能:
+ *  - 注文一覧の上部に CPaSS バナー (Inbox 取込待機 / 未取込警告)
+ *  - [📥 取込実行] ボタンで PWA から直接 Apps Script の取込を実行
+ *  - 注文カードに ⚠ CPaSS未取込 警告バッジ
+ *  - 発送情報入力画面に ⚠ CPaSS 未取込警告
+ *  - Apps Script の getOrders レスポンスの cpass_status を読む
  *
  * v3.14 追加機能:
  *  - CPaSS パッケージ番号 / ASIN の表示
@@ -27,9 +34,10 @@ const App = {
     selectedCarrierIndex: 0,
     recentCountries: [],
     pendingWrites: 0,
-    batchScanActive: false
+    batchScanActive: false,
+    cpassStatus: null  // v3.15: { inbox_pending_count, unimported_count, unimported_orders }
   },
- 
+
   async init() {
     // 設定画面のボタンは常にバインド（後で歯車アイコンから設定変更したい時のため）
     this.bindSetup();
@@ -40,12 +48,12 @@ const App = {
     this.bindAll();
     await this.loadAll();
   },
- 
+
   show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
   },
- 
+
   bindSetup() {
     const saveBtn = document.getElementById('btn-save-config');
     if (saveBtn) {
@@ -69,7 +77,7 @@ const App = {
         saveBtn.style.opacity = '1';
       }, { passive: true });
     }
- 
+
     const clearBtn = document.getElementById('btn-clear-cache');
     if (clearBtn) {
       clearBtn.textContent = '✓ マスタキャッシュをクリア';
@@ -89,13 +97,13 @@ const App = {
       }, { passive: true });
     }
   },
- 
+
   /** 要素が存在する場合のみハンドラを設定（防御） */
   _bind(id, eventName, handler) {
     const el = document.getElementById(id);
     if (el) el[eventName] = handler;
   },
- 
+
   bindAll() {
     try {
       this._bind('btn-sync', 'onclick', () => this.sync());
@@ -104,15 +112,15 @@ const App = {
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
- 
+
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
       this._bind('btn-home-input', 'onclick', () => this.goHome());
       this._bind('btn-home-result', 'onclick', () => this.goHome());
- 
+
       this._bind('btn-calculate', 'onclick', () => this.calculate());
       this._bind('btn-confirm', 'onclick', () => this.confirmShipment());
- 
+
       this._bind('btn-ocr', 'onclick', () => {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => {
@@ -125,7 +133,10 @@ const App = {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => this.handleScanFromList(orderId));
       });
- 
+
+      // v3.15: CPaSS 取込実行ボタン
+      this._bind('btn-cpass-import', 'onclick', () => this.runCpassImport());
+
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
         if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
@@ -134,7 +145,7 @@ const App = {
           showToast('本日グループをクリアしました');
         }
       });
- 
+
       this._bind('btn-ocr-cancel', 'onclick', () => {
         this.state.batchScanActive = false;
         OCR.keepOpen = false;
@@ -142,7 +153,7 @@ const App = {
         this.renderOrders();
       });
       this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
- 
+
       // 数値入力用フローティングツールバー（重量→長→幅→高、最終フィールドで完了）
       this.bindNumericToolbar();
     } catch (err) {
@@ -150,9 +161,9 @@ const App = {
       showToast('初期化エラー: ' + err.message);
     }
   },
- 
+
   NUMERIC_CHAIN: ['input-weight', 'input-length', 'input-width', 'input-height'],
- 
+
   /**
    * 数値入力用フローティングツールバーをバインド。
    * iPhone数値キーパッドには「次へ」キーが構造的に無いため、
@@ -168,7 +179,7 @@ const App = {
     const doneBtn = document.getElementById('kb-done');
     if (!toolbar || !prevBtn || !nextBtn || !doneBtn) return;
     const chain = this.NUMERIC_CHAIN;
- 
+
     // ===== ツールバーをキーボードの真上に固定するための VisualViewport 連動 =====
     // iOS Safari は position:fixed bottom:0 がキーボード裏に隠れるため、
     // 見えている領域（visualViewport）の下端に合わせて動的に top を設定する
@@ -188,18 +199,18 @@ const App = {
       toolbar.style.left = vv.offsetLeft + 'px';
       toolbar.style.width = vv.width + 'px';
     };
- 
+
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', syncPosition);
       window.visualViewport.addEventListener('scroll', syncPosition);
     }
     window.addEventListener('resize', syncPosition);
     window.addEventListener('orientationchange', () => setTimeout(syncPosition, 100));
- 
+
     // 最後にフォーカスされていた数値フィールドのインデックスを保持
     // （ボタンタップ時に activeElement が body 等になるため、これを信頼ソースに使う）
     let lastFocusedIdx = -1;
- 
+
     const updateToolbar = () => {
       const active = document.activeElement;
       const idx = active ? chain.indexOf(active.id) : -1;
@@ -222,7 +233,7 @@ const App = {
       setTimeout(syncPosition, 100);
       setTimeout(syncPosition, 300);
     };
- 
+
     const focusByIndex = (idx) => {
       if (idx < 0 || idx >= chain.length) return;
       const el = document.getElementById(chain[idx]);
@@ -232,7 +243,7 @@ const App = {
       try { el.select(); } catch (_) {}
       updateToolbar();
     };
- 
+
     // 各数値フィールドのフォーカス/ブラー監視
     chain.forEach((id, idx) => {
       const el = document.getElementById(id);
@@ -255,7 +266,7 @@ const App = {
         }
       });
     });
- 
+
     // 共通ボタンハンドラ。
     // iOS では touchstart で preventDefault するとクリックも止まるので、
     // touchstart で直接アクションを起こし、その後の click 重複発火はフラグでブロック。
@@ -275,11 +286,11 @@ const App = {
         action();
       });
     };
- 
+
     wireButton(prevBtn, () => {
       if (lastFocusedIdx > 0) focusByIndex(lastFocusedIdx - 1);
     });
- 
+
     wireButton(nextBtn, () => {
       if (lastFocusedIdx === -1) return;
       if (lastFocusedIdx === chain.length - 1) {
@@ -293,7 +304,7 @@ const App = {
         focusByIndex(lastFocusedIdx + 1);
       }
     });
- 
+
     wireButton(doneBtn, () => {
       const idx = (lastFocusedIdx !== -1) ? lastFocusedIdx : (document.activeElement ? chain.indexOf(document.activeElement.id) : -1);
       if (idx !== -1) {
@@ -305,7 +316,7 @@ const App = {
       this.calculate();
     });
   },
- 
+
   goHome() {
     this.show('screen-list');
     this.renderOrders();
@@ -313,7 +324,7 @@ const App = {
       showToast('Sheetsへ書込み中... (' + this.state.pendingWrites + '件)');
     }
   },
- 
+
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
@@ -324,7 +335,7 @@ const App = {
       showToast('注文ID ' + orderId + ' が見つかりません');
     }
   },
- 
+
   startBatchScan() {
     this.state.batchScanActive = true;
     OCR.setKnownOrders(this.state.orders);
@@ -339,7 +350,7 @@ const App = {
       this.renderOrders();
     }, { keepOpen: true });
   },
- 
+
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
@@ -354,16 +365,18 @@ const App = {
       Calculator.setMaster(this.state.masterData);
       const data = await API.getOrders(undefined, undefined, API.DEFAULT_DAYS_BACK);
       this.state.orders = data.orders || [];
+      this.state.cpassStatus = data.cpass_status || null;  // v3.15
       this.pruneTodayGroup();
       this.populateCountrySelect();
       this.renderOrders();
+      this.updateCpassBanner();  // v3.15
     } catch (err) {
       showToast('読み込みエラー: ' + err.message);
     } finally {
       this.setLoader(false);
     }
   },
- 
+
   pruneTodayGroup() {
     const g = TodayGroup.load();
     if (!g.ids.length) return;
@@ -374,11 +387,11 @@ const App = {
     });
     if (removed > 0) showToast(removed + '件の発送完了を本日グループから除外しました');
   },
- 
+
   setLoader(show) {
     document.getElementById('list-loader').classList.toggle('hidden', !show);
   },
- 
+
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
@@ -412,12 +425,12 @@ const App = {
     });
     sel.appendChild(og2);
   },
- 
+
   recordRecentCountry(code) {
     this.recentCountries = [code, ...this.recentCountries.filter(c => c !== code)].slice(0, 10);
     localStorage.setItem('recent_countries', JSON.stringify(this.recentCountries));
   },
- 
+
   renderOrders() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
@@ -425,12 +438,12 @@ const App = {
     const hideShippedEl = document.getElementById('filter-hide-shipped');
     const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
     const list = document.getElementById('order-list');
- 
+
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
- 
+
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
     if (todayCount > 0) {
@@ -439,19 +452,19 @@ const App = {
     } else {
       todayBar.classList.add('hidden');
     }
- 
+
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す／発送済を隠す）</span></div>';
       return;
     }
- 
+
     const todaySet = new Set(TodayGroup.load().ids);
     const sortedOrders = orders.slice().sort((a, b) => {
       const ta = todaySet.has(a.orderId) ? 0 : 1;
       const tb = todaySet.has(b.orderId) ? 0 : 1;
       return ta - tb;
     });
- 
+
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
       const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
@@ -461,6 +474,8 @@ const App = {
       // v3.13: 発送済情報の組み立て
       const isShipped = !!o.trackingNumber;
       const shippedBadge = isShipped ? '<span class="badge shipped">✓ 発送済</span>' : '';
+      // v3.15: CPaSS 未取込警告バッジ (発送済かつ未取込のみ)
+      const cpassUnimportedBadge = o.cpass_unimported ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
       const shippingInfoHtml = isShipped ? `
           <div class="order-shipping-info">
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
@@ -475,6 +490,7 @@ const App = {
             ${inToday ? '<span class="today-tag">本日</span>' : ''}
             ${o.selectedCarrier ? '<span class="badge done">確定</span>' : ''}
             ${shippedBadge}
+            ${cpassUnimportedBadge}
           </div>
           <div class="order-id">${escapeHtml(o.orderId)}</div>
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
@@ -484,7 +500,7 @@ const App = {
         </div>
       </div>`;
     }).join('');
- 
+
     list.querySelectorAll('.order-item').forEach(el => {
       el.onclick = () => {
         TodayGroup.add(el.dataset.id);
@@ -492,12 +508,12 @@ const App = {
       };
     });
   },
- 
+
   openInput(orderId) {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
- 
+
     // サムネ画像＋商品名（index.htmlが旧版なら要素なし→スキップ）
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
@@ -510,22 +526,31 @@ const App = {
       }
     }
     if (titleEl) titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
- 
+
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
- 
-    // v3.14: CPaSS パッケージ番号 (発送先国と梱包後重量の間に表示)
+
+    // v3.14/v3.15: CPaSS パッケージ番号 または 未取込警告 (発送先国と梱包後重量の間)
     const cpassRow = document.getElementById('input-cpass-row');
     const cpassNo = document.getElementById('input-cpass-no');
+    const cpassWarning = document.getElementById('input-cpass-warning');
     if (cpassRow && cpassNo) {
       if (order && order.cpass && order.cpass.package_no) {
+        // 取込済み: パッケージ番号表示
         cpassNo.textContent = order.cpass.package_no;
         cpassRow.classList.remove('hidden');
-      } else {
+        if (cpassWarning) cpassWarning.classList.add('hidden');
+      } else if (order && order.cpass_unimported) {
+        // v3.15: 未取込: 警告表示
         cpassRow.classList.add('hidden');
+        if (cpassWarning) cpassWarning.classList.remove('hidden');
+      } else {
+        // どちらも該当しない: 両方非表示
+        cpassRow.classList.add('hidden');
+        if (cpassWarning) cpassWarning.classList.add('hidden');
       }
     }
- 
+
     // v3.12: order.weightG は実際は kg 単位（Apps Script の getOrders が I列=weightKg を weightG 名で返している）
     // 入力欄は g 単位なので kg→g 変換。1未満なら kg と判断して1000倍、それ以上ならそのまま g として扱う
     const wRaw = order && order.weightG;
@@ -557,7 +582,7 @@ const App = {
       } catch (_) {}
     }
   },
- 
+
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -565,7 +590,7 @@ const App = {
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
   },
- 
+
   calculate() {
     const order = this.state.currentOrder;
     const country = document.getElementById('input-country').value;
@@ -573,9 +598,9 @@ const App = {
     const lengthCm = this._readNum('input-length');
     const widthCm = this._readNum('input-width');
     const heightCm = this._readNum('input-height');
- 
+
     if (!country) return showToast('発送先国を選択してください');
- 
+
     // v3.12: 重量が極端に小さい（< 10g）場合は kg 入力と判断して救済
     if (weightG !== null && weightG > 0 && weightG < 10) {
       const corrected = Math.round(weightG * 1000);
@@ -584,7 +609,7 @@ const App = {
         document.getElementById('input-weight').value = weightG;
       }
     }
- 
+
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
     if (!lengthCm || lengthCm <= 0) missing.push('長');
@@ -594,7 +619,7 @@ const App = {
       console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm });
       return showToast(missing.join('・') + ' が未入力または0です');
     }
- 
+
     const input = {
       country: country,
       weightG: Math.round(weightG),
@@ -612,13 +637,13 @@ const App = {
     this.renderResult(result);
     this.show('screen-result');
   },
- 
+
   renderResult(result) {
     document.getElementById('m-actual').textContent = result.context.actualG + ' g';
     document.getElementById('m-vol8').textContent = result.context.vol8000G + ' g';
     document.getElementById('m-vol5').textContent = result.context.vol5000G + ' g';
     document.getElementById('m-country').textContent = result.context.country;
- 
+
     const list = document.getElementById('result-list');
     if (result.candidates.length === 0) {
       list.innerHTML = '<div class="empty">利用可能な発送方法がありません<br>サイズ・重量を確認してください</div>';
@@ -632,7 +657,7 @@ const App = {
     const hintHtml = (recommendedTypes.length > 0)
       ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
       : '';
- 
+
     const legendHtml = `
       <div class="legend">
         <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
@@ -646,7 +671,7 @@ const App = {
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
       const isRecommended = this.isRecommendedCarrier(c.carrier, recommendedTypes);
- 
+
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
         breakdownHtml = `
@@ -660,7 +685,7 @@ const App = {
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
       }
- 
+
       return `
         <div class="result-card${isRecommended ? ' recommended' : ''}" data-idx="${i}">
           <div class="card-header">
@@ -691,7 +716,7 @@ const App = {
     const first = list.querySelector('.result-card');
     if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
- 
+
     if (result.context.tariffJPY > 0) {
       const order = this.state.currentOrder;
       const hsCode = order ? order.hsCode : '';
@@ -707,7 +732,7 @@ const App = {
       `;
       list.appendChild(summary);
     }
- 
+
     // v3.11: 除外された配送会社と理由を末尾に表示（デバッグ可視化）
     if (result.excluded && result.excluded.length > 0) {
       const exDiv = document.createElement('div');
@@ -719,7 +744,7 @@ const App = {
       list.appendChild(exDiv);
     }
   },
- 
+
   getCarrierColorClass(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
@@ -727,7 +752,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
   },
- 
+
   /**
    * v3.10: shipping policy から推奨する配送会社タイプ群を返す
    * 戻り値:
@@ -744,7 +769,7 @@ const App = {
     if (policy.indexOf('Economy') !== -1) return ['epacket'];
     return [];
   },
- 
+
   /** v3.10: carrier 名と推奨タイプ群から、ハイライト対象か判定 */
   isRecommendedCarrier(carrier, types) {
     if (!types || types.length === 0) return false;
@@ -755,7 +780,7 @@ const App = {
     if (types.indexOf('fedex') !== -1 && c.indexOf('Ship via FedEx') !== -1) return true;
     return false;
   },
- 
+
   /**
    * v3.13: 発送日 "YYYY-MM-DD" → "M/D" 形式に整形
    * 不正な値や空はそのまま返す（カードで表示しないかは呼び出し元判断）
@@ -766,7 +791,7 @@ const App = {
     if (!m) return String(s);
     return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
   },
- 
+
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -774,7 +799,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
     return carrier;
   },
- 
+
   /**
    * v3.14: CPaSS パッケージ番号 / ASIN を注文カードに描画
    * 引数: order.cpass オブジェクト (Apps Script の getOrders が JOIN して返す)
@@ -783,7 +808,7 @@ const App = {
   renderCpassInfo(cpass) {
     if (!cpass) return '';
     const parts = [];
- 
+
     if (cpass.package_no) {
       const sibling = cpass.sibling_count > 0
         ? '<span class="sibling-badge">同梱 +' + cpass.sibling_count + '</span>'
@@ -797,7 +822,7 @@ const App = {
         '</div>'
       );
     }
- 
+
     if (cpass.asin && cpass.amazon_jp_url) {
       parts.push(
         '<div class="cpass-asin">' +
@@ -809,11 +834,77 @@ const App = {
         '</div>'
       );
     }
- 
+
     if (parts.length === 0) return '';
     return '<div class="order-cpass-info">' + parts.join('') + '</div>';
   },
- 
+
+  /**
+   * v3.15: CPaSS バナーを表示/更新
+   * - Inbox に取込待ちあり → 青いバナー + [取込実行] ボタン
+   * - CPaSS 未取込あり → 黄色いバナー (情報のみ)
+   * - 両方なし → バナー全体非表示
+   */
+  updateCpassBanner() {
+    const banner = document.getElementById('cpass-banner');
+    const inboxAlert = document.getElementById('cpass-inbox-alert');
+    const unimportedAlert = document.getElementById('cpass-unimported-alert');
+    const inboxCountEl = document.getElementById('cpass-inbox-count');
+    const unimportedCountEl = document.getElementById('cpass-unimported-count');
+    if (!banner || !inboxAlert || !unimportedAlert) return;
+
+    const status = this.state.cpassStatus;
+    const inboxCount = status && status.inbox_pending_count ? status.inbox_pending_count : 0;
+    const unimportedCount = status && status.unimported_count ? status.unimported_count : 0;
+
+    if (inboxCount > 0) {
+      if (inboxCountEl) inboxCountEl.textContent = inboxCount;
+      inboxAlert.classList.remove('hidden');
+    } else {
+      inboxAlert.classList.add('hidden');
+    }
+
+    if (unimportedCount > 0) {
+      if (unimportedCountEl) unimportedCountEl.textContent = unimportedCount;
+      unimportedAlert.classList.remove('hidden');
+    } else {
+      unimportedAlert.classList.add('hidden');
+    }
+
+    if (inboxCount > 0 || unimportedCount > 0) {
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  },
+
+  /**
+   * v3.15: PWA から CPaSS 取込実行 (Apps Script の scanInboxFolder を呼ぶ)
+   */
+  async runCpassImport() {
+    const btn = document.getElementById('btn-cpass-import');
+    if (!btn) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>取込中...';
+
+    try {
+      const result = await API.runCpassImport();
+      if (result && typeof result.files_processed === 'number') {
+        showToast(result.files_processed + ' ファイル取込完了');
+      } else {
+        showToast('取込完了');
+      }
+      // データを再読み込みして UI を更新
+      await this.loadAll();
+    } catch (err) {
+      showToast('取込失敗: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  },
+
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -840,7 +931,7 @@ const App = {
     showToast('Sheetsへ書込み中... ホームへ戻ります');
     this.state.pendingWrites++;
     this.goHome();
- 
+
     API.writeShipment(data)
       .then(res => {
         this.state.pendingWrites--;
@@ -855,7 +946,7 @@ const App = {
         showToast('書込み失敗: ' + err.message);
       });
   },
- 
+
   async sync() {
     showToast('eBayから注文を取得中...');
     try {
@@ -867,7 +958,7 @@ const App = {
     }
   }
 };
- 
+
 function showToast(message) {
   const t = document.getElementById('toast');
   t.textContent = message;
@@ -876,20 +967,19 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
- 
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 document.addEventListener('DOMContentLoaded', () => App.init());
- 

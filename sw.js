@@ -1,5 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-15: PWA に CPaSS バナー + [取込実行] ボタン + 未取込警告 + 6時間メールリマインダ
+ * v3-14: CPaSS パッケージ番号/ASIN 表示 (注文一覧 + 入力画面)
  * v3-13: 発送追跡番号の自動取得 / 発送済バッジ / 発送済を隠すトグル / 発送日+追跡番号表示
  * v3-12: 重量 kg/g 単位ミスマッチを自動補正（過去注文オープン時 + 計算時の救済確認）
  * v3-11: 候補外配送会社の理由を画面表示（ePacket除外原因切り分け）
@@ -7,7 +9,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-14';
+const CACHE_NAME = 'ebay-ship-v3-15';
 
 const STATIC_FILES = [
   './',
@@ -21,13 +23,13 @@ const STATIC_FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(STATIC_CACHE).then(c => c.addAll(STATIC_FILES)));
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_FILES)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== STATIC_CACHE).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });

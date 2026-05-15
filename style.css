@@ -13,7 +13,7 @@
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
 }
- 
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -24,10 +24,10 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
- 
+
 #app { min-height: 100vh; min-height: 100dvh; }
 .hidden { display: none !important; }
- 
+
 .screen { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .head {
   background: var(--primary);
@@ -42,9 +42,9 @@ body {
 }
 .head h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
 .head-actions { display: flex; gap: 4px; }
- 
+
 .content { flex: 1; padding: 16px; padding-bottom: calc(16px + var(--safe-bottom)); }
- 
+
 label {
   display: block;
   margin: 16px 0 6px;
@@ -65,9 +65,9 @@ input, select, textarea {
   font-family: inherit;
 }
 input:focus, select:focus { outline: 2px solid var(--primary-light); outline-offset: -1px; }
- 
+
 select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23606060' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
- 
+
 button {
   padding: 12px 18px;
   font-size: 16px;
@@ -122,7 +122,7 @@ button.scan-pill {
 button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .scan-pill-icon { font-size: 14px; }
 .scan-pill-label { font-size: 12px; }
- 
+
 .hint {
   background: #FFF8E1;
   border-left: 3px solid var(--warning);
@@ -133,7 +133,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   margin: 0 0 16px;
 }
 .muted { color: var(--text-secondary); font-size: 12px; }
- 
+
 .filter-bar {
   display: flex;
   gap: 8px;
@@ -160,7 +160,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   padding: 0;
   accent-color: var(--primary);
 }
- 
+
 /* 本日の作業バー */
 .today-bar {
   background: linear-gradient(180deg, #FFF8E1 0%, #FFEFC4 100%);
@@ -193,7 +193,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #633806;
 }
 .today-bar-btn:active { opacity: 0.85; }
- 
+
 /* 商品サムネイル */
 .order-item {
   display: flex;
@@ -229,7 +229,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
- 
+
 /* 本日の作業対象マーカー */
 .order-item.in-today {
   border-color: #FAC775;
@@ -244,7 +244,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-weight: 500;
   margin-left: 4px;
 }
- 
+
 #order-list .order-item {
   background: var(--surface);
   padding: 14px;
@@ -264,7 +264,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .badge.shipped { background: var(--accent); color: #fff; }
 .order-item .order-meta { font-size: 12px; color: var(--text-secondary); }
 .order-item .order-cost { font-size: 13px; color: var(--accent); margin-top: 4px; }
- 
+
 /* v3.13: 発送済カードの強調と発送情報行 */
 #order-list .order-item.shipped {
   background: #F4FAF7;
@@ -290,15 +290,15 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   word-break: break-all;
   white-space: normal;
 }
- 
+
 .input-with-action { display: flex; gap: 8px; }
 .input-with-action input { flex: 1; }
 .input-with-action button { width: 48px; height: 48px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
- 
+
 .dim-row { display: flex; align-items: center; gap: 6px; }
 .dim-row input { flex: 1; text-align: center; padding: 12px 8px; }
 .dim-sep { color: var(--text-secondary); font-size: 14px; }
- 
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -355,12 +355,12 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .tariff-summary .label { color: #5F5E5A; font-size: 12px; }
 .tariff-summary .amount { font-weight: 600; font-size: 16px; }
 .meta.buyer-note { color: #993C1D; font-style: italic; }
- 
+
 .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .metric { background: var(--surface); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); }
 .metric .muted { font-size: 11px; }
 .metric > div:not(.muted) { font-size: 16px; font-weight: 500; margin-top: 2px; }
- 
+
 .result-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -384,7 +384,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .carrier-circle.c-eco { background: #FFFFFF; border: 1.5px solid #888780; }
 .carrier-circle.c-dhl { background: #EF9F27; }
 .carrier-circle.c-fedex { background: #7F77DD; }
- 
+
 .card-header {
   display: flex;
   align-items: center;
@@ -404,7 +404,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border-radius: 10px;
   font-weight: 500;
 }
- 
+
 .card-main {
   display: flex;
   justify-content: space-between;
@@ -425,7 +425,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   letter-spacing: -0.5px;
   white-space: nowrap;
 }
- 
+
 .card-breakdown {
   border-top: 0.5px solid var(--border);
   padding-top: 6px;
@@ -444,7 +444,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border-radius: 10px;
   font-weight: 500;
 }
- 
+
 .tariff-summary {
   background: #FFF8E1;
   border: 1px solid #FAC775;
@@ -459,7 +459,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .tariff-summary .left .label { font-size: 11px; color: #5F5E5A; }
 .tariff-summary .left .detail { font-size: 12px; color: #633806; margin-top: 2px; }
 .tariff-summary .right { font-size: 22px; font-weight: 600; color: #633806; }
- 
+
 /* v3.11: 候補外配送会社の理由表示（デバッグ可視化） */
 .excluded-info {
   background: #F5F5F7;
@@ -474,7 +474,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .excluded-info .excluded-title { font-weight: 600; margin-bottom: 4px; color: #5F5E5A; }
 .excluded-info .excluded-row { padding: 1px 0; }
 .excluded-info b { font-weight: 600; }
- 
+
 /* v3.10: ゴールド推奨案内バー（提案結果画面のカードリスト上部に表示） */
 .shipping-hint {
   background: #FFE066;
@@ -487,7 +487,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   line-height: 1.5;
 }
 .shipping-hint b { font-weight: 600; }
- 
+
 .legend {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -505,14 +505,14 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-size: 11px;
 }
 .legend-item .carrier-circle { width: 14px; height: 14px; border-width: 1px; }
- 
+
 .empty {
   text-align: center;
   padding: 60px 20px;
   color: var(--text-tertiary);
 }
 .loader { text-align: center; padding: 24px; color: var(--text-secondary); }
- 
+
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -545,7 +545,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .ocr-status { color: #fff; text-align: center; padding: 12px; font-size: 14px; }
 .ocr-buttons { display: flex; gap: 8px; }
 .ocr-buttons button { flex: 1; }
- 
+
 .toast {
   position: fixed;
   bottom: calc(20px + var(--safe-bottom));
@@ -560,12 +560,12 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   max-width: 90vw;
 }
 .toast.show { animation: toast-show 0.2s ease-out; }
- 
+
 @keyframes toast-show {
   from { opacity: 0; transform: translate(-50%, 20px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
- 
+
 /* ============================================
  * 数値入力用フローティングツールバー
  * iPhone数値キーパッドには「次へ」キーが無いため
@@ -605,9 +605,9 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border: 0;
   font-weight: 600;
 }
- 
+
 /* ============ v3.14: CPaSS 情報表示 (注文一覧カード) ============ */
- 
+
 .order-cpass-info {
   margin-top: 6px;
   padding: 6px 10px;
@@ -618,22 +618,22 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   gap: 4px;
   font-size: 13px;
 }
- 
+
 .cpass-package {
   display: flex;
   align-items: center;
   gap: 6px;
   color: #1e2a4a;
 }
- 
+
 .cpass-package .pkg-icon {
   font-size: 14px;
 }
- 
+
 .cpass-package .pkg-no {
   font-weight: 500;
 }
- 
+
 .cpass-package .sibling-badge {
   display: inline-block;
   font-size: 10px;
@@ -643,29 +643,29 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border-radius: 8px;
   margin-left: 4px;
 }
- 
+
 .cpass-asin {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
 }
- 
+
 .cpass-asin .asin-icon {
   font-size: 13px;
 }
- 
+
 .cpass-asin a {
   color: #185fa5;
   text-decoration: none;
   font-family: 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;
 }
- 
+
 .cpass-asin a:hover {
   text-decoration: underline;
 }
- 
+
 /* ============ v3.14: 入力画面の CPaSS # 表示 ============
  * 発送先国 ↓ CPaSS # ↓ 梱包後重量 の縦並びで、CPaSSデータがある時のみ表示
  */
@@ -682,4 +682,99 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .input-cpass-row .input-cpass-icon { font-size: 18px; }
 .input-cpass-row .input-cpass-label { font-size: 14px; }
 .input-cpass-row .input-cpass-no { font-weight: 600; font-size: 16px; }
- 
+
+/* ============ v3.15: CPaSS 未取込通知 (注文一覧バナー + カードバッジ + 入力画面警告) ============ */
+
+/* 上部バナー (Inbox 取込待機 / 未取込警告) */
+.cpass-banner { display: flex; flex-direction: column; }
+.cpass-inbox-alert,
+.cpass-unimported-alert {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cpass-inbox-alert {
+  background: #E6F1FB;
+  border-left: 4px solid #185FA5;
+  border-bottom: 1px solid #B5D4F4;
+}
+.cpass-unimported-alert {
+  background: #FFF3CD;
+  border-left: 4px solid #B88600;
+  border-bottom: 1px solid #FAC775;
+}
+.cpass-banner-icon { font-size: 20px; flex-shrink: 0; }
+.cpass-banner-body { flex: 1; min-width: 0; }
+.cpass-banner-main {
+  font-size: 13px;
+  font-weight: 500;
+}
+.cpass-inbox-alert .cpass-banner-main { color: #0C447C; }
+.cpass-unimported-alert .cpass-banner-main { color: #6B4500; }
+.cpass-banner-sub {
+  font-size: 11px;
+  margin-top: 2px;
+  color: #6B4500;
+}
+.cpass-banner-btn {
+  background: var(--primary);
+  color: #fff;
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  height: 36px;
+  flex-shrink: 0;
+}
+.cpass-banner-btn:active { opacity: 0.85; }
+.cpass-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.cpass-banner-btn .spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cpass-spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+@keyframes cpass-spin { to { transform: rotate(360deg); } }
+
+/* 注文カードの「CPaSS未取込」警告バッジ */
+.badge.cpass-unimported {
+  background: #FCE8B3;
+  color: #6B4500;
+  border: 0.5px solid #FAC775;
+}
+
+/* 入力画面の未取込警告 */
+.input-cpass-warning {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #FFF3CD;
+  border-left: 4px solid #B88600;
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.input-cpass-warning .input-cpass-warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  color: #B88600;
+}
+.input-cpass-warning .input-cpass-warning-body { flex: 1; min-width: 0; }
+.input-cpass-warning .input-cpass-warning-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B4500;
+}
+.input-cpass-warning .input-cpass-warning-detail {
+  font-size: 11px;
+  color: #6B4500;
+  margin-top: 3px;
+  line-height: 1.5;
+}
