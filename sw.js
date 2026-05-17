@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-16: ピックアップシート印刷機能 (1商品1ページ, A4縦, OCR対応OrderID, Amazon商品名)
  * v3-15: PWA に CPaSS バナー + [取込実行] ボタン + 未取込警告 + 6時間メールリマインダ
  * v3-14: CPaSS パッケージ番号/ASIN 表示 (注文一覧 + 入力画面)
  * v3-13: 発送追跡番号の自動取得 / 発送済バッジ / 発送済を隠すトグル / 発送日+追跡番号表示
@@ -9,7 +10,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-15';
+const CACHE_NAME = 'ebay-ship-v3-16';
 
 const STATIC_FILES = [
   './',

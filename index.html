@@ -35,6 +35,12 @@
     <header class="head">
       <h1>未発送の注文</h1>
       <div class="head-actions">
+        <!-- v3.16: 一括印刷ボタン -->
+        <button class="scan-pill print-pill" id="btn-bulk-print" title="ピックアップシート一括印刷">
+          <span class="scan-pill-icon">🖨</span>
+          <span class="scan-pill-label">印刷</span>
+          <span class="print-pill-badge hidden" id="bulk-print-badge">0</span>
+        </button>
         <button class="scan-pill" id="btn-scan-list" title="スキャンして開く">
           <span class="scan-pill-icon">📷</span>
           <span class="scan-pill-label">スキャン</span>
@@ -179,6 +185,34 @@
       <button class="primary hidden" id="btn-confirm">この発送方法で確定</button>
     </div>
   </section>
+
+  <!-- v3.16: 印刷プレビュー画面 -->
+  <section id="screen-print" class="screen hidden">
+    <header class="head">
+      <button class="icon" id="btn-home-print" title="ホームへ戻る">🏠</button>
+      <button class="icon" id="btn-back-print" title="戻る">←</button>
+      <h1 id="print-title">📦 ピックアップシート印刷</h1>
+    </header>
+    <div class="print-actions-bar" id="print-actions-bar">
+      <div class="print-count" id="print-count-label">— 件</div>
+      <div class="print-action-buttons">
+        <button class="secondary" id="btn-print-cancel">← 戻る</button>
+        <button class="primary print-btn-do" id="btn-print-do">🖨 ブラウザ印刷</button>
+        <button class="primary print-btn-mark" id="btn-print-mark">✅ 印刷完了マーク</button>
+      </div>
+    </div>
+    <div id="print-preview-area" class="content print-preview-area"></div>
+  </section>
+
+  <!-- v3.16: 注文カード長押しメニュー -->
+  <div id="card-action-overlay" class="overlay hidden">
+    <div class="card-action-menu">
+      <div class="card-action-target" id="card-action-target">—</div>
+      <button class="card-action-btn" id="card-action-print">🖨 個別印刷</button>
+      <button class="card-action-btn" id="card-action-unmark">🗑 印刷済を解除</button>
+      <button class="card-action-btn secondary" id="card-action-cancel">キャンセル</button>
+    </div>
+  </div>
 
   <!-- カメラ／OCRオーバーレイ -->
   <section id="ocr-overlay" class="overlay hidden">

@@ -1,5 +1,12 @@
 /**
- * メインのUIロジック (v3.15)
+ * メインのUIロジック (v3.16)
+ *
+ * v3.16 追加機能:
+ *  - ピックアップシート印刷 (A4縦・1商品1ページ・黒字のみ)
+ *  - バルク印刷: 未発送 + CPaSS取込済 + 印刷済でない注文を一括印刷
+ *  - 個別印刷 / 印刷済解除: 注文カード長押しメニュー
+ *  - 🖨 印刷済 バッジ表示 (リストから非表示にしない)
+ *  - Amazon商品名表示 (PA-API 連携・キャッシュ付き)
  *
  * v3.15 追加機能:
  *  - 注文一覧の上部に CPaSS バナー (Inbox 取込待機 / 未取込警告)
@@ -35,7 +42,14 @@ const App = {
     recentCountries: [],
     pendingWrites: 0,
     batchScanActive: false,
-    cpassStatus: null  // v3.15: { inbox_pending_count, unimported_count, unimported_orders }
+    cpassStatus: null,  // v3.15: { inbox_pending_count, unimported_count, unimported_orders }
+    // v3.16: 印刷関連
+    bulkPrintCount: 0,
+    bulkPrintTargets: [],
+    printPreviewOrders: [],
+    longPressOrderId: null,
+    _longPressTimer: null,
+    _longPressTriggered: false
   },
 
   async init() {
@@ -136,6 +150,17 @@ const App = {
 
       // v3.15: CPaSS 取込実行ボタン
       this._bind('btn-cpass-import', 'onclick', () => this.runCpassImport());
+
+      // v3.16: 印刷機能
+      this._bind('btn-bulk-print', 'onclick', () => this.openBulkPrint());
+      this._bind('btn-back-print', 'onclick', () => this.goHome());
+      this._bind('btn-home-print', 'onclick', () => this.goHome());
+      this._bind('btn-print-cancel', 'onclick', () => this.goHome());
+      this._bind('btn-print-do', 'onclick', () => this.doBrowserPrint());
+      this._bind('btn-print-mark', 'onclick', () => this.markPrintedAndReturn());
+      this._bind('card-action-print', 'onclick', () => this.openIndividualPrint(this.state.longPressOrderId));
+      this._bind('card-action-unmark', 'onclick', () => this.unmarkPrintedAndReload(this.state.longPressOrderId));
+      this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
 
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
@@ -370,6 +395,7 @@ const App = {
       this.populateCountrySelect();
       this.renderOrders();
       this.updateCpassBanner();  // v3.15
+      this.updateBulkPrintBadge();  // v3.16
     } catch (err) {
       showToast('読み込みエラー: ' + err.message);
     } finally {
@@ -476,6 +502,8 @@ const App = {
       const shippedBadge = isShipped ? '<span class="badge shipped">✓ 発送済</span>' : '';
       // v3.15: CPaSS 未取込警告バッジ (発送済かつ未取込のみ)
       const cpassUnimportedBadge = o.cpass_unimported ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
+      // v3.16: 印刷済バッジ
+      const printedBadge = o.printedAt ? '<span class="badge printed">🖨 印刷済</span>' : '';
       const shippingInfoHtml = isShipped ? `
           <div class="order-shipping-info">
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
@@ -491,6 +519,7 @@ const App = {
             ${o.selectedCarrier ? '<span class="badge done">確定</span>' : ''}
             ${shippedBadge}
             ${cpassUnimportedBadge}
+            ${printedBadge}
           </div>
           <div class="order-id">${escapeHtml(o.orderId)}</div>
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
@@ -501,11 +530,73 @@ const App = {
       </div>`;
     }).join('');
 
+    // v3.16: 長押し対応 + 通常クリック
     list.querySelectorAll('.order-item').forEach(el => {
-      el.onclick = () => {
-        TodayGroup.add(el.dataset.id);
-        this.openInput(el.dataset.id);
-      };
+      const orderId = el.dataset.id;
+      this._bindCardLongPress(el, orderId);
+    });
+  },
+
+  /**
+   * v3.16: カードの長押し検出 (500ms) + 通常クリック
+   * - 長押し: 個別印刷/印刷済解除メニューを開く
+   * - 通常クリック: 入力画面へ
+   */
+  _bindCardLongPress(el, orderId) {
+    const LONG_MS = 500;
+    let pressTimer = null;
+    let triggered = false;
+    let startY = 0;
+
+    const cleanup = () => {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    };
+    const handleStart = (clientY) => {
+      triggered = false;
+      startY = clientY;
+      pressTimer = setTimeout(() => {
+        triggered = true;
+        if (navigator.vibrate) try { navigator.vibrate(40); } catch (_) {}
+        this.showCardActionMenu(orderId);
+      }, LONG_MS);
+    };
+    const handleMove = (clientY) => {
+      if (Math.abs(clientY - startY) > 10) cleanup();
+    };
+    const handleEnd = () => {
+      cleanup();
+      // triggered フラグは showCardActionMenu 内で参照される
+    };
+
+    // Touch
+    el.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientY), { passive: true });
+    el.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientY), { passive: true });
+    el.addEventListener('touchend', handleEnd, { passive: true });
+    el.addEventListener('touchcancel', cleanup, { passive: true });
+
+    // Mouse (PC)
+    el.addEventListener('mousedown', (e) => handleStart(e.clientY));
+    el.addEventListener('mousemove', (e) => { if (pressTimer) handleMove(e.clientY); });
+    el.addEventListener('mouseup', handleEnd);
+    el.addEventListener('mouseleave', cleanup);
+
+    // 右クリック (PC) でも長押しメニューを開く
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      triggered = true;
+      this.showCardActionMenu(orderId);
+    });
+
+    // クリック: 長押しでなければ openInput
+    el.addEventListener('click', (e) => {
+      if (triggered) {
+        triggered = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      TodayGroup.add(orderId);
+      this.openInput(orderId);
     });
   },
 
@@ -876,6 +967,264 @@ const App = {
     } else {
       banner.classList.add('hidden');
     }
+  },
+
+  // ============================================================
+  // v3.16: 印刷機能
+  // ============================================================
+
+  /**
+   * ヘッダーの印刷ボタンのバッジを更新 (バルク印刷対象数)
+   */
+  async updateBulkPrintBadge() {
+    const badge = document.getElementById('bulk-print-badge');
+    if (!badge) return;
+    try {
+      const r = await API.getPrintTargets();
+      const count = (r && typeof r.count === 'number') ? r.count : 0;
+      this.state.bulkPrintCount = count;
+      this.state.bulkPrintTargets = r.orderIds || [];
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    } catch (e) {
+      console.error('updateBulkPrintBadge error:', e);
+    }
+  },
+
+  /**
+   * 一括印刷を開始: 対象注文の印刷データを取得して印刷プレビュー画面へ
+   */
+  async openBulkPrint() {
+    if (this.state.bulkPrintCount === 0) {
+      showToast('印刷対象がありません (未発送+CPaSS取込済+未印刷の注文がない)');
+      return;
+    }
+    showToast('印刷データを取得中... (' + this.state.bulkPrintCount + '件)');
+    try {
+      const r = await API.getPrintData([]); // 空配列 = サーバ側で getBulkPrintTargets
+      const orders = (r && r.orders) || [];
+      if (orders.length === 0) {
+        showToast('印刷対象がありません');
+        return;
+      }
+      this.state.printPreviewOrders = orders;
+      this.renderPrintPreview(orders);
+      this.show('screen-print');
+    } catch (e) {
+      showToast('印刷データ取得失敗: ' + e.message);
+    }
+  },
+
+  /**
+   * 個別印刷: 指定注文1件のみ
+   */
+  async openIndividualPrint(orderId) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    showToast('印刷データを取得中... (' + orderId + ')');
+    try {
+      const r = await API.getPrintData([orderId]);
+      const orders = (r && r.orders) || [];
+      if (orders.length === 0) {
+        showToast('注文データが見つかりません');
+        return;
+      }
+      this.state.printPreviewOrders = orders;
+      this.renderPrintPreview(orders);
+      this.show('screen-print');
+    } catch (e) {
+      showToast('印刷データ取得失敗: ' + e.message);
+    }
+  },
+
+  /**
+   * 印刷プレビューを描画 (1商品1ページ)
+   */
+  renderPrintPreview(orders) {
+    const area = document.getElementById('print-preview-area');
+    const countLabel = document.getElementById('print-count-label');
+    const titleEl = document.getElementById('print-title');
+    if (!area) return;
+
+    if (countLabel) countLabel.textContent = orders.length + ' 件 (1商品1ページ)';
+    if (titleEl) titleEl.textContent = '📦 ピックアップシート印刷 (' + orders.length + '件)';
+
+    const dateStr = this._formatPrintDate(new Date());
+    const total = orders.length;
+
+    const html = orders.map((o, idx) => this._renderPrintPage(o, idx + 1, total, dateStr)).join('');
+    area.innerHTML = html;
+  },
+
+  _formatPrintDate(d) {
+    const pad = n => (n < 10 ? '0' + n : '' + n);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  },
+
+  /**
+   * 1注文の印刷ページHTML
+   */
+  _renderPrintPage(o, pageNum, total, dateStr) {
+    const orderId = escapeHtml(o.orderId || '');
+    const account = escapeHtml(o.account || '');
+    const country = escapeHtml(o.country || '');
+    const ebayTitle = escapeHtml(o.itemTitle || '');
+    const amazonTitle = escapeHtml(o.amazonTitle || '');
+    const asin = escapeHtml(o.asin || '');
+    const cpassPackage = escapeHtml(o.cpassPackage || '');
+    const carrier = escapeHtml(o.selectedCarrier || o.shippingPolicy || '未確定');
+    const hsCode = escapeHtml(o.hsCode || '');
+    const tariffRate = o.tariffRate ? (parseFloat(o.tariffRate).toFixed(1) + '%') : '0%';
+    const buyer = escapeHtml(o.buyerName || '');
+    const imageHtml = (o.imageUrl && String(o.imageUrl).indexOf('http') === 0)
+      ? `<img src="${escapeAttr(o.imageUrl)}" alt="" onerror="this.outerHTML='📦'">`
+      : '📦';
+
+    const cpassBlock = cpassPackage
+      ? `<div class="pp-cpass">
+           <div class="pp-cpass-label">CPASS PACKAGE</div>
+           <div class="pp-cpass-value">#${cpassPackage}</div>
+         </div>`
+      : `<div class="pp-cpass warning">
+           <div class="pp-cpass-label">CPASS</div>
+           <div class="pp-cpass-value">⚠ 未取込</div>
+         </div>`;
+
+    const amazonBlock = amazonTitle
+      ? `<div class="pp-amazon-text">${amazonTitle}</div>
+         <div class="pp-amazon-asin">🛒 ${asin}</div>`
+      : `<div class="pp-amazon-text" style="color:#666;">(${asin ? 'ASIN: ' + asin + ' / PA-API未取得' : '未取込'})</div>`;
+
+    return `
+      <div class="print-page">
+        <div class="pp-header">
+          <div class="pp-title">📦 ピックアップシート</div>
+          <div class="pp-meta">${dateStr} &nbsp;|&nbsp; Page ${pageNum} / ${total}</div>
+        </div>
+        <div class="pp-orderid-frame">
+          <div class="pp-orderid-label">ORDER ID</div>
+          <div class="pp-orderid-id">${orderId}</div>
+        </div>
+        <div class="pp-card-area">
+          <div class="pp-info">
+            <div class="pp-img-wrap">
+              <div class="pp-img">${imageHtml}</div>
+              <div class="pp-ac-bottom">${account} / ${country}</div>
+            </div>
+            <div class="pp-text-area">
+              <div class="pp-ebay">
+                <div class="pp-ebay-label">eBay商品名</div>
+                <div class="pp-ebay-text">${ebayTitle}</div>
+              </div>
+              <div class="pp-amazon">
+                <div class="pp-amazon-label">AMAZON商品名 ⭐</div>
+                ${amazonBlock}
+              </div>
+            </div>
+          </div>
+          ${cpassBlock}
+          <div class="pp-measure">
+            <div class="pp-measure-label">⚖ 計測 (記入欄)</div>
+            重量: <span class="pp-write-box"></span> g &nbsp;&nbsp;
+            寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm
+          </div>
+          <div class="pp-meta-info">📦 ${carrier} / HS ${hsCode || '-'} / 関税 ${tariffRate}</div>
+          <div class="pp-buyer">
+            <div class="pp-buyer-label">SHIP TO</div>
+            ${buyer}<br>${country}
+          </div>
+        </div>
+        <div class="pp-empty-bottom"></div>
+      </div>
+    `;
+  },
+
+  /**
+   * ブラウザの印刷ダイアログを呼び出し
+   */
+  doBrowserPrint() {
+    window.print();
+  },
+
+  /**
+   * 印刷完了 → 表示中の全注文を印刷済としてマーク → 注文一覧へ戻る
+   */
+  async markPrintedAndReturn() {
+    const orders = this.state.printPreviewOrders || [];
+    if (orders.length === 0) {
+      this.goHome();
+      return;
+    }
+    const ids = orders.map(o => o.orderId);
+    showToast('印刷済マーク中... (' + ids.length + '件)');
+    try {
+      const r = await API.markPrinted(ids);
+      const updated = (r && r.updated) || 0;
+      showToast(updated + '件を印刷済としてマークしました');
+      this.state.printPreviewOrders = [];
+      await this.loadAll();
+    } catch (e) {
+      showToast('印刷済マーク失敗: ' + e.message);
+    }
+  },
+
+  /**
+   * 印刷済解除 (個別注文の Y列クリア)
+   */
+  async unmarkPrintedAndReload(orderId) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    showToast('印刷済を解除中...');
+    try {
+      const r = await API.unmarkPrinted(orderId);
+      if (r && r.updated > 0) {
+        showToast('印刷済を解除しました: ' + orderId);
+      } else {
+        showToast('対象注文が見つかりませんでした');
+      }
+      await this.loadAll();
+    } catch (e) {
+      showToast('印刷済解除失敗: ' + e.message);
+    }
+  },
+
+  /**
+   * 注文カード長押しメニューを表示
+   */
+  showCardActionMenu(orderId) {
+    this.state.longPressOrderId = orderId;
+    const overlay = document.getElementById('card-action-overlay');
+    const target = document.getElementById('card-action-target');
+    const unmarkBtn = document.getElementById('card-action-unmark');
+    if (!overlay || !target) return;
+
+    target.textContent = orderId;
+
+    // 印刷済か否かでメニュー表示制御
+    const order = this.state.orders.find(o => o.orderId === orderId);
+    if (unmarkBtn) {
+      if (order && order.printedAt) {
+        unmarkBtn.style.display = '';
+      } else {
+        unmarkBtn.style.display = 'none';
+      }
+    }
+
+    overlay.classList.remove('hidden');
+    // オーバーレイ外タップで閉じる
+    overlay.onclick = (e) => {
+      if (e.target === overlay) this.closeCardActionMenu();
+    };
+  },
+
+  closeCardActionMenu() {
+    const overlay = document.getElementById('card-action-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    this.state.longPressOrderId = null;
   },
 
   /**

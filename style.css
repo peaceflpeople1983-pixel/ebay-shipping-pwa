@@ -778,3 +778,327 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   margin-top: 3px;
   line-height: 1.5;
 }
+
+/* ============================================
+ * v3.16: 印刷機能 (ピックアップシート)
+ * ============================================ */
+
+/* --- ヘッダ印刷ピル + バッジ --- */
+.scan-pill.print-pill { position: relative; }
+.print-pill-badge {
+  background: #FFC726;
+  color: #1F3864;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 2px;
+  min-width: 16px;
+  text-align: center;
+}
+.print-pill-badge.hidden { display: none !important; }
+
+/* --- 注文カードの「印刷済」バッジ --- */
+.badge.printed {
+  background: #E0E0E0;
+  color: #333;
+  border: 0.5px solid #999;
+}
+
+/* --- 印刷プレビュー画面 --- */
+.print-actions-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.print-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary);
+}
+.print-action-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.print-action-buttons button {
+  padding: 8px 14px;
+  font-size: 13px;
+  margin-top: 0;
+  width: auto;
+}
+.print-btn-do { background: var(--primary); color: #fff; }
+.print-btn-mark { background: var(--accent); color: #fff; }
+
+.print-preview-area {
+  background: #ddd;
+  padding: 16px;
+  min-height: 80vh;
+}
+
+/* プリント用カード (画面プレビュー時) */
+.print-page {
+  background: white;
+  width: 210mm;
+  height: 297mm;
+  max-width: 100%;
+  margin: 0 auto 12px;
+  padding: 14mm;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  color: #000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  /* @media print で page-break-after */
+}
+@media (max-width: 220mm) {
+  .print-page {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 210 / 297;
+  }
+}
+
+.pp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+  border-bottom: 1.2px solid #000;
+  margin-bottom: 10px;
+}
+.pp-title { font-weight: 700; font-size: 14px; color: #000; }
+.pp-meta { font-size: 10px; color: #000; }
+
+.pp-orderid-frame {
+  border: 2.5px solid #000;
+  padding: 6px 10px;
+  background: white;
+  text-align: center;
+  margin: 0 auto 10px;
+  width: 66%;
+  box-sizing: border-box;
+}
+.pp-orderid-frame .pp-orderid-label {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 3px;
+}
+.pp-orderid-frame .pp-orderid-id {
+  font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: #000;
+  line-height: 1;
+}
+
+.pp-card-area { flex: 0 0 auto; }
+
+.pp-info {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+}
+.pp-img-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pp-img {
+  width: 96px;
+  height: 96px;
+  background: #eee;
+  border: 0.5px solid #000;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  overflow: hidden;
+}
+.pp-img img { width: 100%; height: 100%; object-fit: cover; }
+.pp-ac-bottom {
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+  border: 0.5px solid #000;
+  padding: 2px 0;
+  border-radius: 2px;
+}
+
+.pp-text-area { display: flex; flex-direction: column; gap: 5px; }
+.pp-ebay {
+  padding-bottom: 5px;
+  border-bottom: 0.5px solid #000;
+}
+.pp-ebay-label { font-size: 9px; color: #444; font-weight: 700; }
+.pp-ebay-text { font-size: 11px; color: #000; line-height: 1.4; font-weight: 500; }
+.pp-amazon { flex: 1; }
+.pp-amazon-label { font-size: 9px; color: #444; font-weight: 700; }
+.pp-amazon-text {
+  font-size: 14px;
+  color: #000;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.pp-amazon-asin {
+  font-size: 9px;
+  color: #000;
+  font-family: monospace;
+  margin-top: 3px;
+}
+
+.pp-cpass {
+  background: white;
+  border: 2.5px solid #000;
+  padding: 6px 10px;
+  border-radius: 2px;
+  margin-top: 10px;
+  text-align: center;
+}
+.pp-cpass-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+.pp-cpass-value { font-size: 18px; font-weight: 800; margin-top: 1px; }
+.pp-cpass.warning { background: #f7f7f7; }
+.pp-cpass.warning .pp-cpass-value { font-size: 13px; }
+
+.pp-measure {
+  border: 1px dashed #000;
+  border-radius: 2px;
+  padding: 7px 10px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #000;
+}
+.pp-measure-label { font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+.pp-write-box {
+  display: inline-block;
+  border-bottom: 1.5px solid #000;
+  min-width: 60px;
+  height: 14px;
+  vertical-align: middle;
+}
+.pp-write-box.tiny { min-width: 32px; }
+
+.pp-meta-info {
+  font-size: 10px;
+  color: #000;
+  margin-top: 7px;
+}
+
+.pp-buyer {
+  border-left: 3px solid #000;
+  padding: 5px 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #000;
+  line-height: 1.45;
+}
+.pp-buyer-label { font-size: 9px; color: #444; font-weight: 700; }
+
+.pp-empty-bottom {
+  min-height: 50%;
+  flex: 1;
+  background: white;
+}
+
+/* ============================================
+ * @media print: 実印刷時のスタイル
+ * ============================================ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  body {
+    background: white !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  /* PWA の他の要素は非表示 */
+  #app > *:not(#screen-print) { display: none !important; }
+  #screen-print .head,
+  #screen-print .print-actions-bar { display: none !important; }
+  #screen-print .print-preview-area {
+    background: white !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+  .print-page {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    box-shadow: none;
+    padding: 14mm;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+  .print-page:last-child { page-break-after: auto; }
+  /* 黒のみ印刷 */
+  .pp-orderid-frame,
+  .pp-cpass,
+  .pp-measure,
+  .pp-buyer,
+  .pp-img,
+  .pp-ebay,
+  .pp-ac-bottom {
+    border-color: #000 !important;
+  }
+}
+
+/* ============================================
+ * v3.16: 注文カード長押しメニュー
+ * ============================================ */
+#card-action-overlay {
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.card-action-menu {
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding-bottom: calc(16px + var(--safe-bottom));
+}
+.card-action-target {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+.card-action-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  text-align: center;
+  color: var(--text);
+  font-weight: 500;
+}
+.card-action-btn:active { background: var(--bg); }
+.card-action-btn.secondary {
+  background: var(--bg);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}

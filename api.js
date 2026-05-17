@@ -86,6 +86,32 @@ const API = {
   },
 
   /**
+   * v3.16: 印刷機能
+   */
+  async getPrintTargets() {
+    // バルク印刷対象 (未発送 + CPaSS取込済 + 印刷済でない) の orderIds + count を返す
+    return this._get('?action=printGetTargets');
+  },
+
+  async getPrintData(orderIds) {
+    // orderIds が空配列ならサーバ側で getBulkPrintTargets を呼ぶ
+    const ids = (orderIds || []).join(',');
+    const q = '?action=printGetData' + (ids ? '&orderIds=' + encodeURIComponent(ids) : '');
+    return this._get(q);
+  },
+
+  async markPrinted(orderIds) {
+    // 印刷済タイムスタンプを Y列に書込む
+    const ids = (orderIds || []).join(',');
+    return this._get('?action=printMark&orderIds=' + encodeURIComponent(ids));
+  },
+
+  async unmarkPrinted(orderId) {
+    // 単一注文の Y列クリア
+    return this._get('?action=printUnmark&orderId=' + encodeURIComponent(orderId));
+  },
+
+  /**
    * Sheets書込み（バックグラウンド）。
    * 戻り値の Promise を await しなくても処理は継続する。
    * UI を返してから resolve されるまで保持する場合は呼び出し側で .then() を使う。
