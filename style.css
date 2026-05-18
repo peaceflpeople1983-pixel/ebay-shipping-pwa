@@ -881,10 +881,10 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 .pp-orderid-frame {
   border: 2.5px solid #000;
-  padding: 6px 10px;
+  padding: 4px 10px;  /* v3.16.5: 余白縮小 */
   background: white;
   text-align: center;
-  margin: 0 auto 10px;
+  margin: 0 auto 6px;
   width: 66%;
   box-sizing: border-box;
 }
@@ -908,8 +908,8 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 .pp-info {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 10px;
+  grid-template-columns: 72px 1fr;  /* v3.16.5: 画像縮小 96→72px */
+  gap: 8px;
 }
 .pp-img-wrap {
   display: flex;
@@ -917,15 +917,15 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   gap: 3px;
 }
 .pp-img {
-  width: 96px;
-  height: 96px;
+  width: 72px;   /* v3.16.5: 96→72px (140mm 収納のため) */
+  height: 72px;
   background: #eee;
   border: 0.5px solid #000;
   border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 38px;
+  font-size: 30px;
   overflow: hidden;
 }
 .pp-img img { width: 100%; height: 100%; object-fit: cover; }
@@ -964,9 +964,9 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .pp-cpass {
   background: white;
   border: 2.5px solid #000;
-  padding: 6px 10px;
+  padding: 4px 10px;  /* v3.16.5: 余白縮小 */
   border-radius: 2px;
-  margin-top: 10px;
+  margin-top: 6px;
   text-align: center;
 }
 .pp-cpass-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
@@ -977,8 +977,8 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .pp-measure {
   border: 1px dashed #000;
   border-radius: 2px;
-  padding: 7px 10px;
-  margin-top: 10px;
+  padding: 5px 10px;  /* v3.16.5: 余白縮小 */
+  margin-top: 6px;
   font-size: 12px;
   color: #000;
 }
@@ -1000,11 +1000,11 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 .pp-buyer {
   border-left: 3px solid #000;
-  padding: 5px 8px;
-  margin-top: 8px;
+  padding: 4px 8px;  /* v3.16.5: 余白縮小 */
+  margin-top: 5px;
   font-size: 11px;
   color: #000;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 .pp-buyer-label { font-size: 9px; color: #444; font-weight: 700; }
 
@@ -1016,12 +1016,12 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 /* ============================================
  * @media print: 実印刷時のスタイル
- * v3.16.3: iOS Safari 対応強化 (1注文 = 確実に1ページ)
+ * v3.16.4: 固定 height 撤廃 (iOS の累積ドリフト対策)
  * ============================================ */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm;  /* iOS Safari は最小 margin が大きめなので余裕を持たせる */
+    margin: 12mm;
   }
   html, body {
     background: white !important;
@@ -1045,36 +1045,38 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* ★ iOS Safari 対策: 1ページに確実に収まるよう余裕を持って 250mm に設定 */
-  /* A4: 297mm, margin上下24mm差し引きで 273mm 利用可能、安全マージン取って 250mm */
+  /* ★ v3.16.5 重要変更:
+   *   カードを A4 上半分 (140mm) ぴったりに固定。
+   *   page-break-after: always で残り下半分は空白で次ページへ。
+   *   将来 1ページ2商品印刷時は page-break-after を解除して 2枚並べる予定。
+   *   140mm = A4 (297mm) - margin (24mm) ÷ 2 = 136.5mm に近い安全値。
+   */
   .print-page {
+    display: block !important;       /* iOS の flex 印刷バグ回避 */
     width: 100%;
-    height: 250mm;
-    max-height: 250mm;
-    min-height: 250mm;
+    height: 140mm !important;        /* ← 上半分固定 */
+    max-height: 140mm !important;
+    min-height: 140mm !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
-    /* 現代の break-* + レガシーの page-break-* を両方指定 (iOS Safari 用) */
+    /* 現代の break-* + レガシー page-break-* を両指定 (iOS Safari 用) */
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
     -webkit-column-break-after: always;
     -webkit-column-break-inside: avoid;
-    overflow: hidden;  /* はみ出しクリップで 2ページ化防止 */
+    overflow: hidden;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
   }
   .print-page:last-child {
     page-break-after: auto;
     break-after: auto;
   }
-  /* 印刷時の余白下半分 (min-height 50% を解除して flex のみで埋める) */
+  /* 印刷時は空白用 div を非表示 (固定高さ140mm に強制したので不要) */
   .pp-empty-bottom {
-    min-height: 0 !important;
-    flex: 1;
+    display: none !important;
   }
   /* 黒のみ印刷 */
   .pp-orderid-frame,
