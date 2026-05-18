@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-16-6: ブラウザのヘッダ/フッタ(URL・日付・ページ番号)を CSS で抑制
  * v3-16-5: カードを A4 上半分 140mm 固定 (将来 1ページ2商品印刷の準備)
  * v3-16-4: iOS の累積ドリフト対策 (固定 height 撤廃・page-break-after のみで制御)
  * v3-16-3: iOS Safari 印刷の 2ページ化を修正 (.print-page を 250mm + break-after プリフィックス追加)
@@ -16,7 +17,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-16-5';
+const CACHE_NAME = 'ebay-ship-v3-16-6';
 
 const STATIC_FILES = [
   './',

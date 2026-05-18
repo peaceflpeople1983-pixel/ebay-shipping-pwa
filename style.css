@@ -1016,12 +1016,12 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 /* ============================================
  * @media print: 実印刷時のスタイル
- * v3.16.4: 固定 height 撤廃 (iOS の累積ドリフト対策)
+ * v3.16.6: ブラウザのヘッダ/フッタ(URL・日付・ページ番号) を CSS で抑制
  * ============================================ */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm;
+    margin: 0;  /* ★ 0 にすることでブラウザの ヘッダ/フッタ 表示領域を消す */
   }
   html, body {
     background: white !important;
@@ -1054,11 +1054,12 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   .print-page {
     display: block !important;       /* iOS の flex 印刷バグ回避 */
     width: 100%;
-    height: 140mm !important;        /* ← 上半分固定 */
-    max-height: 140mm !important;
-    min-height: 140mm !important;
+    height: 148mm !important;        /* ← A4の上半分ピッタリ (297÷2) */
+    max-height: 148mm !important;
+    min-height: 148mm !important;
     margin: 0 !important;
-    padding: 0 !important;
+    /* @page margin:0 にしたので、内側に印刷余白を確保 */
+    padding: 10mm 12mm 0 12mm !important;
     box-shadow: none !important;
     /* 現代の break-* + レガシー page-break-* を両指定 (iOS Safari 用) */
     page-break-after: always;
