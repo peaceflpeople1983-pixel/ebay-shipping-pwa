@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-16-3: iOS Safari 印刷の 2ページ化を修正 (.print-page を 250mm + break-after プリフィックス追加)
  * v3-16-2: 印刷時に 1注文が 2ページに分かれる問題を修正 (.print-page サイズ調整)
  * v3-16-1: Apps Script API を SW intercept から除外 (FetchEvent.respondWith null エラー対策)
  *          Keepa API URL も intercept しない
@@ -13,7 +14,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-16-2';
+const CACHE_NAME = 'ebay-ship-v3-16-3';
 
 const STATIC_FILES = [
   './',

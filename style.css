@@ -1016,43 +1016,61 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 /* ============================================
  * @media print: 実印刷時のスタイル
- * v3.16.2: 1注文 = 確実に1ページに収める
+ * v3.16.3: iOS Safari 対応強化 (1注文 = 確実に1ページ)
  * ============================================ */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;  /* プリンタ余白を明示的に確保 (margin:0 だとプリンタが追加余白を入れる) */
+    margin: 12mm;  /* iOS Safari は最小 margin が大きめなので余裕を持たせる */
   }
-  body {
+  html, body {
     background: white !important;
     font-family: 'Helvetica Neue', Arial, sans-serif;
     margin: 0 !important;
     padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
   }
   /* PWA の他の要素は非表示 */
   #app > *:not(#screen-print) { display: none !important; }
   #screen-print .head,
   #screen-print .print-actions-bar { display: none !important; }
+  #screen-print,
   #screen-print .print-preview-area {
     background: white !important;
     padding: 0 !important;
     margin: 0 !important;
     min-height: auto !important;
+    height: auto !important;
+    display: block !important;
   }
-  /* 1ページにピッタリ収める: A4 - 上下margin(10mm*2=20mm) = 277mm */
+
+  /* ★ iOS Safari 対策: 1ページに確実に収まるよう余裕を持って 250mm に設定 */
+  /* A4: 297mm, margin上下24mm差し引きで 273mm 利用可能、安全マージン取って 250mm */
   .print-page {
     width: 100%;
-    height: 277mm;
-    max-height: 277mm;
+    height: 250mm;
+    max-height: 250mm;
+    min-height: 250mm;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
+    /* 現代の break-* + レガシーの page-break-* を両方指定 (iOS Safari 用) */
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
-    overflow: hidden;  /* 万一はみ出ても 2ページ化を防ぐ */
+    break-inside: avoid;
+    -webkit-column-break-after: always;
+    -webkit-column-break-inside: avoid;
+    overflow: hidden;  /* はみ出しクリップで 2ページ化防止 */
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
-  .print-page:last-child { page-break-after: auto; }
+  .print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
   /* 印刷時の余白下半分 (min-height 50% を解除して flex のみで埋める) */
   .pp-empty-bottom {
     min-height: 0 !important;
@@ -1068,7 +1086,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   .pp-ac-bottom {
     border-color: #000 !important;
   }
-  /* カラー印刷OFF時の挙動を安定化 */
+  /* カラー印刷の安定化 */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
