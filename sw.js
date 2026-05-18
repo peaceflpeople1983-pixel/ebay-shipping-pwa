@@ -1,5 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-16-1: Apps Script API を SW intercept から除外 (FetchEvent.respondWith null エラー対策)
+ *          Keepa API URL も intercept しない
  * v3-16: ピックアップシート印刷機能 (1商品1ページ, A4縦, OCR対応OrderID, Amazon商品名)
  * v3-15: PWA に CPaSS バナー + [取込実行] ボタン + 未取込警告 + 6時間メールリマインダ
  * v3-14: CPaSS パッケージ番号/ASIN 表示 (注文一覧 + 入力画面)
@@ -10,7 +12,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-16';
+const CACHE_NAME = 'ebay-ship-v3-16-1';
 
 const STATIC_FILES = [
   './',
@@ -43,12 +45,29 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Apps Script API・CDNはネットワーク優先
-  if (url.hostname.includes('script.google.com') || url.hostname.includes('cdnjs.cloudflare.com')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  // v3.16.1: Apps Script API は SW で一切触らない (リダイレクト処理 + null Response 防止)
+  // script.google.com → script.googleusercontent.com の redirect を SW で intercept すると壊れる
+  if (url.hostname.includes('script.google.com') ||
+      url.hostname.includes('script.googleusercontent.com') ||
+      url.hostname.includes('googleapis.com') ||
+      url.hostname.includes('keepa.com')) {
     return;
   }
 
-  // 静的ファイルはキャッシュ優先
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  // CDN はネットワーク優先 (失敗時はキャッシュ、それも無ければ最小エラー Response)
+  if (url.hostname.includes('cdnjs.cloudflare.com')) {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        caches.match(e.request).then(r => r || new Response('', { status: 503, statusText: 'Offline' }))
+      )
+    );
+    return;
+  }
+
+  // 静的ファイルはキャッシュ優先 (キャッシュ無ければネットワーク、それも失敗時はエラー Response)
+  e.respondWith(
+    caches.match(e.request).then(r =>
+      r || fetch(e.request).catch(() => new Response('', { status: 503, statusText: 'Offline' }))
+    )
+  );
 });
