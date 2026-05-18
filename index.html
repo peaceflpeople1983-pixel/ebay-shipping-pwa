@@ -85,6 +85,13 @@
       <label class="filter-toggle">
         <input type="checkbox" id="filter-hide-shipped" checked> 発送済を隠す
       </label>
+      <!-- v3.17: 発送期日フィルタ -->
+      <label class="filter-toggle deadline-red">
+        <input type="checkbox" id="filter-overdue-only"> ⛔ 超過のみ
+      </label>
+      <label class="filter-toggle deadline-orange">
+        <input type="checkbox" id="filter-urgent-only"> ⚠ 24h以内のみ
+      </label>
       <button class="secondary" id="btn-new">+ 手動入力</button>
     </div>
     <div id="order-list" class="content"></div>

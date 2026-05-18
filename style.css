@@ -160,6 +160,11 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   padding: 0;
   accent-color: var(--primary);
 }
+/* v3.17: 期限フィルタリンク (緊急色付き) */
+.filter-toggle.deadline-red    { color: #8A1A1A; font-weight: 500; }
+.filter-toggle.deadline-orange { color: #8A4310; font-weight: 500; }
+.filter-toggle.deadline-red input[type="checkbox"]    { accent-color: #8A1A1A; }
+.filter-toggle.deadline-orange input[type="checkbox"] { accent-color: #8A4310; }
 
 /* 本日の作業バー */
 .today-bar {
@@ -264,6 +269,13 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .badge.shipped { background: var(--accent); color: #fff; }
 .order-item .order-meta { font-size: 12px; color: var(--text-secondary); }
 .order-item .order-cost { font-size: 13px; color: var(--accent); margin-top: 4px; }
+
+/* v3.17: 発送期日ピル (緊急度4段階 + 期限不明) - 他バッジと同サイズ */
+.badge.due-red    { background: #FDE0E0; color: #8A1A1A; border: 0.5px solid #F09595; }
+.badge.due-orange { background: #FFE4CC; color: #8A4310; border: 0.5px solid #EF9F27; }
+.badge.due-yellow { background: #FDF3D1; color: #7D5D10; border: 0.5px solid #FAC775; }
+.badge.due-green  { background: #DFF1D8; color: #2F5A1A; border: 0.5px solid #97C459; }
+.badge.due-gray   { background: #ECECEC; color: #5A5A5A; border: 0.5px solid #B4B2A9; }
 
 /* v3.13: 発送済カードの強調と発送情報行 */
 #order-list .order-item.shipped {
@@ -844,81 +856,122 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   min-height: 80vh;
 }
 
-/* プリント用カード (画面プレビュー時) */
-.print-page {
+/* v3.17: A4 1枚に2商品 — ペアラッパ (画面プレビュー時) */
+.print-pair {
   background: white;
   width: 210mm;
   height: 297mm;
   max-width: 100%;
   margin: 0 auto 12px;
-  padding: 14mm;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  /* @media print で page-break-after */
 }
 @media (max-width: 220mm) {
-  .print-page {
+  .print-pair {
     width: 100%;
     height: auto;
     aspect-ratio: 210 / 297;
   }
 }
 
+/* v3.17: 各カード=A4上半分(148.5mm)。ペア内の上下2枚に同じスタイル */
+.print-page {
+  background: white;
+  width: 100%;
+  height: 148.5mm;
+  padding: 10mm 12mm 8mm 12mm;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  color: #000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* ペア内のカード間の切取り線 (画面のみ) */
+.print-pair > .print-page:first-child {
+  border-bottom: 1px dashed #ccc;
+}
+/* 奇数最終ページの空カード */
+.print-page.empty {
+  background: white;
+  position: relative;
+}
+.print-page.empty::after {
+  content: "(このページは1件のみ・下半分は空白)";
+  position: absolute; top: 8mm; left: 0; right: 0;
+  text-align: center; font-size: 10px; color: #bbb;
+}
+
 .pp-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  padding-bottom: 4px;
-  border-bottom: 1.2px solid #000;
-  margin-bottom: 10px;
+  align-items: center;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #000;
+  margin-bottom: 6px;
+  font-size: 9.5px;
+  white-space: nowrap;
+  gap: 8px;
 }
-.pp-title { font-weight: 700; font-size: 14px; color: #000; }
-.pp-meta { font-size: 10px; color: #000; }
+.pp-title { font-weight: 700; color: #000; flex-shrink: 0; }
+.pp-deadline { flex: 1; text-align: center; }
+.pp-deadline.urgent-red    { color: #8A1A1A; font-weight: 700; }
+.pp-deadline.urgent-orange { color: #8A4310; font-weight: 700; }
+.pp-deadline.urgent-yellow { color: #7D5D10; }
+.pp-deadline.urgent-green  { color: #2F5A1A; }
+.pp-deadline.urgent-gray   { color: #666; }
+.pp-meta { color: #000; flex-shrink: 0; }
 
 .pp-orderid-frame {
   border: 2.5px solid #000;
-  padding: 4px 10px;  /* v3.16.5: 余白縮小 */
+  padding: 3px 10px;  /* v3.17: 2商品/ページ用に上下圧縮 */
   background: white;
   text-align: center;
-  margin: 0 auto 6px;
-  width: 66%;
+  margin: 0 auto 5px;
+  width: 70%;
   box-sizing: border-box;
 }
 .pp-orderid-frame .pp-orderid-label {
-  font-size: 9px;
+  font-size: 8.5px;
   letter-spacing: 0.5px;
   font-weight: 700;
   color: #000;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 .pp-orderid-frame .pp-orderid-id {
   font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
-  font-size: 22px;
+  font-size: 18px;  /* v3.17: 22pt → 18pt (2商品/ページ用) */
   font-weight: 800;
   letter-spacing: 0;
   color: #000;
   line-height: 1;
 }
 
-.pp-card-area { flex: 0 0 auto; }
+/* v3.17: SHIP TOを最下部に押し付けるための拡張領域 */
+.pp-card-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 
 .pp-info {
   display: grid;
-  grid-template-columns: 72px 1fr;  /* v3.16.5: 画像縮小 96→72px */
-  gap: 8px;
+  grid-template-columns: 58px 1fr;  /* v3.17: 画像縮小 72→58px (2商品/ページ用) */
+  gap: 7px;
 }
 .pp-img-wrap {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 .pp-img {
-  width: 72px;   /* v3.16.5: 96→72px (140mm 収納のため) */
-  height: 72px;
+  width: 58px;   /* v3.17: 72→58px (148.5mm 収納のため) */
+  height: 58px;
   background: #eee;
   border: 0.5px solid #000;
   border-radius: 2px;
@@ -930,83 +983,85 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 }
 .pp-img img { width: 100%; height: 100%; object-fit: cover; }
 .pp-ac-bottom {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: #000;
   text-align: center;
   border: 0.5px solid #000;
-  padding: 2px 0;
+  padding: 1px 0;
   border-radius: 2px;
 }
 
-.pp-text-area { display: flex; flex-direction: column; gap: 5px; }
+.pp-text-area { display: flex; flex-direction: column; gap: 3px; }
 .pp-ebay {
-  padding-bottom: 5px;
+  padding-bottom: 3px;
   border-bottom: 0.5px solid #000;
 }
-.pp-ebay-label { font-size: 9px; color: #444; font-weight: 700; }
-.pp-ebay-text { font-size: 11px; color: #000; line-height: 1.4; font-weight: 500; }
+.pp-ebay-label { font-size: 8.5px; color: #444; font-weight: 700; }
+.pp-ebay-text { font-size: 10px; color: #000; line-height: 1.3; font-weight: 500; }
 .pp-amazon { flex: 1; }
-.pp-amazon-label { font-size: 9px; color: #444; font-weight: 700; }
+.pp-amazon-label { font-size: 8.5px; color: #444; font-weight: 700; }
 .pp-amazon-text {
-  font-size: 14px;
+  font-size: 11px;  /* v3.17: 14→11 (2商品/ページ用) */
   color: #000;
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 .pp-amazon-asin {
-  font-size: 9px;
+  font-size: 8.5px;
   color: #000;
   font-family: monospace;
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
 .pp-cpass {
   background: white;
   border: 2.5px solid #000;
-  padding: 4px 10px;  /* v3.16.5: 余白縮小 */
+  padding: 3px 10px;  /* v3.17: 上下圧縮 */
   border-radius: 2px;
-  margin-top: 6px;
+  margin-top: 4px;
   text-align: center;
 }
-.pp-cpass-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
-.pp-cpass-value { font-size: 18px; font-weight: 800; margin-top: 1px; }
+.pp-cpass-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; }
+.pp-cpass-value { font-size: 15px; font-weight: 800; margin-top: 0; }  /* v3.17: 18→15pt */
 .pp-cpass.warning { background: #f7f7f7; }
-.pp-cpass.warning .pp-cpass-value { font-size: 13px; }
+.pp-cpass.warning .pp-cpass-value { font-size: 11px; }
 
 .pp-measure {
   border: 1px dashed #000;
   border-radius: 2px;
-  padding: 5px 10px;  /* v3.16.5: 余白縮小 */
-  margin-top: 6px;
-  font-size: 12px;
+  padding: 3px 8px;
+  margin-top: 4px;
+  font-size: 10px;
   color: #000;
 }
-.pp-measure-label { font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+.pp-measure-label { font-weight: 700; font-size: 9.5px; margin-bottom: 2px; }
 .pp-write-box {
   display: inline-block;
   border-bottom: 1.5px solid #000;
-  min-width: 60px;
-  height: 14px;
+  min-width: 48px;
+  height: 12px;
   vertical-align: middle;
 }
-.pp-write-box.tiny { min-width: 32px; }
+.pp-write-box.tiny { min-width: 26px; }
 
 .pp-meta-info {
-  font-size: 10px;
+  font-size: 9.5px;
   color: #000;
-  margin-top: 7px;
+  margin-top: 5px;
 }
 
+/* v3.17: SHIP TOをカードの最下部に押し付ける (見切れ防止) */
 .pp-buyer {
   border-left: 3px solid #000;
-  padding: 4px 8px;  /* v3.16.5: 余白縮小 */
-  margin-top: 5px;
-  font-size: 11px;
+  padding: 3px 8px;
+  margin-top: auto;  /* ★ 上の要素から押されず、必ず最下部 */
+  font-size: 10px;
   color: #000;
-  line-height: 1.4;
+  line-height: 1.35;
 }
-.pp-buyer-label { font-size: 9px; color: #444; font-weight: 700; }
+.pp-buyer-label { font-size: 8.5px; color: #444; font-weight: 700; }
+.pp-buyer-addr { font-size: 10px; color: #000; }
 
 .pp-empty-bottom {
   /* 画面プレビュー: flex で余白埋め (min-height で強制すると print で2ページ化する) */
@@ -1016,12 +1071,14 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 /* ============================================
  * @media print: 実印刷時のスタイル
+ * v3.17: A4 1枚に 2商品 (上下148.5mm × 2)
+ *        .print-pair が page-break 単位、内側に .print-page を 2枚配置
  * v3.16.6: ブラウザのヘッダ/フッタ(URL・日付・ページ番号) を CSS で抑制
  * ============================================ */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;  /* ★ 0 にすることでブラウザの ヘッダ/フッタ 表示領域を消す */
+    margin: 0;
   }
   html, body {
     background: white !important;
@@ -1045,23 +1102,13 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* ★ v3.16.5 重要変更:
-   *   カードを A4 上半分 (140mm) ぴったりに固定。
-   *   page-break-after: always で残り下半分は空白で次ページへ。
-   *   将来 1ページ2商品印刷時は page-break-after を解除して 2枚並べる予定。
-   *   140mm = A4 (297mm) - margin (24mm) ÷ 2 = 136.5mm に近い安全値。
-   */
-  .print-page {
-    display: block !important;       /* iOS の flex 印刷バグ回避 */
+  /* v3.17: ペアラッパが page-break の単位 (A4 1枚 = 1ペア) */
+  .print-pair {
     width: 100%;
-    height: 148mm !important;        /* ← A4の上半分ピッタリ (297÷2) */
-    max-height: 148mm !important;
-    min-height: 148mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
-    /* @page margin:0 にしたので、内側に印刷余白を確保 */
-    padding: 10mm 12mm 0 12mm !important;
     box-shadow: none !important;
-    /* 現代の break-* + レガシー page-break-* を両指定 (iOS Safari 用) */
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
@@ -1069,13 +1116,34 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     -webkit-column-break-after: always;
     -webkit-column-break-inside: avoid;
     overflow: hidden;
+    display: block !important;
     box-sizing: border-box;
   }
-  .print-page:last-child {
+  .print-pair:last-child {
     page-break-after: auto;
     break-after: auto;
   }
-  /* 印刷時は空白用 div を非表示 (固定高さ140mm に強制したので不要) */
+
+  /* 各カード = A4上半分(148.5mm) */
+  .print-page {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100%;
+    height: 148.5mm !important;
+    max-height: 148.5mm !important;
+    min-height: 148.5mm !important;
+    margin: 0 !important;
+    padding: 10mm 12mm 6mm 12mm !important;
+    box-shadow: none !important;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: none !important;
+  }
+  /* ペア内のカード境界線 (画面のみ表示・印刷では不要) */
+  .print-pair > .print-page:first-child {
+    border-bottom: none !important;
+  }
+  /* 印刷時は古い .pp-empty-bottom を非表示 */
   .pp-empty-bottom {
     display: none !important;
   }

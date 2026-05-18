@@ -126,6 +126,9 @@ const App = {
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
+      // v3.17: 発送期日フィルタ
+      this._bind('filter-overdue-only', 'onchange', () => this.renderOrders());
+      this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
 
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
@@ -463,12 +466,30 @@ const App = {
     // v3.13: 発送済（追跡番号あり）を隠すトグル。要素が無い古い HTML には防御的に対応
     const hideShippedEl = document.getElementById('filter-hide-shipped');
     const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
+    // v3.17: 発送期日フィルタ
+    const overdueOnlyEl = document.getElementById('filter-overdue-only');
+    const overdueOnly = overdueOnlyEl ? overdueOnlyEl.checked : false;
+    const urgentOnlyEl = document.getElementById('filter-urgent-only');
+    const urgentOnly = urgentOnlyEl ? urgentOnlyEl.checked : false;
     const list = document.getElementById('order-list');
 
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
+    // v3.17: 期限フィルタ
+    if (overdueOnly) {
+      orders = orders.filter(o => {
+        const m = this.computeDeadlineMeta(o.shipByDate);
+        return m.level === 'red';
+      });
+    }
+    if (urgentOnly) {
+      orders = orders.filter(o => {
+        const m = this.computeDeadlineMeta(o.shipByDate);
+        return m.level === 'red' || m.level === 'orange';
+      });
+    }
 
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
@@ -504,6 +525,8 @@ const App = {
       const cpassUnimportedBadge = o.cpass_unimported ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
       // v3.16: 印刷済バッジ
       const printedBadge = o.printedAt ? '<span class="badge printed">🖨 印刷済</span>' : '';
+      // v3.17: 発送期日バッジ (緊急度4段階 + 期限不明)。発送済はバッジ非表示
+      const deadlineBadge = (!isShipped) ? this._buildDeadlineBadge(o.shipByDate) : '';
       const shippingInfoHtml = isShipped ? `
           <div class="order-shipping-info">
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
@@ -520,6 +543,7 @@ const App = {
             ${shippedBadge}
             ${cpassUnimportedBadge}
             ${printedBadge}
+            ${deadlineBadge}
           </div>
           <div class="order-id">${escapeHtml(o.orderId)}</div>
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
@@ -883,6 +907,71 @@ const App = {
     return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
   },
 
+  /**
+   * v3.17: shipByDate (ISO 8601 UTC) を JST に変換し、緊急度メタデータを返す
+   * 戻り値: { date: Date|null, level: 'red'|'orange'|'yellow'|'green'|'gray',
+   *           label: string ("5/22(金) 23:59" / "期限不明"), hoursLeft: number|null }
+   * level の判定 (発送期限までの残り時間):
+   *   red    = 既に超過
+   *   orange = 24h以内
+   *   yellow = 48h以内
+   *   green  = 48h より先
+   *   gray   = shipByDate が無い / parse失敗
+   */
+  computeDeadlineMeta(shipByDate) {
+    if (!shipByDate) return { date: null, level: 'gray', label: '期限不明', hoursLeft: null };
+    let d;
+    try {
+      d = new Date(shipByDate);
+      if (isNaN(d.getTime())) throw new Error('invalid');
+    } catch (e) {
+      return { date: null, level: 'gray', label: '期限不明', hoursLeft: null };
+    }
+    const now = new Date();
+    const hoursLeft = (d.getTime() - now.getTime()) / (1000 * 60 * 60);
+    let level;
+    if (hoursLeft < 0) level = 'red';
+    else if (hoursLeft <= 24) level = 'orange';
+    else if (hoursLeft <= 48) level = 'yellow';
+    else level = 'green';
+    return { date: d, level: level, label: this._formatDeadlineJst(d), hoursLeft: hoursLeft };
+  },
+
+  /**
+   * v3.17: Date を JST の "M/D(曜) HH:MM" に整形 (例: "5/22(金) 23:59")
+   */
+  _formatDeadlineJst(d) {
+    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const M = jst.getUTCMonth() + 1;
+    const D = jst.getUTCDate();
+    const h = jst.getUTCHours();
+    const m = jst.getUTCMinutes();
+    const youbi = ['日','月','火','水','木','金','土'][jst.getUTCDay()];
+    const pad = n => (n < 10 ? '0' + n : '' + n);
+    return M + '/' + D + '(' + youbi + ') ' + pad(h) + ':' + pad(m);
+  },
+
+  /**
+   * v3.17: 一覧カード右上に表示する発送期日バッジHTMLを生成
+   * 既存バッジ群 (acc/done/shipped/cpass-unimported/printed) と同形状
+   */
+  _buildDeadlineBadge(shipByDate) {
+    const meta = this.computeDeadlineMeta(shipByDate);
+    const cls = 'badge due-' + meta.level;
+    let icon = '';
+    if (meta.level === 'red') icon = '⛔ ';
+    else if (meta.level === 'orange') icon = '⚠ ';
+    let text;
+    if (meta.level === 'gray') {
+      text = '期限不明';
+    } else if (meta.level === 'red') {
+      text = '期限超過 ' + meta.label;
+    } else {
+      text = '期限 ' + meta.label;
+    }
+    return '<span class="' + cls + '">' + icon + escapeHtml(text) + '</span>';
+  },
+
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -1042,7 +1131,8 @@ const App = {
   },
 
   /**
-   * 印刷プレビューを描画 (1商品1ページ)
+   * v3.17: 印刷プレビューを描画 (A4 1枚に 2商品・上下分割)
+   * 奇数末尾の最終ペアは上カードのみ・下半分は空白
    */
   renderPrintPreview(orders) {
     const area = document.getElementById('print-preview-area');
@@ -1050,13 +1140,28 @@ const App = {
     const titleEl = document.getElementById('print-title');
     if (!area) return;
 
-    if (countLabel) countLabel.textContent = orders.length + ' 件 (1商品1ページ)';
-    if (titleEl) titleEl.textContent = '📦 ピックアップシート印刷 (' + orders.length + '件)';
+    const total = orders.length;
+    const pageCount = Math.ceil(total / 2);
+    if (countLabel) countLabel.textContent = total + ' 件 / ' + pageCount + ' 枚 (1ページ2商品)';
+    if (titleEl) titleEl.textContent = '📦 ピックアップシート印刷 (' + total + '件 / ' + pageCount + '枚)';
 
     const dateStr = this._formatPrintDate(new Date());
-    const total = orders.length;
 
-    const html = orders.map((o, idx) => this._renderPrintPage(o, idx + 1, total, dateStr)).join('');
+    // 2件ずつペアにグループ化
+    const pairs = [];
+    for (let i = 0; i < total; i += 2) {
+      pairs.push([orders[i], orders[i + 1] || null]);
+    }
+
+    const html = pairs.map((pair, pairIdx) => {
+      const topIdx = pairIdx * 2 + 1;
+      const botIdx = pairIdx * 2 + 2;
+      const topCard = this._renderPrintPage(pair[0], topIdx, total, dateStr);
+      const botCard = pair[1]
+        ? this._renderPrintPage(pair[1], botIdx, total, dateStr)
+        : '<div class="print-page empty"></div>';
+      return '<div class="print-pair">' + topCard + botCard + '</div>';
+    }).join('');
     area.innerHTML = html;
   },
 
@@ -1066,9 +1171,12 @@ const App = {
   },
 
   /**
-   * 1注文の印刷ページHTML
+   * v3.17: 1注文の印刷カードHTML (A4上半分 148.5mm)
+   *  - ヘッダ3カラム: タイトル N/M | ⛔発送期日 | 日付
+   *  - SHIP TO は margin-top:auto で最下部固定 (見切れ防止)
+   *  - フル住所 (氏名/番地/市州ZIP/国) を全行表示
    */
-  _renderPrintPage(o, pageNum, total, dateStr) {
+  _renderPrintPage(o, orderIdx, total, dateStr) {
     const orderId = escapeHtml(o.orderId || '');
     const account = escapeHtml(o.account || '');
     const country = escapeHtml(o.country || '');
@@ -1084,6 +1192,38 @@ const App = {
       ? `<img src="${escapeAttr(o.imageUrl)}" alt="" onerror="this.outerHTML='📦'">`
       : '📦';
 
+    // v3.17: 発送期日 (ヘッダ中央に表示)
+    const dm = this.computeDeadlineMeta(o.shipByDate);
+    let deadlineLabel;
+    if (dm.level === 'gray') {
+      deadlineLabel = '発送期日 不明';
+    } else if (dm.level === 'red') {
+      deadlineLabel = '⛔ 発送期日 ' + dm.label + ' (超過)';
+    } else if (dm.level === 'orange') {
+      deadlineLabel = '⚠ 発送期日 ' + dm.label;
+    } else {
+      deadlineLabel = '発送期日 ' + dm.label;
+    }
+    const deadlineHtml = `<div class="pp-deadline urgent-${dm.level}">${escapeHtml(deadlineLabel)}</div>`;
+
+    // v3.17: SHIP TO フル住所 (氏名 / 住所行1 / 住所行2 / 市州ZIP / 国)
+    // Apps Script 側で個別フィールド (addrLine1/city/state/postalCode) を返すまでは
+    // buyerName + country の暫定表示。後方互換のため両対応。
+    const addrLine1 = escapeHtml(o.addrLine1 || '');
+    const addrLine2 = escapeHtml(o.addrLine2 || '');
+    const city = escapeHtml(o.city || '');
+    const stateRegion = escapeHtml(o.stateRegion || '');
+    const postalCode = escapeHtml(o.postalCode || '');
+    const countryFull = escapeHtml(o.countryFull || o.country || '');
+    const cityStateZip = [city, stateRegion, postalCode].filter(Boolean).join(' ');
+    const buyerAddrHtml = [
+      buyer ? `<div>${buyer}</div>` : '',
+      addrLine1 ? `<div>${addrLine1}</div>` : '',
+      addrLine2 ? `<div>${addrLine2}</div>` : '',
+      cityStateZip ? `<div>${cityStateZip}</div>` : '',
+      countryFull ? `<div>${countryFull}</div>` : ''
+    ].filter(Boolean).join('');
+
     const cpassBlock = cpassPackage
       ? `<div class="pp-cpass">
            <div class="pp-cpass-label">CPASS PACKAGE</div>
@@ -1097,13 +1237,14 @@ const App = {
     const amazonBlock = amazonTitle
       ? `<div class="pp-amazon-text">${amazonTitle}</div>
          <div class="pp-amazon-asin">🛒 ${asin}</div>`
-      : `<div class="pp-amazon-text" style="color:#666;">(${asin ? 'ASIN: ' + asin + ' / PA-API未取得' : '未取込'})</div>`;
+      : `<div class="pp-amazon-text" style="color:#666;">(${asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込'})</div>`;
 
     return `
       <div class="print-page">
         <div class="pp-header">
-          <div class="pp-title">📦 ピックアップシート</div>
-          <div class="pp-meta">${dateStr} &nbsp;|&nbsp; Page ${pageNum} / ${total}</div>
+          <div class="pp-title">📦 ピックアップシート ${orderIdx}/${total}</div>
+          ${deadlineHtml}
+          <div class="pp-meta">${dateStr}</div>
         </div>
         <div class="pp-orderid-frame">
           <div class="pp-orderid-label">ORDER ID</div>
@@ -1113,7 +1254,7 @@ const App = {
           <div class="pp-info">
             <div class="pp-img-wrap">
               <div class="pp-img">${imageHtml}</div>
-              <div class="pp-ac-bottom">${account} / ${country}</div>
+              <div class="pp-ac-bottom">${account}<br>/ ${country}</div>
             </div>
             <div class="pp-text-area">
               <div class="pp-ebay">
@@ -1129,16 +1270,15 @@ const App = {
           ${cpassBlock}
           <div class="pp-measure">
             <div class="pp-measure-label">⚖ 計測 (記入欄)</div>
-            重量: <span class="pp-write-box"></span> g &nbsp;&nbsp;
+            重量: <span class="pp-write-box"></span> g &nbsp;
             寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm
           </div>
           <div class="pp-meta-info">📦 ${carrier} / HS ${hsCode || '-'} / 関税 ${tariffRate}</div>
           <div class="pp-buyer">
             <div class="pp-buyer-label">SHIP TO</div>
-            ${buyer}<br>${country}
+            <div class="pp-buyer-addr">${buyerAddrHtml || (buyer + '<br>' + country)}</div>
           </div>
         </div>
-        <div class="pp-empty-bottom"></div>
       </div>
     `;
   },
