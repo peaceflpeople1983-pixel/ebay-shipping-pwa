@@ -1,5 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-5: v3.17.4 までの「ペアラッパー依存」を撤回し、位置クラス方式に変更
+ *          - 奇数カード=.top に page-break-before:always (A4 先頭強制)
+ *          - 偶数カード=.bottom に page-break-before:avoid (上カードと同ページ・148.5mm 位置)
+ *          - .print-pair から height/overflow/page-break を撤去 (iOS Safari 破綻の原因排除)
+ *          - 各カード height:148.5mm + overflow:hidden で物理的に半分占有
+ *          - 折り目ガイド破線は維持
  * v3-17-4: v3.17.3 で CSS Grid が iOS Safari 印刷で機能せず 4商品が3ページに分散した問題を修正
  *          - Grid 撤回 → block レイアウト + .print-page { height: 148.5mm } で均等2分割実現
  *          - 折り目ガイド破線を印刷時も表示 (border-bottom: 1px dashed #999)
@@ -46,7 +52,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-4';
+const CACHE_NAME = 'ebay-ship-v3-17-5';
 
 const STATIC_FILES = [
   './',

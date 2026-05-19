@@ -1153,13 +1153,16 @@ const App = {
       pairs.push([orders[i], orders[i + 1] || null]);
     }
 
+    // v3.17.5: 位置クラス方式
+    //  奇数番カード(1,3,5...) = .top (A4上半分・page-break-before で新ページ強制)
+    //  偶数番カード(2,4,6...) = .bottom (A4下半分・page-break-before:avoid で上カードと同ページ)
     const html = pairs.map((pair, pairIdx) => {
       const topIdx = pairIdx * 2 + 1;
       const botIdx = pairIdx * 2 + 2;
-      const topCard = this._renderPrintPage(pair[0], topIdx, total, dateStr);
+      const topCard = this._renderPrintPage(pair[0], topIdx, total, dateStr, 'top');
       const botCard = pair[1]
-        ? this._renderPrintPage(pair[1], botIdx, total, dateStr)
-        : '<div class="print-page empty"></div>';
+        ? this._renderPrintPage(pair[1], botIdx, total, dateStr, 'bottom')
+        : '<div class="print-page empty bottom"></div>';
       return '<div class="print-pair">' + topCard + botCard + '</div>';
     }).join('');
     area.innerHTML = html;
@@ -1173,10 +1176,11 @@ const App = {
   /**
    * v3.17: 1注文の印刷カードHTML (A4上半分 148.5mm)
    *  - ヘッダ3カラム: タイトル N/M | ⛔発送期日 | 日付
-   *  - SHIP TO は margin-top:auto で最下部固定 (見切れ防止)
+   *  - SHIP TO は自然フロー (shipping info の直後・余分な空白なし)
    *  - フル住所 (氏名/番地/市州ZIP/国) を全行表示
+   *  - v3.17.5: 位置クラス (top/bottom) を付与し、印刷時の A4 上下配置を確定
    */
-  _renderPrintPage(o, orderIdx, total, dateStr) {
+  _renderPrintPage(o, orderIdx, total, dateStr, positionClass) {
     const orderId = escapeHtml(o.orderId || '');
     const account = escapeHtml(o.account || '');
     const country = escapeHtml(o.country || '');
@@ -1239,8 +1243,9 @@ const App = {
          <div class="pp-amazon-asin">🛒 ${asin}</div>`
       : `<div class="pp-amazon-text" style="color:#666;">(${asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込'})</div>`;
 
+    const posCls = positionClass ? (' ' + positionClass) : '';
     return `
-      <div class="print-page">
+      <div class="print-page${posCls}">
         <div class="pp-header">
           <div class="pp-title">📦 ピックアップシート ${orderIdx}/${total}</div>
           ${deadlineHtml}

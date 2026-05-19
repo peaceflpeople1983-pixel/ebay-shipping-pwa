@@ -1119,33 +1119,25 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* v3.17.4: .print-pair = A4 1枚 (block + 固定高で均等2分割)
-   * - Grid 撤回 (iOS Safari 印刷でセル高が守られず破綻したため)
-   * - 内側 2枚の .print-page (148.5mm × 2 = 297mm) で A4 を完全に埋める */
+  /* v3.17.5: ラッパーは「見えない透明な箱」として残し、印刷制御は使わない
+   * - height/overflow/page-break を撤回 (v3.17.4 までこれが iOS で破綻の原因)
+   * - 各カード(.print-page.top/.bottom)が自分の位置を知っていて、個別に page-break 制御 */
   .print-pair {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 297mm !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
     background: white !important;
     box-sizing: border-box !important;
-    page-break-after: always !important;
-    break-after: page !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    -webkit-column-break-after: always !important;
-    -webkit-column-break-inside: avoid !important;
-    overflow: hidden !important;
-  }
-  .print-pair:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
+    overflow: visible !important;
+    /* page-break-* は一切設定しない */
   }
 
-  /* v3.17.4: カードは 148.5mm 固定 (block で縦に2枚並ぶ) */
+  /* v3.17.5: カードは 148.5mm 固定 (A4 縦半分を物理的に占有) */
   .print-page {
     display: block !important;
     width: 100% !important;
@@ -1158,11 +1150,33 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     border: none !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
-    /* 個別 .print-page には page-break-inside: avoid を付けない
-     * (v3.17.1 で過剰ページ分割を引き起こした原因) */
   }
-  /* v3.17.4: 折り目ガイド線を印刷時も表示 (物理折り作業の助け) */
-  .print-pair > .print-page:first-child {
+
+  /* v3.17.5: ★ 位置クラスで page-break 制御
+   *  .top (奇数番カード) → 必ず新ページの先頭から開始
+   *  .bottom (偶数番カード) → 直前の .top と同じページに残る (148.5mm 位置で下半分) */
+  .print-page.top {
+    page-break-before: always !important;
+    break-before: page !important;
+    -webkit-column-break-before: always !important;
+  }
+  /* 最初のカードだけは page-break-before しない (空白ページ防止) */
+  .print-page.top:first-of-type,
+  .print-pair:first-child > .print-page.top {
+    page-break-before: auto !important;
+    break-before: auto !important;
+    -webkit-column-break-before: auto !important;
+  }
+  .print-page.bottom {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    -webkit-column-break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* v3.17.5: 折り目ガイド線 (印刷時も維持・物理折り作業の助け) */
+  .print-pair > .print-page.top {
     border-bottom: 1px dashed #999 !important;
   }
   /* 奇数最終ページの空カード (148.5mm 白紙として残す) */
