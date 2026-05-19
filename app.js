@@ -382,25 +382,39 @@ const App = {
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
+    let step = 'init';
     try {
+      step = 'localStorage';
       this.recentCountries = JSON.parse(localStorage.getItem('recent_countries') || '[]');
+      step = 'getMasterData';
       this.state.masterData = await API.getMasterData();
       if (!this.state.masterData || !Array.isArray(this.state.masterData.countries) || this.state.masterData.countries.length < 10) {
         showToast('マスタデータ不完全。再取得します...');
         API.clearMasterCache();
+        step = 'getMasterData(retry)';
         this.state.masterData = await API.getMasterData(true);
       }
+      step = 'Calculator.setMaster';
       Calculator.setMaster(this.state.masterData);
+      step = 'getOrders';
       const data = await API.getOrders(undefined, undefined, API.DEFAULT_DAYS_BACK);
+      step = 'state assignment';
       this.state.orders = data.orders || [];
       this.state.cpassStatus = data.cpass_status || null;  // v3.15
+      step = 'pruneTodayGroup';
       this.pruneTodayGroup();
+      step = 'populateCountrySelect';
       this.populateCountrySelect();
+      step = 'renderOrders';
       this.renderOrders();
+      step = 'updateCpassBanner';
       this.updateCpassBanner();  // v3.15
+      step = 'updateBulkPrintBadge';
       this.updateBulkPrintBadge();  // v3.16
     } catch (err) {
-      showToast('読み込みエラー: ' + err.message);
+      try { console.error('loadAll failed at step:', step, err); } catch (_) {}
+      const msg = (err && err.message) ? err.message : String(err);
+      showToast('読み込みエラー[' + step + ']: ' + msg);
     } finally {
       this.setLoader(false);
     }
@@ -461,6 +475,20 @@ const App = {
   },
 
   renderOrders() {
+    try {
+      this._renderOrdersImpl();
+    } catch (err) {
+      try { console.error('renderOrders failed:', err); } catch (_) {}
+      const list = document.getElementById('order-list');
+      if (list) {
+        list.innerHTML = '<div class="empty">一覧描画エラー: ' +
+          escapeHtml(String(err && err.message ? err.message : err)) +
+          '<br><small>サポートに連絡してください</small></div>';
+      }
+    }
+  },
+
+  _renderOrdersImpl() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
     // v3.13: 発送済（追跡番号あり）を隠すトグル。要素が無い古い HTML には防御的に対応
@@ -477,17 +505,23 @@ const App = {
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
-    // v3.17: 期限フィルタ
+    // v3.17: 期限フィルタ (computeDeadlineMeta は完全防御化済み)
     if (overdueOnly) {
-      orders = orders.filter(o => {
-        const m = this.computeDeadlineMeta(o.shipByDate);
-        return m.level === 'red';
+      const self = this;
+      orders = orders.filter(function(o) {
+        try {
+          const m = self.computeDeadlineMeta(o.shipByDate);
+          return m && m.level === 'red';
+        } catch (e) { return false; }
       });
     }
     if (urgentOnly) {
-      orders = orders.filter(o => {
-        const m = this.computeDeadlineMeta(o.shipByDate);
-        return m.level === 'red' || m.level === 'orange';
+      const self = this;
+      orders = orders.filter(function(o) {
+        try {
+          const m = self.computeDeadlineMeta(o.shipByDate);
+          return m && (m.level === 'red' || m.level === 'orange');
+        } catch (e) { return false; }
       });
     }
 
@@ -911,67 +945,93 @@ const App = {
 
   /**
    * v3.17: shipByDate (ISO 8601 UTC) を JST に変換し、緊急度メタデータを返す
+   * v3.17.7: iOS Safari の任意例外 (RangeError "The string did not match...") を完全に捕捉
    * 戻り値: { date: Date|null, level: 'red'|'orange'|'yellow'|'green'|'gray',
    *           label: string ("5/22(金) 23:59" / "期限不明"), hoursLeft: number|null }
-   * level の判定 (発送期限までの残り時間):
-   *   red    = 既に超過
-   *   orange = 24h以内
-   *   yellow = 48h以内
-   *   green  = 48h より先
-   *   gray   = shipByDate が無い / parse失敗
    */
   computeDeadlineMeta(shipByDate) {
-    if (!shipByDate) return { date: null, level: 'gray', label: '期限不明', hoursLeft: null };
-    let d;
+    var grayResult = { date: null, level: 'gray', label: '期限不明', hoursLeft: null };
     try {
-      d = new Date(shipByDate);
-      if (isNaN(d.getTime())) throw new Error('invalid');
+      if (shipByDate == null || shipByDate === '') return grayResult;
+      // 型安全変換: 文字列でない値も String() 化、空白も除去
+      var s;
+      try { s = String(shipByDate).trim(); } catch (e1) { return grayResult; }
+      if (!s) return grayResult;
+      // iOS Safari 互換: "YYYY-MM-DD HH:MM:SS" や "YYYY/MM/DD HH:MM" を ISO に整形
+      // (Apps Script の Sheets セルが日時として返ってきた場合のフォールバック)
+      var normalized = s
+        .replace(/^(\d{4})\/(\d{2})\/(\d{2})/, '$1-$2-$3')   // YYYY/MM/DD → YYYY-MM-DD
+        .replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1-$2-$3T$4:$5:$6Z'); // space→T
+      var d;
+      try { d = new Date(normalized); } catch (e2) { return grayResult; }
+      var t;
+      try { t = d && d.getTime ? d.getTime() : NaN; } catch (e3) { return grayResult; }
+      if (!t || isNaN(t)) return grayResult;
+      var now = new Date();
+      var hoursLeft = (t - now.getTime()) / (1000 * 60 * 60);
+      var level;
+      if (hoursLeft < 0) level = 'red';
+      else if (hoursLeft <= 24) level = 'orange';
+      else if (hoursLeft <= 48) level = 'yellow';
+      else level = 'green';
+      var label;
+      try { label = this._formatDeadlineJst(d); } catch (e4) { label = '期限不明'; }
+      return { date: d, level: level, label: label, hoursLeft: hoursLeft };
     } catch (e) {
-      return { date: null, level: 'gray', label: '期限不明', hoursLeft: null };
+      try { console.warn('computeDeadlineMeta error:', e && e.message ? e.message : e, 'input:', shipByDate); } catch (_) {}
+      return grayResult;
     }
-    const now = new Date();
-    const hoursLeft = (d.getTime() - now.getTime()) / (1000 * 60 * 60);
-    let level;
-    if (hoursLeft < 0) level = 'red';
-    else if (hoursLeft <= 24) level = 'orange';
-    else if (hoursLeft <= 48) level = 'yellow';
-    else level = 'green';
-    return { date: d, level: level, label: this._formatDeadlineJst(d), hoursLeft: hoursLeft };
   },
 
   /**
    * v3.17: Date を JST の "M/D(曜) HH:MM" に整形 (例: "5/22(金) 23:59")
+   * v3.17.7: 完全例外捕捉 (Invalid Date のメソッド呼出も安全に)
    */
   _formatDeadlineJst(d) {
-    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-    const M = jst.getUTCMonth() + 1;
-    const D = jst.getUTCDate();
-    const h = jst.getUTCHours();
-    const m = jst.getUTCMinutes();
-    const youbi = ['日','月','火','水','木','金','土'][jst.getUTCDay()];
-    const pad = n => (n < 10 ? '0' + n : '' + n);
-    return M + '/' + D + '(' + youbi + ') ' + pad(h) + ':' + pad(m);
+    try {
+      if (!d || !d.getTime) return '';
+      var t = d.getTime();
+      if (isNaN(t)) return '';
+      var jst = new Date(t + 9 * 60 * 60 * 1000);
+      var jt = jst.getTime();
+      if (isNaN(jt)) return '';
+      var M = jst.getUTCMonth() + 1;
+      var D = jst.getUTCDate();
+      var h = jst.getUTCHours();
+      var m = jst.getUTCMinutes();
+      var youbi = ['日','月','火','水','木','金','土'][jst.getUTCDay()];
+      var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+      return M + '/' + D + '(' + youbi + ') ' + pad(h) + ':' + pad(m);
+    } catch (e) {
+      return '';
+    }
   },
 
   /**
    * v3.17: 一覧カード右上に表示する発送期日バッジHTMLを生成
-   * 既存バッジ群 (acc/done/shipped/cpass-unimported/printed) と同形状
+   * v3.17.7: 完全防御 — 何があってもバッジを返す (空文字含む)
    */
   _buildDeadlineBadge(shipByDate) {
-    const meta = this.computeDeadlineMeta(shipByDate);
-    const cls = 'badge due-' + meta.level;
-    let icon = '';
-    if (meta.level === 'red') icon = '⛔ ';
-    else if (meta.level === 'orange') icon = '⚠ ';
-    let text;
-    if (meta.level === 'gray') {
-      text = '期限不明';
-    } else if (meta.level === 'red') {
-      text = '期限超過 ' + meta.label;
-    } else {
-      text = '期限 ' + meta.label;
+    try {
+      var meta = this.computeDeadlineMeta(shipByDate);
+      if (!meta) return '';
+      var cls = 'badge due-' + (meta.level || 'gray');
+      var icon = '';
+      if (meta.level === 'red') icon = '⛔ ';
+      else if (meta.level === 'orange') icon = '⚠ ';
+      var text;
+      if (!meta.level || meta.level === 'gray') {
+        text = '期限不明';
+      } else if (meta.level === 'red') {
+        text = '期限超過 ' + (meta.label || '');
+      } else {
+        text = '期限 ' + (meta.label || '');
+      }
+      return '<span class="' + cls + '">' + icon + escapeHtml(text) + '</span>';
+    } catch (e) {
+      try { console.warn('_buildDeadlineBadge error:', e); } catch (_) {}
+      return '';
     }
-    return '<span class="' + cls + '">' + icon + escapeHtml(text) + '</span>';
   },
 
   shortenCarrier(carrier) {

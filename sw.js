@@ -1,5 +1,10 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-7: 「The string did not match the expected pattern」エラー対策
+ *          - computeDeadlineMeta/_formatDeadlineJst/_buildDeadlineBadge を完全防御化
+ *          - YYYY/MM/DD や space 区切り日時を ISO に正規化してから new Date()
+ *          - renderOrders を try/catch で囲み、エラー時もエラー表示で継続
+ *          - loadAll の各ステップに識別子を付与し、エラー時にどの段階で失敗したか分かる
  * v3-17-6: DHL/FedEx を全 shipping policy で常時ゴールド推奨化
  *          - getRecommendedCarrierTypes に DHL/FedEx を追加
  *          - eBay SpeedPAK Economy → ['speedpak','dhl','fedex']
@@ -57,7 +62,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-6';
+const CACHE_NAME = 'ebay-ship-v3-17-7';
 
 const STATIC_FILES = [
   './',
