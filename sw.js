@@ -1,5 +1,10 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-6: DHL/FedEx を全 shipping policy で常時ゴールド推奨化
+ *          - getRecommendedCarrierTypes に DHL/FedEx を追加
+ *          - eBay SpeedPAK Economy → ['speedpak','dhl','fedex']
+ *          - Economy International Shipping → ['epacket','dhl','fedex']
+ *          - Expedited 系は元々 ['dhl','fedex'] なので変更なし
  * v3-17-5: v3.17.4 までの「ペアラッパー依存」を撤回し、位置クラス方式に変更
  *          - 奇数カード=.top に page-break-before:always (A4 先頭強制)
  *          - 偶数カード=.bottom に page-break-before:avoid (上カードと同ページ・148.5mm 位置)
@@ -52,7 +57,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-5';
+const CACHE_NAME = 'ebay-ship-v3-17-6';
 
 const STATIC_FILES = [
   './',

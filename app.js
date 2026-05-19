@@ -870,18 +870,20 @@ const App = {
 
   /**
    * v3.10: shipping policy から推奨する配送会社タイプ群を返す
+   * v3.17.6: DHL/FedEx は既知の全 shipping policy で常時推奨表示する
+   *   policy 固有の推奨キャリア + DHL + FedEx を返す
    * 戻り値:
-   *   ['speedpak']      → eBay SpeedPAK Economy
-   *   ['dhl','fedex']   → Expedited International Shipping / eBay SpeedPAK Expedited
-   *   ['epacket']       → Economy International Shipping
-   *   []                → policy 不明・未定義 → ハイライトしない
+   *   ['speedpak','dhl','fedex']     → eBay SpeedPAK Economy
+   *   ['dhl','fedex']                → Expedited International Shipping / eBay SpeedPAK Expedited
+   *   ['epacket','dhl','fedex']      → Economy International Shipping
+   *   []                              → policy 不明・未定義 → ハイライトしない (現状維持)
    * 判定順序: SpeedPAK Economy（完全一致）→ Expedited（含む）→ Economy（含む）
    */
   getRecommendedCarrierTypes(shippingPolicy) {
     const policy = String(shippingPolicy || '');
-    if (policy === 'eBay SpeedPAK Economy') return ['speedpak'];
+    if (policy === 'eBay SpeedPAK Economy') return ['speedpak', 'dhl', 'fedex'];
     if (policy.indexOf('Expedited') !== -1) return ['dhl', 'fedex'];
-    if (policy.indexOf('Economy') !== -1) return ['epacket'];
+    if (policy.indexOf('Economy') !== -1) return ['epacket', 'dhl', 'fedex'];
     return [];
   },
 
