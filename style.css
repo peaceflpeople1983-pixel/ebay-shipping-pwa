@@ -856,48 +856,53 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   min-height: 80vh;
 }
 
-/* v3.17.1: A4 1枚に2商品 — ペアラッパ (画面プレビュー専用・印刷時は透過) */
+/* v3.17.2: A4 1枚に2商品 — .print-pair が A4 ページ単位
+ * - .print-pair が page-break-after の発生単位 (1ペア = A4 1枚)
+ * - .print-page はナチュラル高さで縦に2枚並ぶ (固定高さは設定しない)
+ * - SHIP TO は自然フロー (shipping info の直後に表示・余分な空白なし) */
 .print-pair {
   background: white;
   width: 210mm;
   max-width: 100%;
   margin: 0 auto 12px;
+  padding: 10mm 12mm;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  /* v3.17.1: height 固定を廃止 → 子要素の自然な高さに任せる
-     (iOS Safari の印刷モードで 297mm 固定 + overflow:hidden が効かないため) */
+  min-height: 297mm; /* 画面プレビューで A4 サイズに見せる (印刷時は @page で実A4) */
 }
 @media (max-width: 220mm) {
   .print-pair {
     width: 100%;
+    min-height: 0;
+    aspect-ratio: 210 / 297;
   }
 }
 
-/* v3.17.1: 各カード=A4上半分(140mm)。
- * - 148.5mm から 140mm に縮小 (2 × 140 = 280mm、A4 内に 17mm 安全余白)
- * - position: relative + SHIP TO を absolute で底面固定 (iOS margin-top:auto 不安定対策)
- * - flex 廃止 → block 配置 (iOS Safari 印刷モードで flex の挙動が不安定) */
+/* v3.17.2: 各カード = ナチュラル高さ(コンテンツ依存、~90-100mm想定)
+ * - 固定 height は設定しない (iOS Safari + 固定高 + page-break-inside:avoid で1カード1ページ化する問題回避)
+ * - ペア内の上下カードは縦に並ぶ
+ * - SHIP TO は自然フロー (position:absolute を廃止) */
 .print-page {
   background: white;
   width: 100%;
-  height: 140mm;
-  padding: 8mm 12mm 22mm 12mm; /* 下 22mm は SHIP TO 絶対配置用の予約スペース */
+  padding: 0 0 6mm 0;
+  margin: 0 0 6mm 0;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
-  position: relative;
-  overflow: hidden;
 }
 /* ペア内のカード間の切取り線 (画面のみ) */
 .print-pair > .print-page:first-child {
   border-bottom: 1px dashed #ccc;
 }
-/* 奇数最終ページの空カード */
+/* 奇数最終ページの空カード (画面表示用のプレースホルダ) */
 .print-page.empty {
   background: white;
+  min-height: 80mm;
   position: relative;
+  border-bottom: none !important;
 }
 .print-page.empty::after {
   content: "(このページは1件のみ・下半分は空白)";
@@ -1057,21 +1062,16 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   margin-top: 5px;
 }
 
-/* v3.17.1: SHIP TOをカード底面に絶対配置 (margin-top:auto は iOS Safari 印刷で不安定なため変更)
- * - position: absolute + bottom で「上のコンテンツが何mmあっても」必ず最下部に表示
- * - .print-page には position: relative + padding-bottom: 22mm でこの領域を確保済み
- */
+/* v3.17.2: SHIP TO は自然フロー (shipping info の直後に表示)
+ * - position: absolute を廃止 → コンテンツが少なくても余分な空白なし
+ * - カード自体がナチュラル高さなのでSHIP TOが見切れることもない */
 .pp-buyer {
-  position: absolute;
-  bottom: 6mm;
-  left: 12mm;
-  right: 12mm;
   border-left: 3px solid #000;
   padding: 3px 8px;
+  margin-top: 5px;
   font-size: 9.5px;
   color: #000;
   line-height: 1.3;
-  background: white;       /* 上の領域から透けないように */
 }
 .pp-buyer-label { font-size: 8px; color: #444; font-weight: 700; }
 .pp-buyer-addr { font-size: 9.5px; color: #000; }
@@ -1084,11 +1084,11 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 
 /* ============================================
  * @media print: 実印刷時のスタイル
- * v3.17.1: A4 1枚に 2商品 (上下140mm × 2)
- *  - .print-pair ラッパーは display: contents で透過 (iOS Safari の 297mm 制約失敗対策)
- *  - .print-page:nth-of-type(2n) で 2枚ごとに page-break-after
- *  - 各カード 140mm 厳守 (2 × 140 = 280mm、17mm 安全余白)
- *  - SHIP TO は position:absolute で底面固定 (margin-top:auto 不安定対策)
+ * v3.17.2: A4 1枚に 2商品 (.print-pair = A4 1枚、内側に2カードがナチュラル高さで縦並び)
+ *  - .print-pair が page-break-after の単位 (v3.16時代と同じ確実な方式)
+ *  - カード自体は固定高なし → コンテンツに応じた自然な高さ
+ *  - SHIP TO は shipping info の直後に自然配置 (空白なし)
+ *  - page-break-inside: avoid は .print-pair のみに適用 (個別カードには付けない)
  * ============================================ */
 @media print {
   @page {
@@ -1117,61 +1117,63 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* v3.17.1: ペアラッパは印刷時に「透過」させ、カードを直接フローに配置
-   * display: contents は iOS 16+ で対応・印刷でも有効 */
+  /* v3.17.2: .print-pair = A4 1枚 (page-break 単位) */
   .print-pair {
-    display: contents !important;
-    box-shadow: none !important;
-    background: transparent !important;
-  }
-
-  /* v3.17.1: 各カード = A4上半分(140mm)。
-   * - flex 廃止 (iOS Safari の flex 印刷が不安定) → block 配置
-   * - position: relative で SHIP TO の absolute 配置を有効化
-   * - 2枚ごとに page-break-after で A4 を 2分割 */
-  .print-page {
     display: block !important;
-    width: 100%;
-    height: 140mm !important;
-    max-height: 140mm !important;
-    min-height: 140mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
-    padding: 8mm 12mm 22mm 12mm !important; /* 下 22mm は SHIP TO 予約 */
+    padding: 8mm 12mm !important;
     box-shadow: none !important;
-    border: none !important;
-    overflow: hidden;
-    box-sizing: border-box;
-    position: relative;
-    page-break-inside: avoid;
-    break-inside: avoid;
-    -webkit-column-break-inside: avoid;
-  }
-
-  /* 2枚ごとに改ページ (A4 1枚 = カード2枚) */
-  .print-page:nth-of-type(2n) {
+    background: white !important;
+    box-sizing: border-box !important;
     page-break-after: always !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     -webkit-column-break-after: always !important;
+    -webkit-column-break-inside: avoid !important;
+    overflow: hidden;
   }
-  .print-page:last-child {
+  .print-pair:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
   }
 
-  /* v3.17.1: SHIP TO は印刷時もカード底面に絶対配置 */
-  .pp-buyer {
-    position: absolute !important;
-    bottom: 6mm !important;
-    left: 12mm !important;
-    right: 12mm !important;
-    margin-top: 0 !important;
-    background: white !important;
+  /* v3.17.2: カードは自然な高さ。ペア内で縦に2枚並ぶ。
+   * - 固定 height/page-break ルールは設定しない (iOS Safari の過剰ページ分割回避) */
+  .print-page {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 0 6mm 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
   }
-
-  /* ペア内のカード境界線 (画面のみ表示・印刷では不要) */
+  /* ペア内 1枚目と2枚目の間に薄い区切り線 (任意・なくても可) */
   .print-pair > .print-page:first-child {
     border-bottom: none !important;
+    padding-bottom: 4mm;
+    margin-bottom: 4mm;
   }
+  /* 奇数最終ページの空プレースホルダは印刷では非表示 */
+  .print-page.empty {
+    display: none !important;
+  }
+
+  /* v3.17.2: SHIP TO は自然フロー (shipping info の直後) */
+  .pp-buyer {
+    position: relative !important;
+    margin-top: 5px !important;
+    padding: 3px 8px !important;
+  }
+
   /* 印刷時は古い .pp-empty-bottom を非表示 */
   .pp-empty-bottom {
     display: none !important;

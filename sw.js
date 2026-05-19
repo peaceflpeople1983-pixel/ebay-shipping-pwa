@@ -1,5 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-2: v3.17.1 で「各カード1ページ・SHIP TO周辺に大きな空白」になった問題を修正
+ *          - display:contents + nth-of-type(2n) を撤回 (iOS Safari で機能せず)
+ *          - .print-pair を A4 1枚の page-break 単位に戻す (v3.16時代と同方式)
+ *          - カードの固定高 140mm を撤廃 → ナチュラル高さ (コンテンツ依存 ~95mm)
+ *          - SHIP TO を position:absolute から自然フローに戻す (空白なし)
+ *          - page-break-inside: avoid は .print-pair のみ (個別カードには付けず過剰ページ分割回避)
  * v3-17-1: v3.17.0 の印刷レイアウト崩れを修正
  *          - カード高 148.5mm → 140mm (2 × 140 = 280mm、A4 内に 17mm 安全余白)
  *          - SHIP TO を position:absolute で底面固定 (iOS Safari の margin-top:auto 不安定対策)
@@ -30,7 +36,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-1';
+const CACHE_NAME = 'ebay-ship-v3-17-2';
 
 const STATIC_FILES = [
   './',
