@@ -856,53 +856,54 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   min-height: 80vh;
 }
 
-/* v3.17.2: A4 1枚に2商品 — .print-pair が A4 ページ単位
- * - .print-pair が page-break-after の発生単位 (1ペア = A4 1枚)
- * - .print-page はナチュラル高さで縦に2枚並ぶ (固定高さは設定しない)
- * - SHIP TO は自然フロー (shipping info の直後に表示・余分な空白なし) */
+/* v3.17.3: A4 1枚に2商品 — CSS Grid で縦幅を 148.5mm × 2 に均等割付
+ * - 半分折り・カット運用に最適 (折り目位置=148.5mm が物理的に明確)
+ * - 各カードは Grid セルに収まり、上半分/下半分が必ず半々
+ * - 画面プレビューも実印刷と同じ均等配置 (WYSIWYG) */
 .print-pair {
   background: white;
   width: 210mm;
+  height: 297mm;
   max-width: 100%;
   margin: 0 auto 12px;
-  padding: 10mm 12mm;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  min-height: 297mm; /* 画面プレビューで A4 サイズに見せる (印刷時は @page で実A4) */
+  display: grid;
+  grid-template-rows: 148.5mm 148.5mm;  /* ★ 縦を完全均等2分割 */
 }
 @media (max-width: 220mm) {
   .print-pair {
     width: 100%;
-    min-height: 0;
+    height: auto;
     aspect-ratio: 210 / 297;
+    /* aspect-ratio で A4 比率を保持、grid-template-rows は 1fr 1fr に */
+    grid-template-rows: 1fr 1fr;
   }
 }
 
-/* v3.17.2: 各カード = ナチュラル高さ(コンテンツ依存、~90-100mm想定)
- * - 固定 height は設定しない (iOS Safari + 固定高 + page-break-inside:avoid で1カード1ページ化する問題回避)
- * - ペア内の上下カードは縦に並ぶ
- * - SHIP TO は自然フロー (position:absolute を廃止) */
+/* v3.17.3: 各カード = Grid セル (148.5mm 厳守)
+ * - height/min-height は Grid 親が制御するので設定しない
+ * - overflow:hidden でセル外にはみ出さない */
 .print-page {
   background: white;
   width: 100%;
-  padding: 0 0 6mm 0;
-  margin: 0 0 6mm 0;
+  padding: 8mm 12mm;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
+  overflow: hidden;
 }
-/* ペア内のカード間の切取り線 (画面のみ) */
+/* 折り目ガイド線 (画面のみ・破線で半分折り位置を視覚化) */
 .print-pair > .print-page:first-child {
   border-bottom: 1px dashed #ccc;
 }
-/* 奇数最終ページの空カード (画面表示用のプレースホルダ) */
+/* 奇数最終ページの空カード (Grid 下半分セルとして残す → A4 下半分は白紙)
+ * display: none は使わない (Grid セル維持のため) */
 .print-page.empty {
   background: white;
-  min-height: 80mm;
   position: relative;
-  border-bottom: none !important;
 }
 .print-page.empty::after {
   content: "(このページは1件のみ・下半分は空白)";
@@ -1117,14 +1118,17 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* v3.17.2: .print-pair = A4 1枚 (page-break 単位) */
+  /* v3.17.3: .print-pair = A4 1枚 を Grid で 148.5mm × 2 均等分割
+   * - 各カードが必ず上半分/下半分の148.5mm を占有
+   * - 半分折り・カット運用時に折り目位置が物理的に明確 */
   .print-pair {
-    display: block !important;
+    display: grid !important;
+    grid-template-rows: 148.5mm 148.5mm !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 0 !important;
+    height: 297mm !important;
     margin: 0 !important;
-    padding: 8mm 12mm !important;
+    padding: 0 !important;
     box-shadow: none !important;
     background: white !important;
     box-sizing: border-box !important;
@@ -1134,36 +1138,39 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     break-inside: avoid !important;
     -webkit-column-break-after: always !important;
     -webkit-column-break-inside: avoid !important;
-    overflow: hidden;
   }
   .print-pair:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
   }
 
-  /* v3.17.2: カードは自然な高さ。ペア内で縦に2枚並ぶ。
-   * - 固定 height/page-break ルールは設定しない (iOS Safari の過剰ページ分割回避) */
+  /* v3.17.3: カードは Grid セル (148.5mm 厳守) */
   .print-page {
     display: block !important;
     width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 0 6mm 0 !important;
-    padding: 0 !important;
+    height: 148.5mm !important;
+    max-height: 148.5mm !important;
+    min-height: 148.5mm !important;
+    margin: 0 !important;
+    padding: 8mm 12mm !important;
     box-shadow: none !important;
     border: none !important;
     box-sizing: border-box !important;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
-  /* ペア内 1枚目と2枚目の間に薄い区切り線 (任意・なくても可) */
+  /* 画面用の折り目ガイド線は印刷では消す */
   .print-pair > .print-page:first-child {
     border-bottom: none !important;
-    padding-bottom: 4mm;
-    margin-bottom: 4mm;
+    padding-bottom: 8mm !important;
+    margin-bottom: 0 !important;
   }
-  /* 奇数最終ページの空プレースホルダは印刷では非表示 */
+  /* v3.17.3: 奇数最終ページの空セルは Grid セルとして残す (下半分白紙)
+   * display: none せず、空のセルとして保持 */
   .print-page.empty {
+    display: block !important;
+    background: white !important;
+  }
+  .print-page.empty::after {
     display: none !important;
   }
 

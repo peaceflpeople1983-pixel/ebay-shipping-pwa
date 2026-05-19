@@ -1,5 +1,10 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-3: A4縦幅を 148.5mm × 2 で均等割付 (半分折り/カット運用対応)
+ *          - CSS Grid (grid-template-rows: 148.5mm 148.5mm) で .print-pair を完全均等2分割
+ *          - 上半分=カード1、下半分=カード2 が物理的に固定 → 折り目位置が明確
+ *          - 各カードに height: 148.5mm + overflow: hidden で厳密制限
+ *          - 奇数最終ページの下半分セルは空白として残す (display: none せず)
  * v3-17-2: v3.17.1 で「各カード1ページ・SHIP TO周辺に大きな空白」になった問題を修正
  *          - display:contents + nth-of-type(2n) を撤回 (iOS Safari で機能せず)
  *          - .print-pair を A4 1枚の page-break 単位に戻す (v3.16時代と同方式)
@@ -36,7 +41,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-2';
+const CACHE_NAME = 'ebay-ship-v3-17-3';
 
 const STATIC_FILES = [
   './',
