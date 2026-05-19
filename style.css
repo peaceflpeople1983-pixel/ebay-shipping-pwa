@@ -856,10 +856,10 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   min-height: 80vh;
 }
 
-/* v3.17.3: A4 1枚に2商品 — CSS Grid で縦幅を 148.5mm × 2 に均等割付
- * - 半分折り・カット運用に最適 (折り目位置=148.5mm が物理的に明確)
- * - 各カードは Grid セルに収まり、上半分/下半分が必ず半々
- * - 画面プレビューも実印刷と同じ均等配置 (WYSIWYG) */
+/* v3.17.4: A4 1枚に2商品 — block + 固定高さで縦幅均等2分割
+ * - CSS Grid は iOS Safari 印刷でセル高が守られず破綻するため block 配置に変更
+ * - 各カード 148.5mm 厳守で A4 を物理的に半々に分割
+ * - 折り目ガイドの破線は画面・印刷とも表示 (物理折り作業の助け) */
 .print-pair {
   background: white;
   width: 210mm;
@@ -870,37 +870,38 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #000;
   box-sizing: border-box;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  display: grid;
-  grid-template-rows: 148.5mm 148.5mm;  /* ★ 縦を完全均等2分割 */
+  display: block;  /* v3.17.4: Grid → block */
+  overflow: hidden;
 }
 @media (max-width: 220mm) {
   .print-pair {
     width: 100%;
     height: auto;
     aspect-ratio: 210 / 297;
-    /* aspect-ratio で A4 比率を保持、grid-template-rows は 1fr 1fr に */
-    grid-template-rows: 1fr 1fr;
   }
 }
 
-/* v3.17.3: 各カード = Grid セル (148.5mm 厳守)
- * - height/min-height は Grid 親が制御するので設定しない
- * - overflow:hidden でセル外にはみ出さない */
+/* v3.17.4: 各カード = 148.5mm 固定 (A4 縦の半分)
+ * - block 配置で2枚を縦に並べる
+ * - overflow:hidden で 148.5mm を厳守 */
 .print-page {
   background: white;
   width: 100%;
+  height: 148.5mm;
+  min-height: 148.5mm;
+  max-height: 148.5mm;
   padding: 8mm 12mm;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: #000;
   box-sizing: border-box;
   overflow: hidden;
+  display: block;
 }
-/* 折り目ガイド線 (画面のみ・破線で半分折り位置を視覚化) */
+/* 折り目ガイド線 (画面・印刷とも表示) */
 .print-pair > .print-page:first-child {
   border-bottom: 1px dashed #ccc;
 }
-/* 奇数最終ページの空カード (Grid 下半分セルとして残す → A4 下半分は白紙)
- * display: none は使わない (Grid セル維持のため) */
+/* 奇数最終ページの空カード (148.5mm の白紙として残す) */
 .print-page.empty {
   background: white;
   position: relative;
@@ -1118,12 +1119,11 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: block !important;
   }
 
-  /* v3.17.3: .print-pair = A4 1枚 を Grid で 148.5mm × 2 均等分割
-   * - 各カードが必ず上半分/下半分の148.5mm を占有
-   * - 半分折り・カット運用時に折り目位置が物理的に明確 */
+  /* v3.17.4: .print-pair = A4 1枚 (block + 固定高で均等2分割)
+   * - Grid 撤回 (iOS Safari 印刷でセル高が守られず破綻したため)
+   * - 内側 2枚の .print-page (148.5mm × 2 = 297mm) で A4 を完全に埋める */
   .print-pair {
-    display: grid !important;
-    grid-template-rows: 148.5mm 148.5mm !important;
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     height: 297mm !important;
@@ -1138,13 +1138,14 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     break-inside: avoid !important;
     -webkit-column-break-after: always !important;
     -webkit-column-break-inside: avoid !important;
+    overflow: hidden !important;
   }
   .print-pair:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
   }
 
-  /* v3.17.3: カードは Grid セル (148.5mm 厳守) */
+  /* v3.17.4: カードは 148.5mm 固定 (block で縦に2枚並ぶ) */
   .print-page {
     display: block !important;
     width: 100% !important;
@@ -1157,15 +1158,14 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     border: none !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    /* 個別 .print-page には page-break-inside: avoid を付けない
+     * (v3.17.1 で過剰ページ分割を引き起こした原因) */
   }
-  /* 画面用の折り目ガイド線は印刷では消す */
+  /* v3.17.4: 折り目ガイド線を印刷時も表示 (物理折り作業の助け) */
   .print-pair > .print-page:first-child {
-    border-bottom: none !important;
-    padding-bottom: 8mm !important;
-    margin-bottom: 0 !important;
+    border-bottom: 1px dashed #999 !important;
   }
-  /* v3.17.3: 奇数最終ページの空セルは Grid セルとして残す (下半分白紙)
-   * display: none せず、空のセルとして保持 */
+  /* 奇数最終ページの空カード (148.5mm 白紙として残す) */
   .print-page.empty {
     display: block !important;
     background: white !important;
@@ -1174,7 +1174,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     display: none !important;
   }
 
-  /* v3.17.2: SHIP TO は自然フロー (shipping info の直後) */
+  /* SHIP TO は自然フロー (shipping info の直後) */
   .pp-buyer {
     position: relative !important;
     margin-top: 5px !important;

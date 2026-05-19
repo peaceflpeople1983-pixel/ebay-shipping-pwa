@@ -1,5 +1,10 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-4: v3.17.3 で CSS Grid が iOS Safari 印刷で機能せず 4商品が3ページに分散した問題を修正
+ *          - Grid 撤回 → block レイアウト + .print-page { height: 148.5mm } で均等2分割実現
+ *          - 折り目ガイド破線を印刷時も表示 (border-bottom: 1px dashed #999)
+ *          - .print-pair に overflow:hidden 追加で 297mm 厳守 (オーバーフロー時はクリップ)
+ *          - 個別カードに page-break-inside: avoid は付けない (過剰ページ分割回避)
  * v3-17-3: A4縦幅を 148.5mm × 2 で均等割付 (半分折り/カット運用対応)
  *          - CSS Grid (grid-template-rows: 148.5mm 148.5mm) で .print-pair を完全均等2分割
  *          - 上半分=カード1、下半分=カード2 が物理的に固定 → 折り目位置が明確
@@ -41,7 +46,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-3';
+const CACHE_NAME = 'ebay-ship-v3-17-4';
 
 const STATIC_FILES = [
   './',
