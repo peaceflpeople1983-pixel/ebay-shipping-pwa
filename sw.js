@@ -1,5 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-17-1: v3.17.0 の印刷レイアウト崩れを修正
+ *          - カード高 148.5mm → 140mm (2 × 140 = 280mm、A4 内に 17mm 安全余白)
+ *          - SHIP TO を position:absolute で底面固定 (iOS Safari の margin-top:auto 不安定対策)
+ *          - .print-pair を印刷時 display:contents で透過 + .print-page:nth-of-type(2n) で改ページ
+ *          - アカウント名カラム 58→80px に拡張、フォント縮小で1行収まり
+ *          - flex 廃止 → block 配置 (iOS Safari 印刷モードの flex 不安定対策)
  * v3-17-0: 発送期日 (eBay shipByDate) を一覧・印刷に表示 + 印刷モードを 1ページ2商品に固定
  *          - 一覧右上に色付き期日バッジ (緊急度4段階 + 期限不明)
  *          - 期限フィルタ ⛔超過のみ / ⚠24h以内のみ を追加
@@ -24,7 +30,7 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-17-0';
+const CACHE_NAME = 'ebay-ship-v3-17-1';
 
 const STATIC_FILES = [
   './',

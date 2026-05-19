@@ -1254,7 +1254,7 @@ const App = {
           <div class="pp-info">
             <div class="pp-img-wrap">
               <div class="pp-img">${imageHtml}</div>
-              <div class="pp-ac-bottom">${account}<br>/ ${country}</div>
+              <div class="pp-ac-bottom" title="${account} / ${country}">${account} / ${country}</div>
             </div>
             <div class="pp-text-area">
               <div class="pp-ebay">
