@@ -1263,8 +1263,19 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
    v3.18 同梱機能: PWAカード用クラス
    ===================================================== */
 
-/* 同梱カードのコンテナ装飾 (左ボーダー＋背景) */
-.order-item.doukon { position: relative; }
+/* 同梱カードのコンテナ装飾 (左ボーダー＋背景)
+   v3.18.1: doukon-banner が flex 子要素として巨大な pill 化するバグを修正
+   - flex-wrap: wrap で banner を最初の行に独占させ、thumb+body を次の行へ折返し
+   - banner に flex-basis: 100% を付与 */
+.order-item.doukon {
+  position: relative;
+  flex-wrap: wrap;
+}
+.order-item.doukon .doukon-banner {
+  flex-basis: 100%;
+  align-self: flex-start;  /* stretch で高さが伸びるのを防ぐ */
+  order: -1;               /* 念のため一番上に配置 */
+}
 .order-item.doukon-lead.doukon-a { border-left: 4px solid #2E2280; }
 .order-item.doukon-lead.doukon-b { border-left: 4px solid #7A1247; }
 .order-item.doukon-lead.doukon-c { border-left: 4px solid #0C447C; }
