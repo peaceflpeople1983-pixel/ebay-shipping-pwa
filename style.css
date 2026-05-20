@@ -742,6 +742,40 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 }
 .cpass-banner-btn:active { opacity: 0.85; }
 .cpass-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* v3.18.8: 発送期日警告バナー (残り7日以内の未発送あり) */
+.deadline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.deadline-banner-icon { font-size: 20px; flex-shrink: 0; }
+.deadline-banner-body { flex: 1; min-width: 0; }
+.deadline-banner-main { font-size: 13px; font-weight: 500; }
+.deadline-banner-sub { font-size: 11px; margin-top: 2px; }
+/* 最緊急レベルで色分け */
+.deadline-banner.urgent-red {
+  background: #FDE0E0; border-left: 4px solid #A32D2D;
+}
+.deadline-banner.urgent-red .deadline-banner-main,
+.deadline-banner.urgent-red .deadline-banner-sub { color: #8A1A1A; }
+.deadline-banner.urgent-orange {
+  background: #FFE4CC; border-left: 4px solid #C0700F;
+}
+.deadline-banner.urgent-orange .deadline-banner-main,
+.deadline-banner.urgent-orange .deadline-banner-sub { color: #8A4310; }
+.deadline-banner.urgent-yellow {
+  background: #FDF3D1; border-left: 4px solid #B88600;
+}
+.deadline-banner.urgent-yellow .deadline-banner-main,
+.deadline-banner.urgent-yellow .deadline-banner-sub { color: #7D5D10; }
+.deadline-banner.urgent-green {
+  background: #DFF1D8; border-left: 4px solid #3B6D11;
+}
+.deadline-banner.urgent-green .deadline-banner-main,
+.deadline-banner.urgent-green .deadline-banner-sub { color: #2F5A1A; }
 .cpass-banner-btn .spinner {
   display: inline-block;
   width: 12px;

@@ -534,6 +534,9 @@ const App = {
       todayBar.classList.add('hidden');
     }
 
+    // v3.18.8: 発送期日警告バナーを更新 (フィルタに依らず全注文で集計)
+    this._updateDeadlineBanner();
+
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す／発送済を隠す）</span></div>';
       return;
@@ -983,14 +986,22 @@ const App = {
       if (!t || isNaN(t)) return grayResult;
       var now = new Date();
       var hoursLeft = (t - now.getTime()) / (1000 * 60 * 60);
+      // v3.18.8: 残りカレンダー日数(JST)ベースの4段階＋無色
+      //  JSTの暦日番号で差分を取る (時刻ではなく「日付」で残り日数を判定)
+      var jstDay = function (dateObj) {
+        return Math.floor((dateObj.getTime() + 9 * 3600 * 1000) / (24 * 3600 * 1000));
+      };
+      var daysLeft = jstDay(d) - jstDay(now);
+      // 仕様: ≥8日=無色(none) / 7日=green / 6-5=yellow / 4-3=orange / 2-1=red / 当日(0)=red / 超過=red
       var level;
-      if (hoursLeft < 0) level = 'red';
-      else if (hoursLeft <= 24) level = 'orange';
-      else if (hoursLeft <= 48) level = 'yellow';
-      else level = 'green';
+      if (daysLeft >= 8) level = 'none';
+      else if (daysLeft === 7) level = 'green';
+      else if (daysLeft >= 5) level = 'yellow';   // 6,5
+      else if (daysLeft >= 3) level = 'orange';   // 4,3
+      else level = 'red';                          // 2,1,0,超過
       var label;
       try { label = this._formatDeadlineJst(d); } catch (e4) { label = '期限不明'; }
-      return { date: d, level: level, label: label, hoursLeft: hoursLeft };
+      return { date: d, level: level, label: label, hoursLeft: hoursLeft, daysLeft: daysLeft };
     } catch (e) {
       try { console.warn('computeDeadlineMeta error:', e && e.message ? e.message : e, 'input:', shipByDate); } catch (_) {}
       return grayResult;
@@ -1177,6 +1188,8 @@ const App = {
     try {
       var meta = this.computeDeadlineMeta(shipByDate);
       if (!meta) return '';
+      // v3.18.8: 8日以上先(none)はバッジを出さない
+      if (meta.level === 'none') return '';
       var cls = 'badge due-' + (meta.level || 'gray');
       var icon = '';
       if (meta.level === 'red') icon = '⛔ ';
@@ -1184,7 +1197,8 @@ const App = {
       var text;
       if (!meta.level || meta.level === 'gray') {
         text = '期限不明';
-      } else if (meta.level === 'red') {
+      } else if (meta.daysLeft != null && meta.daysLeft < 0) {
+        // 超過(締切を過ぎた)は Red のまま「超過」表記で明示
         text = '期限超過 ' + (meta.label || '');
       } else {
         text = '期限 ' + (meta.label || '');
@@ -1193,6 +1207,60 @@ const App = {
     } catch (e) {
       try { console.warn('_buildDeadlineBadge error:', e); } catch (_) {}
       return '';
+    }
+  },
+
+  /**
+   * v3.18.8: 発送期日警告バナーの表示制御
+   *  - 残り7日以内(level: green/yellow/orange/red)の「未発送」注文が1件でもあれば表示
+   *  - 同梱の重複を避けるため orderId 単位でユニークカウント
+   *  - 最も緊急な状態(red>orange>yellow>green)に応じて文言を変える
+   */
+  _updateDeadlineBanner() {
+    try {
+      var banner = document.getElementById('deadline-banner');
+      if (!banner) return;
+      var orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+      var seen = {};
+      var counts = { red: 0, orange: 0, yellow: 0, green: 0 };
+      var total = 0;
+      for (var i = 0; i < orders.length; i++) {
+        var o = orders[i];
+        if (!o || o.trackingNumber) continue;            // 発送済は対象外
+        var oid = String(o.orderId || '');
+        if (!oid || seen[oid]) continue;                  // orderId 単位でユニーク
+        var meta;
+        try { meta = this.computeDeadlineMeta(o.shipByDate); } catch (e) { meta = null; }
+        if (!meta) continue;
+        var lv = meta.level;
+        if (lv === 'red' || lv === 'orange' || lv === 'yellow' || lv === 'green') {
+          seen[oid] = true;
+          counts[lv]++;
+          total++;
+        }
+      }
+      if (total === 0) {
+        banner.classList.add('hidden');
+        banner.classList.remove('urgent-red', 'urgent-orange', 'urgent-yellow', 'urgent-green');
+        return;
+      }
+      // 最緊急レベルでバナー色・文言を決定
+      var topLevel = counts.red ? 'red' : (counts.orange ? 'orange' : (counts.yellow ? 'yellow' : 'green'));
+      var subText;
+      if (counts.red) subText = '⛔ 期限間近/超過が ' + counts.red + '件あります';
+      else if (counts.orange) subText = '⚠ 残り3〜4日が ' + counts.orange + '件あります';
+      else if (counts.yellow) subText = '残り5〜6日が ' + counts.yellow + '件あります';
+      else subText = '残り7日が ' + counts.green + '件あります';
+
+      var countEl = document.getElementById('deadline-banner-count');
+      var subEl = document.getElementById('deadline-banner-sub');
+      if (countEl) countEl.textContent = total + '件';
+      if (subEl) subEl.textContent = subText;
+      banner.classList.remove('urgent-red', 'urgent-orange', 'urgent-yellow', 'urgent-green');
+      banner.classList.add('urgent-' + topLevel);
+      banner.classList.remove('hidden');
+    } catch (e) {
+      try { console.warn('_updateDeadlineBanner error:', e); } catch (_) {}
     }
   },
 
@@ -1552,10 +1620,12 @@ const App = {
 
     const dm = this.computeDeadlineMeta(o.shipByDate);
     let deadlineLabel;
-    if (dm.level === 'gray')        deadlineLabel = '発送期日 不明';
-    else if (dm.level === 'red')    deadlineLabel = '⛔ 発送期日 ' + dm.label + ' (超過)';
-    else if (dm.level === 'orange') deadlineLabel = '⚠ 発送期日 ' + dm.label;
-    else                            deadlineLabel = '発送期日 ' + dm.label;
+    // v3.18.8: 超過は daysLeft<0 でのみ「(超過)」表記。red は当日/残り1-2日も含むため区別する
+    if (dm.level === 'gray')                          deadlineLabel = '発送期日 不明';
+    else if (dm.daysLeft != null && dm.daysLeft < 0)  deadlineLabel = '⛔ 発送期日 ' + dm.label + ' (超過)';
+    else if (dm.level === 'red')                      deadlineLabel = '⛔ 発送期日 ' + dm.label;
+    else if (dm.level === 'orange')                   deadlineLabel = '⚠ 発送期日 ' + dm.label;
+    else                                              deadlineLabel = '発送期日 ' + dm.label;
     const deadlineHtml = '<div class="pp-deadline urgent-' + dm.level + '">' + escapeHtml(deadlineLabel) + '</div>';
 
     const addrLine1 = escapeHtml(o.addrLine1 || '');

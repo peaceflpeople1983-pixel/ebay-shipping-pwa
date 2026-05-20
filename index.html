@@ -73,6 +73,15 @@
       </div>
     </div>
 
+    <!-- v3.18.8: 発送期日警告バナー (残り7日以内の未発送が1件でもあれば表示) -->
+    <div class="deadline-banner hidden" id="deadline-banner">
+      <span class="deadline-banner-icon">⏰</span>
+      <div class="deadline-banner-body">
+        <div class="deadline-banner-main">発送期日が近い注文: <strong id="deadline-banner-count">0</strong>件</div>
+        <div class="deadline-banner-sub" id="deadline-banner-sub">1週間以内の未発送があります</div>
+      </div>
+    </div>
+
     <div class="filter-bar">
       <select id="filter-account">
         <option value="">すべてのアカウント</option>
@@ -85,12 +94,12 @@
       <label class="filter-toggle">
         <input type="checkbox" id="filter-hide-shipped" checked> 発送済を隠す
       </label>
-      <!-- v3.17: 発送期日フィルタ -->
+      <!-- v3.18.8: 発送期日フィルタ (4分割に合わせてラベル更新) -->
       <label class="filter-toggle deadline-red">
-        <input type="checkbox" id="filter-overdue-only"> ⛔ 超過のみ
+        <input type="checkbox" id="filter-overdue-only"> ⛔ 残2日〜超過
       </label>
       <label class="filter-toggle deadline-orange">
-        <input type="checkbox" id="filter-urgent-only"> ⚠ 24h以内のみ
+        <input type="checkbox" id="filter-urgent-only"> ⚠ 残4日以内
       </label>
       <button class="secondary" id="btn-new">+ 手動入力</button>
     </div>
