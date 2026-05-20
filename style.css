@@ -1258,3 +1258,243 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: var(--text-secondary);
   margin-top: 4px;
 }
+
+/* =====================================================
+   v3.18 同梱機能: PWAカード用クラス
+   ===================================================== */
+
+/* 同梱カードのコンテナ装飾 (左ボーダー＋背景) */
+.order-item.doukon { position: relative; }
+.order-item.doukon-lead.doukon-a { border-left: 4px solid #2E2280; }
+.order-item.doukon-lead.doukon-b { border-left: 4px solid #7A1247; }
+.order-item.doukon-lead.doukon-c { border-left: 4px solid #0C447C; }
+.order-item.doukon-lead.doukon-d { border-left: 4px solid #5C3A0E; }
+.order-item.doukon-lead.doukon-e { border-left: 4px solid #0E5460; }
+.order-item.doukon-sub {
+  border-left: 4px solid #B4B2A9;
+  background: #fafafa;
+}
+
+/* 上部バナー */
+.doukon-banner {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-block;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+}
+
+/* 同梱バッジ (アカウント横の小バッジ) */
+.badge.doukon-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* サブタグ */
+.badge.doukon-sub-tag {
+  background: #ECECEC;
+  color: #5A5A5A;
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 0.5px solid #B4B2A9;
+}
+
+/* ORDER ID 枠（代表＝スキャン対象） */
+.doukon-id-box {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 3px 9px;
+  margin: 2px 0 4px;
+  background: white;
+}
+.doukon-id-box.doukon-id-lead {
+  border: 2px solid #111;
+}
+.doukon-id-box .doukon-id-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: #111;
+  line-height: 1.2;
+}
+.doukon-id-box.doukon-id-lead .doukon-id-value {
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  color: #111;
+}
+
+/* PICKUP REF 枠（サブ＝スキャン対象外） */
+.doukon-id-box.doukon-id-sub {
+  border: 1px dashed #888;
+  background: repeating-linear-gradient(135deg, #fafafa, #fafafa 8px, #eee 8px, #eee 10px);
+}
+.doukon-id-box.doukon-id-sub .doukon-id-label { color: #5A5A5A; }
+.doukon-id-box.doukon-id-sub .doukon-id-value {
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #5A5A5A;
+  text-decoration: line-through;
+  text-decoration-color: #999;
+  line-height: 1.15;
+}
+
+/* パターン2サブ専用：赤い警告バー */
+.doukon-warning-bar {
+  background: #FDE0E0;
+  color: #8A1A1A;
+  border: 1px solid #F09595;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  text-align: center;
+  margin: 4px 0 6px;
+  line-height: 1.3;
+}
+.doukon-warning-bar strong {
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  font-weight: 600;
+}
+
+/* 同梱内訳ボックス */
+.doukon-breakdown {
+  border-radius: 8px;
+  padding: 7px 11px;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.doukon-breakdown .dk-breakdown-head {
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+.doukon-breakdown .dk-buyer {
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+.doukon-breakdown .dk-mono {
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+}
+.doukon-breakdown .dk-breakdown-row {
+  padding: 1px 0;
+}
+.doukon-breakdown .dk-no { color: #555; font-weight: 500; }
+.doukon-breakdown .dk-tail {
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  font-size: 11px;
+  color: #555;
+}
+.doukon-breakdown .dk-tag-self {
+  background: #FFE066;
+  color: #5A4400;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+.doukon-breakdown .dk-tag-lead {
+  background: #DFF1D8;
+  color: #2F5A1A;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* =====================================================
+   v3.18 同梱機能: 印刷シート用クラス
+   ===================================================== */
+
+.pp-doukon-banner {
+  text-align: center;
+  margin: 0 auto 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 12px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.pp-doukon-banner-wrap {
+  text-align: center;
+  margin-bottom: 3px;
+}
+
+.pp-doukon-warning {
+  background: #FDE0E0;
+  color: #8A1A1A;
+  border: 1px solid #F09595;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 9px;
+  text-align: center;
+  margin: 0 auto 3px;
+  font-weight: 500;
+}
+.pp-doukon-warning strong {
+  font-family: monospace;
+  font-weight: 700;
+}
+
+/* サブシートの PICKUP REF 枠 (印刷シートで代表の pp-orderid-frame と差別化) */
+.pp-orderid-frame.doukon-sub {
+  border: 1px dashed #888;
+  background: repeating-linear-gradient(135deg, #fafafa, #fafafa 8px, #f0f0f0 8px, #f0f0f0 10px);
+}
+.pp-orderid-frame.doukon-sub .pp-orderid-label { color: #5A5A5A; }
+.pp-orderid-frame.doukon-sub .pp-orderid-id {
+  font-family: inherit;
+  font-weight: 400;
+  color: #5A5A5A;
+  text-decoration: line-through;
+  text-decoration-color: #999;
+}
+
+/* 印刷シートの同梱内訳ブロック */
+.pp-doukon-breakdown {
+  border-radius: 3px;
+  padding: 4px 8px;
+  margin: 0 auto 4px;
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+.pp-doukon-breakdown .pp-dk-head { font-weight: 600; margin-bottom: 1px; }
+.pp-doukon-breakdown .pp-dk-buyer { font-size: 9px; margin-bottom: 2px; }
+.pp-doukon-breakdown .pp-dk-tail { font-family: monospace; color: #555; }
+.pp-doukon-breakdown .pp-dk-tag-self {
+  background: #FFE066;
+  color: #5A4400;
+  font-size: 8.5px;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-left: 3px;
+}
+.pp-doukon-breakdown .pp-dk-tag-lead {
+  background: #DFF1D8;
+  color: #2F5A1A;
+  font-size: 8.5px;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-left: 3px;
+}
+
+/* サブシートの計測欄置換 */
+.pp-measure.doukon-sub-note {
+  background: #FFFCF2;
+  color: #993C1D;
+  text-align: center;
+  font-weight: 500;
+  border-color: #888;
+}
+.pp-measure.doukon-sub-note strong {
+  font-family: monospace;
+  font-weight: 700;
+}

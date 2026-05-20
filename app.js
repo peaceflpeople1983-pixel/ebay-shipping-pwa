@@ -566,8 +566,18 @@ const App = {
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
             <div class="ship-tracking">${escapeHtml(o.trackingNumber)}</div>
           </div>` : '';
+
+      // v3.18: 同梱関連の要素を組み立て
+      const dk = this._buildDoukonElements(o);
+
+      // OrderID 表示: 同梱代表/サブは枠付き、それ以外は素のテキスト
+      const orderIdHtml = dk.idBoxHtml
+        ? dk.idBoxHtml
+        : `<div class="order-id">${escapeHtml(o.orderId)}</div>`;
+
       return `
-      <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}" data-id="${escapeAttr(o.orderId)}">
+      <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}${dk.itemClass}" data-id="${escapeAttr(o.orderId)}" data-line-item-id="${escapeAttr(o.lineItemId || '')}">
+        ${dk.bannerHtml}
         ${thumbHtml}
         <div class="order-body">
           <div class="order-head">
@@ -577,13 +587,17 @@ const App = {
             ${shippedBadge}
             ${cpassUnimportedBadge}
             ${printedBadge}
+            ${dk.badgeHtml}
+            ${dk.subTagHtml}
             ${deadlineBadge}
           </div>
-          <div class="order-id">${escapeHtml(o.orderId)}</div>
+          ${dk.warningBarHtml}
+          ${orderIdHtml}
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
           ${shippingInfoHtml}
           ${this.renderCpassInfo(o.cpass)}
+          ${dk.breakdownHtml}
         </div>
       </div>`;
     }).join('');
@@ -1008,6 +1022,154 @@ const App = {
   },
 
   /**
+   * v3.18: 同梱グループラベル (A/B/C/D/E) → 色定義
+   */
+  _doukonColors: {
+    A: { bg: '#E3DCFB', fg: '#2E2280', border: '#C5B9F2' }, // Indigo
+    B: { bg: '#FCE0EC', fg: '#7A1247', border: '#F4C0D1' }, // Magenta
+    C: { bg: '#DAEAFB', fg: '#0C447C', border: '#85B7EB' }, // Blue
+    D: { bg: '#F0E5D3', fg: '#5C3A0E', border: '#C9A86E' }, // Sand
+    E: { bg: '#DBF0F2', fg: '#0E5460', border: '#7AC0CC' }  // Cyan
+  },
+
+  /**
+   * v3.18: 同梱カードのHTML部品を一括で組み立て
+   *  - 引数: order (doukonGroupLabel, doukonGroupSize, doukonRole, doukonGroupLeadId が必須)
+   *  - 戻り値: { itemClass, bannerHtml, badgeHtml, subTagHtml, idBoxHtml, warningBarHtml, breakdownHtml }
+   *  - 同梱なしの注文では空文字主体の安全な値を返す
+   */
+  _buildDoukonElements(o) {
+    const empty = { itemClass: '', bannerHtml: '', badgeHtml: '', subTagHtml: '', idBoxHtml: '', warningBarHtml: '', breakdownHtml: '' };
+    try {
+      if (!o || !o.doukonGroupId || !o.doukonGroupLabel) return empty;
+      const label = String(o.doukonGroupLabel);
+      const role = String(o.doukonRole || '');
+      const isLead = role === 'lead';
+      const isSub = role === 'sub';
+      const groupSize = parseInt(o.doukonGroupSize, 10) || 0;
+      const colors = this._doukonColors[label] || this._doukonColors.A;
+      const isPattern2 = String(o.doukonGroupId).indexOf('P2-') === 0;
+      const leadOrderId = String(o.doukonGroupLeadId || '');
+
+      // 1) カードに付与するクラス（左ボーダー色＋背景）
+      const itemClass = isLead
+        ? ' doukon doukon-lead doukon-' + label.toLowerCase()
+        : (isSub ? ' doukon doukon-sub' : '');
+
+      // 2) 上部バナー
+      const bannerLabel = isLead
+        ? '📦 同梱グループ' + label + ' ・代表 ・' + groupSize + '点まとめて計測'
+        : '📦 同梱グループ' + label + ' ・サブ ・計測不要 (代表へ)';
+      const bannerStyle = isLead
+        ? 'background:' + colors.bg + ';color:' + colors.fg + ';border:0.5px solid ' + colors.border + ';'
+        : 'background:#ECECEC;color:#5A5A5A;border:0.5px solid #B4B2A9;';
+      const bannerHtml = '<div class="doukon-banner" style="' + bannerStyle + '">' + escapeHtml(bannerLabel) + '</div>';
+
+      // 3) 📦 同梱X×N バッジ
+      const badgeStyle = 'background:' + colors.bg + ';color:' + colors.fg + ';';
+      const badgeHtml = '<span class="badge doukon-badge" style="' + badgeStyle + '">📦 同梱' + escapeHtml(label) + ' ×' + groupSize + '</span>';
+
+      // 4) サブタグ
+      const subTagHtml = isSub
+        ? '<span class="badge doukon-sub-tag">サブ' + (isPattern2 && leadOrderId ? ' → ' + escapeHtml(leadOrderId.substring(0, 8)) : '') + '</span>'
+        : '';
+
+      // 5) ORDER ID 枠: 代表=実線+モノスペース、サブ=破線+取消線
+      let idBoxHtml = '';
+      if (isLead) {
+        idBoxHtml = '<div class="doukon-id-box doukon-id-lead">'
+          + '<div class="doukon-id-label">📷 ORDER ID</div>'
+          + '<div class="doukon-id-value">' + escapeHtml(o.orderId) + '</div>'
+          + '</div>';
+      } else if (isSub) {
+        idBoxHtml = '<div class="doukon-id-box doukon-id-sub">'
+          + '<div class="doukon-id-label">🚫 PICKUP REF</div>'
+          + '<div class="doukon-id-value">' + escapeHtml(o.orderId) + '</div>'
+          + '</div>';
+      }
+
+      // 6) パターン2サブの赤警告バー
+      const warningBarHtml = (isSub && isPattern2 && leadOrderId)
+        ? '<div class="doukon-warning-bar">⚠️ このOrderIDはスキャン対象外 ・代表は <strong>' + escapeHtml(leadOrderId) + '</strong></div>'
+        : '';
+
+      // 7) 同梱内訳ボックス（同グループの他メンバーをリスト）
+      const breakdownHtml = this._buildDoukonBreakdown(o, colors, isPattern2, label);
+
+      return {
+        itemClass: itemClass,
+        bannerHtml: bannerHtml,
+        badgeHtml: badgeHtml,
+        subTagHtml: subTagHtml,
+        idBoxHtml: idBoxHtml,
+        warningBarHtml: warningBarHtml,
+        breakdownHtml: breakdownHtml
+      };
+    } catch (e) {
+      try { console.warn('_buildDoukonElements failed:', e); } catch (_) {}
+      return empty;
+    }
+  },
+
+  /**
+   * v3.18: 同梱内訳ボックスを構築
+   *  - 同じ doukonGroupId に属する全注文（this.state.orders から）を列挙
+   *  - 各行: 「商品名(短縮) 末尾4桁」+ 「本カード」or「代表」マーク
+   */
+  _buildDoukonBreakdown(o, colors, isPattern2, label) {
+    try {
+      const gid = o.doukonGroupId;
+      if (!gid || !Array.isArray(this.state.orders)) return '';
+      // 同グループのメンバー
+      const members = this.state.orders.filter(x => x && x.doukonGroupId === gid);
+      if (members.length === 0) return '';
+
+      // 表示順: 代表→サブ。代表が複数いる場合はOrderId昇順
+      members.sort((a, b) => {
+        const ra = a.doukonRole === 'lead' ? 0 : 1;
+        const rb = b.doukonRole === 'lead' ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return String(a.orderId).localeCompare(String(b.orderId));
+      });
+
+      // 各行を HTML 化
+      const rows = members.map((m, i) => {
+        const isSelf = (m.orderId === o.orderId) && (String(m.lineItemId || '') === String(o.lineItemId || ''));
+        const isLead = m.doukonRole === 'lead';
+        const tail = String(m.orderId || '').slice(-4);
+        const shortTitle = String(m.itemTitle || '').substring(0, 40);
+        let tag = '';
+        if (isSelf) tag = '<span class="dk-tag-self">本カード</span>';
+        else if (isLead) tag = '<span class="dk-tag-lead">代表</span>';
+        return '<div class="dk-breakdown-row">'
+          + '<span class="dk-no">' + (i + 1) + '.</span> '
+          + escapeHtml(shortTitle) + ' '
+          + '<span class="dk-tail">末尾 ' + escapeHtml(tail) + '</span> '
+          + tag
+          + '</div>';
+      }).join('');
+
+      const headLabel = isPattern2
+        ? '📦 同梱' + label + ' 内訳 (' + members.length + '点・別OrderID/同一買主)'
+        : '📦 同梱' + label + ' 内訳 (' + members.length + '点・同一OrderID)';
+
+      const buyerLine = (isPattern2 && o.buyerUsername)
+        ? '<div class="dk-buyer">👤 buyer: <span class="dk-mono">' + escapeHtml(o.buyerUsername) + '</span></div>'
+        : '';
+
+      const style = 'background:' + colors.bg + ';border:0.5px solid ' + colors.border + ';color:' + colors.fg + ';';
+      return '<div class="doukon-breakdown" style="' + style + '">'
+        + '<div class="dk-breakdown-head">' + escapeHtml(headLabel) + '</div>'
+        + buyerLine
+        + rows
+        + '</div>';
+    } catch (e) {
+      try { console.warn('_buildDoukonBreakdown failed:', e); } catch (_) {}
+      return '';
+    }
+  },
+
+  /**
    * v3.17: 一覧カード右上に表示する発送期日バッジHTMLを生成
    * v3.17.7: 完全防御 — 何があってもバッジを返す (空文字含む)
    */
@@ -1202,6 +1364,9 @@ const App = {
     const titleEl = document.getElementById('print-title');
     if (!area) return;
 
+    // v3.18: 同梱グループは「代表→サブ」の順で連続配置。同梱なしの単独商品は元の順序維持。
+    orders = this._reorderForDoukon(orders);
+
     const total = orders.length;
     const pageCount = Math.ceil(total / 2);
     if (countLabel) countLabel.textContent = total + ' 件 / ' + pageCount + ' 枚 (1ページ2商品)';
@@ -1236,12 +1401,137 @@ const App = {
   },
 
   /**
-   * v3.17: 1注文の印刷カードHTML (A4上半分 148.5mm)
-   *  - ヘッダ3カラム: タイトル N/M | ⛔発送期日 | 日付
-   *  - SHIP TO は自然フロー (shipping info の直後・余分な空白なし)
-   *  - フル住所 (氏名/番地/市州ZIP/国) を全行表示
-   *  - v3.17.5: 位置クラス (top/bottom) を付与し、印刷時の A4 上下配置を確定
+   * v3.18: 印刷用に注文配列を並べ替える
+   *  - 同梱グループは「代表→サブ」順で連続配置
+   *  - 同梱グループ間の順序は元の出現順を維持
+   *  - 同梱なしの注文は元の位置に挿入順を保つ
    */
+  _reorderForDoukon(orders) {
+    try {
+      if (!Array.isArray(orders) || orders.length === 0) return orders;
+      const result = [];
+      const visited = new Set();
+      // key: 同梱グループID(or null for non-doukon)
+      orders.forEach((o, idx) => {
+        const key = idx + '|' + (o.orderId || '') + '|' + (o.lineItemId || '');
+        if (visited.has(key)) return;
+        if (o && o.doukonGroupId) {
+          // 同じグループの全メンバーをまとめて取り出す
+          const groupMembers = orders
+            .map((x, i) => ({ o: x, i: i }))
+            .filter(x => x.o && x.o.doukonGroupId === o.doukonGroupId);
+          groupMembers.sort((a, b) => {
+            const ra = a.o.doukonRole === 'lead' ? 0 : 1;
+            const rb = b.o.doukonRole === 'lead' ? 0 : 1;
+            if (ra !== rb) return ra - rb;
+            return a.i - b.i; // 同役割内は元の順序維持
+          });
+          groupMembers.forEach(m => {
+            const k = m.i + '|' + (m.o.orderId || '') + '|' + (m.o.lineItemId || '');
+            if (!visited.has(k)) {
+              result.push(m.o);
+              visited.add(k);
+            }
+          });
+        } else {
+          result.push(o);
+          visited.add(key);
+        }
+      });
+      return result;
+    } catch (e) {
+      try { console.warn('_reorderForDoukon failed:', e); } catch (_) {}
+      return orders;
+    }
+  },
+
+  /**
+   * v3.18: 印刷シート用の同梱要素を組み立て
+   *  - bannerHtml: 上部の同梱バナー
+   *  - warningHtml: パターン2サブ用の赤警告バー
+   *  - frameClass: ORDER ID 枠の追加クラス (' doukon-sub' か '')
+   *  - idLabel: 'ORDER ID' (代表) or 'PICKUP REF (撮影不可)' (サブ)
+   *  - breakdownHtml: 内訳ブロック
+   *  - measureHtml: サブの場合は計測欄置換注記 (代表/単独は空文字 → 既定の計測欄が描画される)
+   */
+  _buildPrintDoukonElements(o) {
+    const empty = { bannerHtml: '', warningHtml: '', frameClass: '', idLabel: 'ORDER ID', breakdownHtml: '', measureHtml: '' };
+    try {
+      if (!o || !o.doukonGroupId || !o.doukonGroupLabel) return empty;
+      const label = String(o.doukonGroupLabel);
+      const role = String(o.doukonRole || '');
+      const isLead = role === 'lead';
+      const isSub = role === 'sub';
+      const groupSize = parseInt(o.doukonGroupSize, 10) || 0;
+      const colors = this._doukonColors[label] || this._doukonColors.A;
+      const isPattern2 = String(o.doukonGroupId).indexOf('P2-') === 0;
+      const leadOrderId = String(o.doukonGroupLeadId || '');
+
+      // バナー
+      const bannerText = isLead
+        ? '📦 同梱グループ' + label + ' ・代表 ・' + groupSize + '点まとめて計測'
+        : '📦 同梱グループ' + label + ' ・サブ ・計測不要 (代表へ)';
+      const bannerStyle = isLead
+        ? 'background:' + colors.bg + ';color:' + colors.fg + ';border:0.5px solid ' + colors.border + ';'
+        : 'background:#ECECEC;color:#5A5A5A;border:0.5px solid #B4B2A9;';
+      const bannerHtml = '<div class="pp-doukon-banner-wrap"><span class="pp-doukon-banner" style="' + bannerStyle + '">' + escapeHtml(bannerText) + '</span></div>';
+
+      // パターン2 サブの赤警告バー
+      const warningHtml = (isSub && isPattern2)
+        ? '<div class="pp-doukon-warning">⚠️ このOrderIDはスキャン対象外です（代表シートをご使用ください） ・代表 <strong>' + escapeHtml(leadOrderId) + '</strong></div>'
+        : '';
+
+      // ORDER ID 枠の装飾切替
+      const frameClass = isSub ? ' doukon-sub' : '';
+      const idLabel = isSub ? '🚫 PICKUP REF (撮影不可)' : '📷 ORDER ID';
+
+      // 内訳ブロック
+      let breakdownHtml = '';
+      if (Array.isArray(this.state.orders)) {
+        const members = this.state.orders.filter(x => x && x.doukonGroupId === o.doukonGroupId);
+        members.sort((a, b) => {
+          const ra = a.doukonRole === 'lead' ? 0 : 1;
+          const rb = b.doukonRole === 'lead' ? 0 : 1;
+          if (ra !== rb) return ra - rb;
+          return String(a.orderId).localeCompare(String(b.orderId));
+        });
+        if (members.length > 0) {
+          const rows = members.map((m, i) => {
+            const isSelf = (m.orderId === o.orderId) && (String(m.lineItemId || '') === String(o.lineItemId || ''));
+            const isMemberLead = m.doukonRole === 'lead';
+            const tail = String(m.orderId || '').slice(-4);
+            const shortTitle = String(m.itemTitle || '').substring(0, 38);
+            let tag = '';
+            if (isSelf) tag = '<span class="pp-dk-tag-self">本シート</span>';
+            else if (isMemberLead) tag = '<span class="pp-dk-tag-lead">代表</span>';
+            return (i + 1) + '. ' + escapeHtml(shortTitle) + ' <span class="pp-dk-tail">末尾 ' + escapeHtml(tail) + '</span>' + tag + '<br>';
+          }).join('');
+          const headLabel = isPattern2
+            ? '\u{1F4E6} 同梱' + label + ' 内訳 (' + members.length + '点・別OrderID/同一買主)'
+            : '\u{1F4E6} 同梱' + label + ' 内訳 (' + members.length + '点・同一OrderID)';
+          const buyerLine = (isPattern2 && o.buyerUsername)
+            ? '<div class="pp-dk-buyer">\u{1F464} buyer: ' + escapeHtml(o.buyerUsername) + '</div>'
+            : '';
+          const style = 'background:' + colors.bg + ';border:0.5px solid ' + colors.border + ';color:' + colors.fg + ';';
+          breakdownHtml = '<div class="pp-doukon-breakdown" style="' + style + '">'
+            + '<div class="pp-dk-head">' + escapeHtml(headLabel) + '</div>'
+            + buyerLine
+            + rows
+            + '</div>';
+        }
+      }
+
+      const measureHtml = isSub
+        ? '<div class="pp-measure doukon-sub-note"><div class="pp-measure-label">⚖ 計測欄なし</div>※ 重量・寸法は代表シート <strong>' + escapeHtml(leadOrderId) + '</strong> に一括入力</div>'
+        : '';
+
+      return { bannerHtml: bannerHtml, warningHtml: warningHtml, frameClass: frameClass, idLabel: idLabel, breakdownHtml: breakdownHtml, measureHtml: measureHtml };
+    } catch (e) {
+      try { console.warn('_buildPrintDoukonElements failed:', e); } catch (_) {}
+      return empty;
+    }
+  },
+
   _renderPrintPage(o, orderIdx, total, dateStr, positionClass) {
     const orderId = escapeHtml(o.orderId || '');
     const account = escapeHtml(o.account || '');
@@ -1255,26 +1545,17 @@ const App = {
     const tariffRate = o.tariffRate ? (parseFloat(o.tariffRate).toFixed(1) + '%') : '0%';
     const buyer = escapeHtml(o.buyerName || '');
     const imageHtml = (o.imageUrl && String(o.imageUrl).indexOf('http') === 0)
-      ? `<img src="${escapeAttr(o.imageUrl)}" alt="" onerror="this.outerHTML='📦'">`
-      : '📦';
+      ? '<img src="' + escapeAttr(o.imageUrl) + '" alt="" onerror="this.outerHTML=&#39;\u{1F4E6}&#39;">'
+      : '\u{1F4E6}';
 
-    // v3.17: 発送期日 (ヘッダ中央に表示)
     const dm = this.computeDeadlineMeta(o.shipByDate);
     let deadlineLabel;
-    if (dm.level === 'gray') {
-      deadlineLabel = '発送期日 不明';
-    } else if (dm.level === 'red') {
-      deadlineLabel = '⛔ 発送期日 ' + dm.label + ' (超過)';
-    } else if (dm.level === 'orange') {
-      deadlineLabel = '⚠ 発送期日 ' + dm.label;
-    } else {
-      deadlineLabel = '発送期日 ' + dm.label;
-    }
-    const deadlineHtml = `<div class="pp-deadline urgent-${dm.level}">${escapeHtml(deadlineLabel)}</div>`;
+    if (dm.level === 'gray')        deadlineLabel = '発送期日 不明';
+    else if (dm.level === 'red')    deadlineLabel = '⛔ 発送期日 ' + dm.label + ' (超過)';
+    else if (dm.level === 'orange') deadlineLabel = '⚠ 発送期日 ' + dm.label;
+    else                            deadlineLabel = '発送期日 ' + dm.label;
+    const deadlineHtml = '<div class="pp-deadline urgent-' + dm.level + '">' + escapeHtml(deadlineLabel) + '</div>';
 
-    // v3.17: SHIP TO フル住所 (氏名 / 住所行1 / 住所行2 / 市州ZIP / 国)
-    // Apps Script 側で個別フィールド (addrLine1/city/state/postalCode) を返すまでは
-    // buyerName + country の暫定表示。後方互換のため両対応。
     const addrLine1 = escapeHtml(o.addrLine1 || '');
     const addrLine2 = escapeHtml(o.addrLine2 || '');
     const city = escapeHtml(o.city || '');
@@ -1283,259 +1564,64 @@ const App = {
     const countryFull = escapeHtml(o.countryFull || o.country || '');
     const cityStateZip = [city, stateRegion, postalCode].filter(Boolean).join(' ');
     const buyerAddrHtml = [
-      buyer ? `<div>${buyer}</div>` : '',
-      addrLine1 ? `<div>${addrLine1}</div>` : '',
-      addrLine2 ? `<div>${addrLine2}</div>` : '',
-      cityStateZip ? `<div>${cityStateZip}</div>` : '',
-      countryFull ? `<div>${countryFull}</div>` : ''
+      buyer ? '<div>' + buyer + '</div>' : '',
+      addrLine1 ? '<div>' + addrLine1 + '</div>' : '',
+      addrLine2 ? '<div>' + addrLine2 + '</div>' : '',
+      cityStateZip ? '<div>' + cityStateZip + '</div>' : '',
+      countryFull ? '<div>' + countryFull + '</div>' : ''
     ].filter(Boolean).join('');
 
     const cpassBlock = cpassPackage
-      ? `<div class="pp-cpass">
-           <div class="pp-cpass-label">CPASS PACKAGE</div>
-           <div class="pp-cpass-value">#${cpassPackage}</div>
-         </div>`
-      : `<div class="pp-cpass warning">
-           <div class="pp-cpass-label">CPASS</div>
-           <div class="pp-cpass-value">⚠ 未取込</div>
-         </div>`;
+      ? '<div class="pp-cpass"><div class="pp-cpass-label">CPASS PACKAGE</div><div class="pp-cpass-value">#' + cpassPackage + '</div></div>'
+      : '<div class="pp-cpass warning"><div class="pp-cpass-label">CPASS</div><div class="pp-cpass-value">⚠ 未取込</div></div>';
 
     const amazonBlock = amazonTitle
-      ? `<div class="pp-amazon-text">${amazonTitle}</div>
-         <div class="pp-amazon-asin">🛒 ${asin}</div>`
-      : `<div class="pp-amazon-text" style="color:#666;">(${asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込'})</div>`;
+      ? '<div class="pp-amazon-text">' + amazonTitle + '</div><div class="pp-amazon-asin">\u{1F6D2} ' + asin + '</div>'
+      : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込') + ')</div>';
 
     const posCls = positionClass ? (' ' + positionClass) : '';
-    return `
-      <div class="print-page${posCls}">
-        <div class="pp-header">
-          <div class="pp-title">📦 ピックアップシート ${orderIdx}/${total}</div>
-          ${deadlineHtml}
-          <div class="pp-meta">${dateStr}</div>
-        </div>
-        <div class="pp-orderid-frame">
-          <div class="pp-orderid-label">ORDER ID</div>
-          <div class="pp-orderid-id">${orderId}</div>
-        </div>
-        <div class="pp-card-area">
-          <div class="pp-info">
-            <div class="pp-img-wrap">
-              <div class="pp-img">${imageHtml}</div>
-              <div class="pp-ac-bottom" title="${account} / ${country}">${account} / ${country}</div>
-            </div>
-            <div class="pp-text-area">
-              <div class="pp-ebay">
-                <div class="pp-ebay-label">eBay商品名</div>
-                <div class="pp-ebay-text">${ebayTitle}</div>
-              </div>
-              <div class="pp-amazon">
-                <div class="pp-amazon-label">AMAZON商品名 ⭐</div>
-                ${amazonBlock}
-              </div>
-            </div>
-          </div>
-          ${cpassBlock}
-          <div class="pp-measure">
-            <div class="pp-measure-label">⚖ 計測 (記入欄)</div>
-            重量: <span class="pp-write-box"></span> g &nbsp;
-            寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm
-          </div>
-          <div class="pp-meta-info">📦 ${carrier} / HS ${hsCode || '-'} / 関税 ${tariffRate}</div>
-          <div class="pp-buyer">
-            <div class="pp-buyer-label">SHIP TO</div>
-            <div class="pp-buyer-addr">${buyerAddrHtml || (buyer + '<br>' + country)}</div>
-          </div>
-        </div>
-      </div>
-    `;
+
+    const dp = this._buildPrintDoukonElements(o);
+    const defaultMeasure =
+      '<div class="pp-measure">' +
+        '<div class="pp-measure-label">⚖ 計測 (記入欄)</div>' +
+        '重量: <span class="pp-write-box"></span> g 　' +
+        '寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm' +
+      '</div>';
+
+    return '' +
+      '<div class="print-page' + posCls + '">' +
+        '<div class="pp-header">' +
+          '<div class="pp-title">\u{1F4E6} ピックアップシート ' + orderIdx + '/' + total + '</div>' +
+          deadlineHtml +
+          '<div class="pp-meta">' + dateStr + '</div>' +
+        '</div>' +
+        dp.bannerHtml +
+        dp.warningHtml +
+        '<div class="pp-orderid-frame' + dp.frameClass + '">' +
+          '<div class="pp-orderid-label">' + dp.idLabel + '</div>' +
+          '<div class="pp-orderid-id">' + orderId + '</div>' +
+        '</div>' +
+        dp.breakdownHtml +
+        '<div class="pp-card-area">' +
+          '<div class="pp-info">' +
+            '<div class="pp-img-wrap">' +
+              '<div class="pp-img">' + imageHtml + '</div>' +
+              '<div class="pp-ac-bottom" title="' + account + ' / ' + country + '">' + account + ' / ' + country + '</div>' +
+            '</div>' +
+            '<div class="pp-text-area">' +
+              '<div class="pp-ebay"><div class="pp-ebay-label">eBay商品名</div><div class="pp-ebay-text">' + ebayTitle + '</div></div>' +
+              '<div class="pp-amazon"><div class="pp-amazon-label">AMAZON商品名 ⭐</div>' + amazonBlock + '</div>' +
+            '</div>' +
+          '</div>' +
+          cpassBlock +
+          (dp.measureHtml || defaultMeasure) +
+          '<div class="pp-meta-info">\u{1F4E6} ' + carrier + ' / HS ' + (hsCode || '-') + ' / 関税 ' + tariffRate + '</div>' +
+          '<div class="pp-buyer">' +
+            '<div class="pp-buyer-label">SHIP TO</div>' +
+            '<div class="pp-buyer-addr">' + (buyerAddrHtml || (buyer + '<br>' + country)) + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
   },
-
-  /**
-   * ブラウザの印刷ダイアログを呼び出し
-   */
-  doBrowserPrint() {
-    window.print();
-  },
-
-  /**
-   * 印刷完了 → 表示中の全注文を印刷済としてマーク → 注文一覧へ戻る
-   */
-  async markPrintedAndReturn() {
-    const orders = this.state.printPreviewOrders || [];
-    if (orders.length === 0) {
-      this.goHome();
-      return;
-    }
-    const ids = orders.map(o => o.orderId);
-    showToast('印刷済マーク中... (' + ids.length + '件)');
-    try {
-      const r = await API.markPrinted(ids);
-      const updated = (r && r.updated) || 0;
-      showToast(updated + '件を印刷済としてマークしました');
-      this.state.printPreviewOrders = [];
-      await this.loadAll();
-    } catch (e) {
-      showToast('印刷済マーク失敗: ' + e.message);
-    }
-  },
-
-  /**
-   * 印刷済解除 (個別注文の Y列クリア)
-   */
-  async unmarkPrintedAndReload(orderId) {
-    this.closeCardActionMenu();
-    if (!orderId) return;
-    showToast('印刷済を解除中...');
-    try {
-      const r = await API.unmarkPrinted(orderId);
-      if (r && r.updated > 0) {
-        showToast('印刷済を解除しました: ' + orderId);
-      } else {
-        showToast('対象注文が見つかりませんでした');
-      }
-      await this.loadAll();
-    } catch (e) {
-      showToast('印刷済解除失敗: ' + e.message);
-    }
-  },
-
-  /**
-   * 注文カード長押しメニューを表示
-   */
-  showCardActionMenu(orderId) {
-    this.state.longPressOrderId = orderId;
-    const overlay = document.getElementById('card-action-overlay');
-    const target = document.getElementById('card-action-target');
-    const unmarkBtn = document.getElementById('card-action-unmark');
-    if (!overlay || !target) return;
-
-    target.textContent = orderId;
-
-    // 印刷済か否かでメニュー表示制御
-    const order = this.state.orders.find(o => o.orderId === orderId);
-    if (unmarkBtn) {
-      if (order && order.printedAt) {
-        unmarkBtn.style.display = '';
-      } else {
-        unmarkBtn.style.display = 'none';
-      }
-    }
-
-    overlay.classList.remove('hidden');
-    // オーバーレイ外タップで閉じる
-    overlay.onclick = (e) => {
-      if (e.target === overlay) this.closeCardActionMenu();
-    };
-  },
-
-  closeCardActionMenu() {
-    const overlay = document.getElementById('card-action-overlay');
-    if (overlay) overlay.classList.add('hidden');
-    this.state.longPressOrderId = null;
-  },
-
-  /**
-   * v3.15: PWA から CPaSS 取込実行 (Apps Script の scanInboxFolder を呼ぶ)
-   */
-  async runCpassImport() {
-    const btn = document.getElementById('btn-cpass-import');
-    if (!btn) return;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>取込中...';
-
-    try {
-      const result = await API.runCpassImport();
-      if (result && typeof result.files_processed === 'number') {
-        showToast(result.files_processed + ' ファイル取込完了');
-      } else {
-        showToast('取込完了');
-      }
-      // データを再読み込みして UI を更新
-      await this.loadAll();
-    } catch (err) {
-      showToast('取込失敗: ' + (err.message || err));
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalText;
-    }
-  },
-
-  confirmShipment() {
-    const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
-    if (!c) return;
-    const orderId = document.getElementById('input-order-id').value.trim();
-    if (!orderId) return showToast('注文IDを入力してください');
-    const i = this.state.currentInput;
-    const weightKg = Math.round((i.weightG / 1000) * 100) / 100;
-    const data = {
-      orderId,
-      weightKg: weightKg,
-      lengthCm: i.lengthCm,
-      widthCm: i.widthCm,
-      heightCm: i.heightCm,
-      carrier: c.carrier,
-      cost: c.totalCost,
-      alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
-    };
-    TodayGroup.remove(orderId);
-    const localOrder = this.state.orders.find(o => o.orderId === orderId);
-    if (localOrder) {
-      localOrder.selectedCarrier = c.carrier;
-      localOrder.shippingCost = c.totalCost;
-    }
-    showToast('Sheetsへ書込み中... ホームへ戻ります');
-    this.state.pendingWrites++;
-    this.goHome();
-
-    API.writeShipment(data)
-      .then(res => {
-        this.state.pendingWrites--;
-        if (res && res.error) {
-          showToast('書込み失敗: ' + res.error);
-        } else {
-          showToast('書込み完了：' + orderId);
-        }
-      })
-      .catch(err => {
-        this.state.pendingWrites--;
-        showToast('書込み失敗: ' + err.message);
-      });
-  },
-
-  async sync() {
-    showToast('eBayから注文を取得中...');
-    try {
-      await API.syncOrders();
-      await this.loadAll();
-      showToast('同期完了');
-    } catch (err) {
-      showToast('同期失敗: ' + err.message);
-    }
-  }
 };
-
-function showToast(message) {
-  const t = document.getElementById('toast');
-  t.textContent = message;
-  t.classList.remove('hidden');
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
-}
-
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-
-function escapeAttr(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-
-document.addEventListener('DOMContentLoaded', () => App.init());
