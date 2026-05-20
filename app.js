@@ -1625,3 +1625,6 @@ const App = {
       '</div>';
   },
 };
+
+// PWA 初期化エントリ
+document.addEventListener('DOMContentLoaded', () => App.init());
