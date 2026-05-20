@@ -1380,9 +1380,11 @@ const App = {
       pairs.push([orders[i], orders[i + 1] || null]);
     }
 
-    // v3.17.5: 位置クラス方式
-    //  奇数番カード(1,3,5...) = .top (A4上半分・page-break-before で新ページ強制)
-    //  偶数番カード(2,4,6...) = .bottom (A4下半分・page-break-before:avoid で上カードと同ページ)
+    // v3.18.6: ★iOS Safari 印刷崩れ修正★
+    //  .print-pair ラッパーを廃止し、.print-page をフラットな兄弟として並べる。
+    //  iOS Safari はラッパー div 内にネストされた要素の page-break-before を無視するため、
+    //  カードを印刷コンテナ直下に置くことで .top の強制改ページを確実に効かせる。
+    //  位置クラス: 奇数=.top (A4上半分・新ページ強制), 偶数=.bottom (同ページ下半分)
     const html = pairs.map((pair, pairIdx) => {
       const topIdx = pairIdx * 2 + 1;
       const botIdx = pairIdx * 2 + 2;
@@ -1390,7 +1392,7 @@ const App = {
       const botCard = pair[1]
         ? this._renderPrintPage(pair[1], botIdx, total, dateStr, 'bottom')
         : '<div class="print-page empty bottom"></div>';
-      return '<div class="print-pair">' + topCard + botCard + '</div>';
+      return topCard + botCard;  // ラッパーなしで連結
     }).join('');
     area.innerHTML = html;
   },

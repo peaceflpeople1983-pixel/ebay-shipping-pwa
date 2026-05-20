@@ -900,8 +900,9 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   display: flex;
   flex-direction: column;
 }
-/* 折り目ガイド線 (画面・印刷とも表示) */
-.print-pair > .print-page:first-child {
+/* 折り目ガイド線 (画面・印刷とも表示)
+   v3.18.6: .print-pair 廃止に伴い .print-page.top に付与 */
+.print-page.top {
   border-bottom: 1px dashed #ccc;
 }
 /* 奇数最終ページの空カード (148.5mm の白紙として残す) */
@@ -1184,11 +1185,9 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     -webkit-column-break-before: always !important;
   }
   /* 最初のカードだけは page-break-before しない (空白ページ防止)
-     v3.18.6: ★バグ修正★ 旧 ".print-page.top:first-of-type" は各 .print-pair 内で
-     最初の div = 全ペアの .top にマッチしてしまい、強制改ページが全て無効化されていた。
-     その結果カード高さの誤差が累積してページがずれていた。
-     最初のペアの .top だけを正しく例外指定する。 */
-  .print-pair:first-child > .print-page.top {
+     v3.18.6: .print-pair ラッパー廃止により .print-page がフラット兄弟になったため、
+     .print-page.top:first-of-type が正しく「最初の .top カードのみ」にマッチする。 */
+  .print-page.top:first-of-type {
     page-break-before: auto !important;
     break-before: auto !important;
     -webkit-column-break-before: auto !important;
@@ -1202,7 +1201,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   }
 
   /* v3.17.5: 折り目ガイド線 (印刷時も維持・物理折り作業の助け) */
-  .print-pair > .print-page.top {
+  .print-page.top {
     border-bottom: 1px dashed #999 !important;
   }
   /* 奇数最終ページの空カード (148.5mm 白紙として残す) */
