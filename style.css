@@ -953,12 +953,17 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   margin-bottom: 2px;
 }
 .pp-orderid-frame .pp-orderid-id {
+  /* v3.18.7: カメラOCR最適化
+     - モノスペースで等幅 (文字位置が安定しOCR精度向上)
+     - 26px に拡大 (カメラ撮影時の解像度確保)
+     - weight 700 (800は太すぎて文字が潰れOCRが誤認しやすいため軽めに)
+     - letter-spacing 2.5px で隣接文字を分離 (1/I, 0/O 等の誤認低減) */
   font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
-  font-size: 18px;  /* v3.17: 22pt → 18pt (2商品/ページ用) */
-  font-weight: 800;
-  letter-spacing: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
   color: #000;
-  line-height: 1;
+  line-height: 1.1;
 }
 
 /* v3.17: SHIP TOを最下部に押し付けるための拡張領域
