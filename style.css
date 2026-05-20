@@ -1017,14 +1017,27 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   border-bottom: 0.5px solid #000;
 }
 .pp-ebay-label { font-size: 8.5px; color: #444; font-weight: 700; }
-.pp-ebay-text { font-size: 10px; color: #000; line-height: 1.3; font-weight: 500; }
-.pp-amazon { flex: 1; }
+.pp-ebay-text {
+  font-size: 10px; color: #000; line-height: 1.3; font-weight: 500;
+  /* v3.18.5: 長い商品名でカードが148.5mmを超えるのを防ぐため2行で打切り
+     (iOS Safari 印刷は overflow:hidden を無視するため、行数で物理的に制限する) */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pp-amazon { flex: 1; min-height: 0; }
 .pp-amazon-label { font-size: 8.5px; color: #444; font-weight: 700; }
 .pp-amazon-text {
   font-size: 11px;  /* v3.17: 14→11 (2商品/ページ用) */
   color: #000;
   font-weight: 800;
   line-height: 1.3;
+  /* v3.18.5: 同上。Amazon商品名は最長になりがちなので3行で打切り */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .pp-amazon-asin {
   font-size: 8.5px;
