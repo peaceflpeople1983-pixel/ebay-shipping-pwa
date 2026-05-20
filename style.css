@@ -895,7 +895,10 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #000;
   box-sizing: border-box;
   overflow: hidden;
-  display: block;
+  /* v3.18.5: flex column に戻す (v3.17.5 動作版と一致)。
+     block だと長い商品名でカードが148.5mmを超え iOS Safari がクリップせずページ跨ぎで崩れる */
+  display: flex;
+  flex-direction: column;
 }
 /* 折り目ガイド線 (画面・印刷とも表示) */
 .print-pair > .print-page:first-child {
@@ -957,12 +960,15 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   line-height: 1;
 }
 
-/* v3.17: SHIP TOを最下部に押し付けるための拡張領域 */
+/* v3.17: SHIP TOを最下部に押し付けるための拡張領域
+   v3.18.5: overflow:hidden を追加し、本体が148.5mmを超えたら確実にクリップ
+   (長い商品名でもカードがページ跨ぎしないようにする) */
 .pp-card-area {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .pp-info {
@@ -1137,9 +1143,13 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
     /* page-break-* は一切設定しない */
   }
 
-  /* v3.17.5: カードは 148.5mm 固定 (A4 縦半分を物理的に占有) */
+  /* v3.17.5: カードは 148.5mm 固定 (A4 縦半分を物理的に占有)
+     v3.18.5: display:flex column に戻す (v3.17.5 動作版と一致)。
+     .pp-card-area { flex:1; overflow:hidden } で本体を148.5mm内にクリップし、
+     長い商品名でもカードがページ跨ぎしないようにする */
   .print-page {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
     width: 100% !important;
     height: 148.5mm !important;
     max-height: 148.5mm !important;
