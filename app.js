@@ -1624,6 +1624,157 @@ const App = {
         '</div>' +
       '</div>';
   },
+
+  // ===== v3.18 復元: 印刷/同期/CPaSS/カードメニュー系メソッド =====
+  async sync() {
+    showToast('eBayから注文を取得中...');
+    try {
+      await API.syncOrders();
+      await this.loadAll();
+      showToast('同期完了');
+    } catch (err) {
+      showToast('同期失敗: ' + err.message);
+    }
+  },
+
+  confirmShipment() {
+    const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
+    if (!c) return;
+    const orderId = document.getElementById('input-order-id').value.trim();
+    if (!orderId) return showToast('注文IDを入力してください');
+    const i = this.state.currentInput;
+    const weightKg = Math.round((i.weightG / 1000) * 100) / 100;
+    const data = {
+      orderId,
+      weightKg: weightKg,
+      lengthCm: i.lengthCm,
+      widthCm: i.widthCm,
+      heightCm: i.heightCm,
+      carrier: c.carrier,
+      cost: c.totalCost,
+      alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
+    };
+    TodayGroup.remove(orderId);
+    const localOrder = this.state.orders.find(o => o.orderId === orderId);
+    if (localOrder) {
+      localOrder.selectedCarrier = c.carrier;
+      localOrder.shippingCost = c.totalCost;
+    }
+    showToast('Sheetsへ書込み中... ホームへ戻ります');
+    this.state.pendingWrites++;
+    this.goHome();
+
+    API.writeShipment(data)
+      .then(res => {
+        this.state.pendingWrites--;
+        if (res && res.error) {
+          showToast('書込み失敗: ' + res.error);
+        } else {
+          showToast('書込み完了：' + orderId);
+        }
+      })
+      .catch(err => {
+        this.state.pendingWrites--;
+        showToast('書込み失敗: ' + err.message);
+      });
+  },
+
+  async runCpassImport() {
+    const btn = document.getElementById('btn-cpass-import');
+    if (!btn) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>取込中...';
+
+    try {
+      const result = await API.runCpassImport();
+      if (result && typeof result.files_processed === 'number') {
+        showToast(result.files_processed + ' ファイル取込完了');
+      } else {
+        showToast('取込完了');
+      }
+      // データを再読み込みして UI を更新
+      await this.loadAll();
+    } catch (err) {
+      showToast('取込失敗: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  },
+
+  showCardActionMenu(orderId) {
+    this.state.longPressOrderId = orderId;
+    const overlay = document.getElementById('card-action-overlay');
+    const target = document.getElementById('card-action-target');
+    const unmarkBtn = document.getElementById('card-action-unmark');
+    if (!overlay || !target) return;
+
+    target.textContent = orderId;
+
+    // 印刷済か否かでメニュー表示制御
+    const order = this.state.orders.find(o => o.orderId === orderId);
+    if (unmarkBtn) {
+      if (order && order.printedAt) {
+        unmarkBtn.style.display = '';
+      } else {
+        unmarkBtn.style.display = 'none';
+      }
+    }
+
+    overlay.classList.remove('hidden');
+    // オーバーレイ外タップで閉じる
+    overlay.onclick = (e) => {
+      if (e.target === overlay) this.closeCardActionMenu();
+    };
+  },
+
+  closeCardActionMenu() {
+    const overlay = document.getElementById('card-action-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    this.state.longPressOrderId = null;
+  },
+
+  doBrowserPrint() {
+    window.print();
+  },
+
+  async markPrintedAndReturn() {
+    const orders = this.state.printPreviewOrders || [];
+    if (orders.length === 0) {
+      this.goHome();
+      return;
+    }
+    const ids = orders.map(o => o.orderId);
+    showToast('印刷済マーク中... (' + ids.length + '件)');
+    try {
+      const r = await API.markPrinted(ids);
+      const updated = (r && r.updated) || 0;
+      showToast(updated + '件を印刷済としてマークしました');
+      this.state.printPreviewOrders = [];
+      await this.loadAll();
+    } catch (e) {
+      showToast('印刷済マーク失敗: ' + e.message);
+    }
+  },
+
+  async unmarkPrintedAndReload(orderId) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    showToast('印刷済を解除中...');
+    try {
+      const r = await API.unmarkPrinted(orderId);
+      if (r && r.updated > 0) {
+        showToast('印刷済を解除しました: ' + orderId);
+      } else {
+        showToast('対象注文が見つかりませんでした');
+      }
+      await this.loadAll();
+    } catch (e) {
+      showToast('印刷済解除失敗: ' + e.message);
+    }
+  },
+
 };
 
 function showToast(message) {
