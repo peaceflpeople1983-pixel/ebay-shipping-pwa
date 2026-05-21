@@ -1487,28 +1487,87 @@ const App = {
   _enrichPrintDoukonLabels(orders) {
     try {
       if (!Array.isArray(orders) || orders.length === 0) return orders;
-      const map = {};
+
+      // 1) 一覧(this.state.orders)から groupId -> 正準ラベルのマップ(あれば優先)
+      const stateMap = {};
       if (Array.isArray(this.state.orders)) {
         this.state.orders.forEach(s => {
-          if (s && s.doukonGroupId && s.doukonGroupLabel && !map[s.doukonGroupId]) {
-            map[s.doukonGroupId] = {
-              label: s.doukonGroupLabel,
-              size: s.doukonGroupSize,
-              leadId: s.doukonGroupLeadId,
-              buyerUsername: s.buyerUsername || ''
+          if (s && s.doukonGroupId && s.doukonGroupLabel && !stateMap[String(s.doukonGroupId)]) {
+            stateMap[String(s.doukonGroupId)] = {
+              label: String(s.doukonGroupLabel),
+              leadId: s.doukonGroupLeadId ? String(s.doukonGroupLeadId) : '',
+              buyer: s.buyerUsername ? String(s.buyerUsername) : ''
             };
           }
         });
       }
+
+      // 2) ★フォールバック★ groupId 未タグでも「同一OrderID複数明細(パターン1)」を自動検出
+      //    getPrintData が AC列を返さない/シート未タグでも、同じ OrderID が複数行あれば
+      //    同梱グループ扱い(代表=先頭明細, 以降=サブ)。ユーザー例 21-14641-67588(2 ASIN) を確実に拾う。
+      const idCount = {};
       orders.forEach(o => {
-        if (!o || !o.doukonGroupId) return;
-        const info = map[o.doukonGroupId];
-        if (!info) return;
-        if (!o.doukonGroupLabel)  o.doukonGroupLabel = info.label;
-        if (o.doukonGroupSize == null || o.doukonGroupSize === '') o.doukonGroupSize = info.size;
-        if (!o.doukonGroupLeadId) o.doukonGroupLeadId = info.leadId;
-        if (!o.buyerUsername && info.buyerUsername) o.buyerUsername = info.buyerUsername;
+        if (o && !o.doukonGroupId && o.orderId) {
+          const k = String(o.orderId);
+          idCount[k] = (idCount[k] || 0) + 1;
+        }
       });
+      const firstSeen = {};
+      orders.forEach(o => {
+        if (!o || o.doukonGroupId || !o.orderId) return;
+        const k = String(o.orderId);
+        if (idCount[k] >= 2) {
+          o.doukonGroupId = 'P1LOCAL-' + k;
+          if (!firstSeen[k]) { o.doukonRole = o.doukonRole || 'lead'; firstSeen[k] = true; }
+          else { o.doukonRole = o.doukonRole || 'sub'; }
+        }
+      });
+
+      // 3) 印刷データ自身を groupId 単位に集計(出現順を保持)
+      const groupOrder = [];
+      const members = {};
+      orders.forEach(o => {
+        const gid = (o && o.doukonGroupId) ? String(o.doukonGroupId) : '';
+        if (!gid) return;
+        if (!members[gid]) { members[gid] = []; groupOrder.push(gid); }
+        members[gid].push(o);
+      });
+
+      // 代表(lead)の特定 + role 未設定グループの補完(先頭=lead, 以降=sub)
+      const leadOf = {};
+      groupOrder.forEach(gid => {
+        const arr = members[gid];
+        const hasLead = arr.some(x => String(x.doukonRole || '') === 'lead');
+        if (!hasLead) {
+          arr.forEach((x, i) => { if (!x.doukonRole) x.doukonRole = (i === 0 ? 'lead' : 'sub'); });
+        } else {
+          arr.forEach(x => { if (!x.doukonRole) x.doukonRole = 'sub'; });
+        }
+        const lead = arr.find(x => String(x.doukonRole || '') === 'lead') || arr[0];
+        leadOf[gid] = lead ? String(lead.orderId || '') : '';
+      });
+
+      // 4) ラベル(A,B,C…)を出現順で割当(state にあればそれを優先し一覧と一致させる)
+      const LB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let li = 0;
+      const labelOf = {};
+      groupOrder.forEach(gid => {
+        if (stateMap[gid] && stateMap[gid].label) labelOf[gid] = stateMap[gid].label;
+        else { labelOf[gid] = LB.charAt(li % LB.length); li += 1; }
+      });
+
+      // 5) 各注文へ反映(単独商品は groupId 無しなので一切変更しない)
+      orders.forEach(o => {
+        const gid = (o && o.doukonGroupId) ? String(o.doukonGroupId) : '';
+        if (!gid) return;
+        o.doukonGroupLabel  = labelOf[gid] || 'A';
+        o.doukonGroupSize   = (members[gid] || []).length;
+        o.doukonGroupLeadId = (stateMap[gid] && stateMap[gid].leadId) || leadOf[gid] || '';
+        if (!o.buyerUsername && stateMap[gid] && stateMap[gid].buyer) o.buyerUsername = stateMap[gid].buyer;
+      });
+
+      // 6) 内訳ブロック用にメンバーマップを保持(state.orders 非依存化)
+      this.state.printGroupMembers = members;
       return orders;
     } catch (e) {
       try { console.warn('_enrichPrintDoukonLabels failed:', e); } catch (_) {}
@@ -1602,9 +1661,16 @@ const App = {
       const idLabel = isSub ? '🚫 PICKUP REF (撮影不可)' : '📷 ORDER ID';
 
       // 内訳ブロック
+      // v3.18.11: メンバーは印刷側マップ(_enrichPrintDoukonLabels が構築)を優先。
+      //   state.orders がフィルタで欠けていても内訳が出るようにする。
       let breakdownHtml = '';
-      if (Array.isArray(this.state.orders)) {
-        const members = this.state.orders.filter(x => x && x.doukonGroupId === o.doukonGroupId);
+      let members = (this.state.printGroupMembers && this.state.printGroupMembers[String(o.doukonGroupId)])
+        ? this.state.printGroupMembers[String(o.doukonGroupId)].slice()
+        : [];
+      if (members.length === 0 && Array.isArray(this.state.orders)) {
+        members = this.state.orders.filter(x => x && String(x.doukonGroupId) === String(o.doukonGroupId));
+      }
+      {
         members.sort((a, b) => {
           const ra = a.doukonRole === 'lead' ? 0 : 1;
           const rb = b.doukonRole === 'lead' ? 0 : 1;
@@ -1919,5 +1985,5 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-// PWA 初期化エントリ
+// PWA 初期化エントリ (v3.18.11)
 document.addEventListener('DOMContentLoaded', () => App.init());
