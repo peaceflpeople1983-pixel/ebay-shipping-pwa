@@ -1432,6 +1432,13 @@ const App = {
     const titleEl = document.getElementById('print-title');
     if (!area) return;
 
+    // v3.18.11: ★同梱表示が印刷で効かない問題の修正★
+    //  getPrintData(Apps Script) は doukonGroupId/doukonRole しか返さず、
+    //  doukonGroupLabel/Size/LeadId が欠落していたため _buildPrintDoukonElements が常に empty を返し、
+    //  サブにも計測欄(defaultMeasure)が描画されていた。
+    //  一覧用 this.state.orders は annotateDoukonLabels_ 済みなので、グループID単位で補完する。
+    orders = this._enrichPrintDoukonLabels(orders);
+
     // v3.18: 同梱グループは「代表→サブ」の順で連続配置。同梱なしの単独商品は元の順序維持。
     orders = this._reorderForDoukon(orders);
 
@@ -1468,6 +1475,45 @@ const App = {
   _formatPrintDate(d) {
     const pad = n => (n < 10 ? '0' + n : '' + n);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  },
+
+  /**
+   * v3.18.11: 印刷データに同梱ラベル情報(label/size/leadId)を補完する
+   *  - getPrintData は doukonGroupId/doukonRole のみ返す。
+   *  - 一覧用 this.state.orders は annotateDoukonLabels_ 済みで label/size/leadId を持つ。
+   *  - グループIDは全メンバーで共通なので、groupId → {label,size,leadId} のマップで補える。
+   *  - buyerUsername も一覧側にあれば補完(パターン2の内訳 buyer 行用)。
+   */
+  _enrichPrintDoukonLabels(orders) {
+    try {
+      if (!Array.isArray(orders) || orders.length === 0) return orders;
+      const map = {};
+      if (Array.isArray(this.state.orders)) {
+        this.state.orders.forEach(s => {
+          if (s && s.doukonGroupId && s.doukonGroupLabel && !map[s.doukonGroupId]) {
+            map[s.doukonGroupId] = {
+              label: s.doukonGroupLabel,
+              size: s.doukonGroupSize,
+              leadId: s.doukonGroupLeadId,
+              buyerUsername: s.buyerUsername || ''
+            };
+          }
+        });
+      }
+      orders.forEach(o => {
+        if (!o || !o.doukonGroupId) return;
+        const info = map[o.doukonGroupId];
+        if (!info) return;
+        if (!o.doukonGroupLabel)  o.doukonGroupLabel = info.label;
+        if (o.doukonGroupSize == null || o.doukonGroupSize === '') o.doukonGroupSize = info.size;
+        if (!o.doukonGroupLeadId) o.doukonGroupLeadId = info.leadId;
+        if (!o.buyerUsername && info.buyerUsername) o.buyerUsername = info.buyerUsername;
+      });
+      return orders;
+    } catch (e) {
+      try { console.warn('_enrichPrintDoukonLabels failed:', e); } catch (_) {}
+      return orders;
+    }
   },
 
   /**

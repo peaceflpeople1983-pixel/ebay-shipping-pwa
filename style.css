@@ -1519,18 +1519,21 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-weight: 700;
 }
 
-/* サブシートの PICKUP REF 枠 (印刷シートで代表の pp-orderid-frame と差別化) */
+/* サブシートの PICKUP REF 枠 (印刷シートで代表の pp-orderid-frame と差別化)
+   v3.18.11: 撮影不可を「斜め網掛け」で視覚化 (PWA同様)。
+   OrderID のフォント/太さ/大きさは代表と同一(mono 26px/700)を維持し、
+   グレー色 + 網掛けのみで区別する (取り消し線・縮小は行わない)。 */
 .pp-orderid-frame.doukon-sub {
   border: 1px dashed #888;
-  background: repeating-linear-gradient(135deg, #fafafa, #fafafa 8px, #f0f0f0 8px, #f0f0f0 10px);
+  background-color: #f7f7f7;
+  background-image: repeating-linear-gradient(45deg, rgba(90,90,90,0.18) 0, rgba(90,90,90,0.18) 5px, transparent 5px, transparent 11px);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .pp-orderid-frame.doukon-sub .pp-orderid-label { color: #5A5A5A; }
 .pp-orderid-frame.doukon-sub .pp-orderid-id {
-  font-family: inherit;
-  font-weight: 400;
+  /* v3.18.11: 代表と同一のフォント/太さ/サイズを維持 (OCR可読性は撮影不可ラベル+網掛けで担保) */
   color: #5A5A5A;
-  text-decoration: line-through;
-  text-decoration-color: #999;
 }
 
 /* 印刷シートの同梱内訳ブロック */
