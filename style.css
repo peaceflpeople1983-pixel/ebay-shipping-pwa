@@ -526,27 +526,41 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .loader { text-align: center; padding: 24px; color: var(--text-secondary); }
 
 .overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: fixed; inset: 0; height: 100vh; height: 100dvh;
+  background: rgba(0,0,0,0.92); z-index: 100;
+  display: flex; flex-direction: column;
 }
-.overlay-content { width: 100%; max-width: 420px; padding: 16px; padding-bottom: calc(16px + var(--safe-bottom)); }
-#ocr-video { width: 100%; border-radius: 12px; }
-.overlay-content { position: relative; }
+/* 上: ステータス（固定・縮まない） */
+.ocr-status {
+  flex: 0 0 auto;
+  color: #fff; text-align: center; font-size: 14px;
+  padding: calc(10px + var(--safe-top)) 16px 10px;
+}
+/* 中: ビデオ表示エリア（残り全部・はみ出しはクリップ） */
+.ocr-stage {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; padding: 0 12px;
+}
+/* ビデオは自然なアスペクト比を維持（ガイド枠=ストリーム座標を一致させるため） */
+.ocr-video-wrap { position: relative; width: 100%; max-width: 460px; }
+#ocr-video { display: block; width: 100%; height: auto; border-radius: 12px; }
+/* ガイド枠（撮影範囲と一致：中央32%帯 top34%/bottom34%） */
 .ocr-roi-guide {
   position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 40%;
-  bottom: 40%;
+  left: 7%;
+  right: 7%;
+  top: 34%;
+  bottom: 34%;
   border: 2px solid #FFC726;
   border-radius: 6px;
   pointer-events: none;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
 }
 .ocr-roi-guide::before {
   content: 'この枠に注文IDを合わせる';
   position: absolute;
-  top: -28px;
+  top: -26px;
   left: 0;
   right: 0;
   text-align: center;
@@ -554,9 +568,21 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #FFC726;
   font-weight: 500;
 }
-.ocr-status { color: #fff; text-align: center; padding: 12px; font-size: 14px; }
-.ocr-buttons { display: flex; gap: 8px; }
-.ocr-buttons button { flex: 1; }
+/* タップ合焦ヒント */
+.ocr-hint { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; pointer-events: none; }
+.ocr-hint span {
+  display: inline-block; background: rgba(0,0,0,0.45);
+  color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 12px;
+}
+/* 下: ボタンバー（常に最下部固定・safe-area確保） */
+.ocr-buttons {
+  flex: 0 0 auto;
+  display: flex; gap: 10px;
+  background: #0d0d0f;
+  padding: 12px 16px calc(16px + var(--safe-bottom));
+}
+.ocr-buttons button { flex: 1; min-height: 50px; font-size: 16px; border-radius: 12px; }
+.ocr-buttons #btn-ocr-capture { flex: 1.4; }
 
 .toast {
   position: fixed;

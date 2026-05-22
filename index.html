@@ -232,14 +232,17 @@
 
   <!-- カメラ／OCRオーバーレイ -->
   <section id="ocr-overlay" class="overlay hidden">
-    <div class="overlay-content">
-      <video id="ocr-video" playsinline autoplay></video>
-      <canvas id="ocr-canvas" class="hidden"></canvas>
-      <div class="ocr-status" id="ocr-status">カメラ準備中...</div>
-      <div class="ocr-buttons">
-        <button class="secondary" id="btn-ocr-cancel">キャンセル</button>
-        <button class="primary" id="btn-ocr-capture">撮影</button>
+    <div class="ocr-status" id="ocr-status">カメラ準備中...</div>
+    <div class="ocr-stage">
+      <div class="ocr-video-wrap" id="ocr-video-wrap">
+        <video id="ocr-video" playsinline autoplay></video>
+        <canvas id="ocr-canvas" class="hidden"></canvas>
+        <div class="ocr-hint"><span>画面タップでピント合わせ</span></div>
       </div>
+    </div>
+    <div class="ocr-buttons">
+      <button class="secondary" id="btn-ocr-cancel">キャンセル</button>
+      <button class="primary" id="btn-ocr-capture">撮影</button>
     </div>
   </section>
 

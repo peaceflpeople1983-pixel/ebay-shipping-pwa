@@ -42,10 +42,44 @@ const OCR = {
       await video.play();
       this._setStatus('注文IDをガイド枠に合わせて「撮影」をタップ');
       this._showROIGuide();
+      this._bindTapFocus();
+      this._refocus();          // 開始直後に連続フォーカスを要求（対応端末のみ）
       this._tryBarcode();
     } catch (err) {
       this._setStatus('カメラを起動できません: ' + err.message);
     }
+  },
+
+  /**
+   * 連続オートフォーカスを要求（iOS Safari は無視されるが対応端末で有効）
+   */
+  async _refocus() {
+    try {
+      if (!this.stream) return;
+      const track = this.stream.getVideoTracks()[0];
+      if (!track || !track.applyConstraints) return;
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps && caps.focusMode && caps.focusMode.indexOf('continuous') !== -1) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    } catch (_) {}
+  },
+
+  /**
+   * 画面（ビデオ）タップで再フォーカスを要求
+   */
+  _bindTapFocus() {
+    if (this._tapFocusBound) return;
+    const wrap = document.getElementById('ocr-video-wrap');
+    if (!wrap) return;
+    wrap.addEventListener('click', () => {
+      this._refocus();
+      this._setStatus('ピント合わせ中...');
+      setTimeout(() => {
+        if (this.stream && !this.busy) this._setStatus('注文IDをガイド枠に合わせて「撮影」をタップ');
+      }, 600);
+    });
+    this._tapFocusBound = true;
   },
  
   _setStatus(msg) {
@@ -59,8 +93,8 @@ const OCR = {
       guide = document.createElement('div');
       guide.id = 'ocr-roi-guide';
       guide.className = 'ocr-roi-guide';
-      const overlay = document.getElementById('ocr-overlay');
-      overlay.querySelector('.overlay-content').appendChild(guide);
+      const wrap = document.getElementById('ocr-video-wrap');
+      (wrap || document.getElementById('ocr-overlay')).appendChild(guide);
     }
     guide.classList.remove('hidden');
   },
@@ -99,19 +133,23 @@ const OCR = {
     if (this.busy) return;
     this.busy = true;
     try {
+      // ピント合わせ：撮影直前に再フォーカス要求 → 約0.4秒待ってから取得
+      this._setStatus('ピント合わせ中...');
+      this._refocus();
+      await new Promise(r => setTimeout(r, 400));
       this._setStatus('撮影 → AI解析中...（2〜4秒）');
  
       const video = document.getElementById('ocr-video');
       const canvas = document.getElementById('ocr-canvas');
  
-      // ROIで中央水平帯のみを切り出し（注文IDが含まれる領域）
+      // ROIで中央水平帯のみを切り出し（ガイド枠と一致：中央32%帯 top34%/height32%）
       const fullW = video.videoWidth;
       const fullH = video.videoHeight;
-      const roiTop = Math.floor(fullH * 0.30);
-      const roiH = Math.floor(fullH * 0.40);
+      const roiTop = Math.floor(fullH * 0.34);
+      const roiH = Math.floor(fullH * 0.32);
  
-      // 解析対象の最大幅は800px に縮小（API送信量を抑える）
-      const targetW = Math.min(fullW, 800);
+      // 解析対象の最大幅は1200px（多少ソフトでもOCRが通りやすいよう解像度を確保）
+      const targetW = Math.min(fullW, 1200);
       const scale = targetW / fullW;
       canvas.width = targetW;
       canvas.height = Math.floor(roiH * scale);
