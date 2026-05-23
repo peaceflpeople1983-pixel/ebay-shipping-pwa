@@ -526,7 +526,14 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .loader { text-align: center; padding: 24px; color: var(--text-secondary); }
 
 .overlay {
-  position: fixed; inset: 0; height: 100vh; height: 100dvh;
+  /* bottom を指定しない（top+bottom+height の過剰指定で height が無視されるのを防ぐ） */
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 100vh;                  /* フォールバック */
+  height: -webkit-fill-available; /* iOS Safari: 可視領域の高さ */
+  height: 100dvh;                 /* モダン: 動的ビューポート */
+  max-height: 100vh;
+  max-height: -webkit-fill-available;
+  max-height: 100dvh;
   background: rgba(0,0,0,0.92); z-index: 100;
   display: flex; flex-direction: column;
 }
@@ -579,7 +586,8 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   flex: 0 0 auto;
   display: flex; gap: 10px;
   background: #0d0d0f;
-  padding: 12px 16px calc(16px + var(--safe-bottom));
+  /* 浮動URLバー回避のため下余白を厚めに確保 */
+  padding: 12px 16px calc(20px + var(--safe-bottom));
 }
 .ocr-buttons button { flex: 1; min-height: 50px; font-size: 16px; border-radius: 12px; }
 .ocr-buttons #btn-ocr-capture { flex: 1.4; }
