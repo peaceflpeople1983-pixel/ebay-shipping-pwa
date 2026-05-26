@@ -16,14 +16,14 @@
  *
  * グローバル: window.Zonos
  */
- 
+
 (function() {
   'use strict';
- 
+
   // ============================================================
   // 定数
   // ============================================================
- 
+
   // Apps Script側の ECONOMY_POLICIES と同じ (フォールバック用)
   const ECONOMY_POLICIES = [
     'ePacketライト',
@@ -33,17 +33,17 @@
     'eBay SpeedPAK Economy',
     'SpeedPAK Eco'
   ];
- 
+
   const DEADLINE_THRESHOLDS = {
     red:    24 * 60 * 60 * 1000,
     orange: 48 * 60 * 60 * 1000,
     yellow:  4 * 24 * 60 * 60 * 1000
   };
- 
+
   // ============================================================
   // ヘルパー: 対象判定
   // ============================================================
- 
+
   /**
    * 注文がZonos対象か (Sheets側の isZonosTarget を信頼するが、無い場合はフォールバック判定)
    */
@@ -59,11 +59,11 @@
     if (lp.indexOf('epacket') !== -1) return true;
     return false;
   }
- 
+
   // ============================================================
   // ヘルパー: 残時間計算
   // ============================================================
- 
+
   /**
    * Declaration ID 期限の残時間を計算 (4段階)
    *
@@ -83,7 +83,7 @@
       const msLeft = expires - now;
       const daysLeft = Math.round(msLeft / (24 * 60 * 60 * 1000) * 10) / 10;
       const hoursLeft = Math.round(msLeft / (60 * 60 * 1000));
- 
+
       let level, label;
       if (msLeft < 0) {
         level = 'red';
@@ -106,11 +106,11 @@
       return { level: 'gray', label: '期限不明', daysLeft: null, msLeft: null };
     }
   }
- 
+
   // ============================================================
   // ヘルパー: バッジHTMLの生成
   // ============================================================
- 
+
   /**
    * 注文カード用のZonosバッジHTMLを構築。対象外の注文には空文字を返す。
    *
@@ -139,7 +139,7 @@
     }
     return '<span class="badge zonos-pending">🆕 Zonos未</span>';
   }
- 
+
   /**
    * 対象外注文に表示する注記HTML
    */
@@ -151,7 +151,7 @@
     }
     return '<span class="sub-note zonos-na">⚖ ' + escapeHtmlZ_(o.shippingPolicy) + 'のためZonos対象外</span>';
   }
- 
+
   /**
    * 注文一覧上部のZonos期限切迫バナー (残24h以内が1件以上で表示)
    * 既存バナーDOMの直前に挿入する想定
@@ -172,7 +172,7 @@
       if (m.level === 'red') criticalCount++;
       else if (m.level === 'orange') urgentCount++;
     });
- 
+
     if (criticalCount === 0 && urgentCount === 0) return '';
     if (criticalCount > 0) {
       return '<div class="banner zonos-expire">' +
@@ -191,18 +191,18 @@
       '</div>' +
     '</div>';
   }
- 
+
   // ============================================================
   // Zonos送信画面 (screen-zonos) コントローラ
   // ============================================================
- 
+
   const ZonosScreen = {
     state: {
       orderId: null,
       data: null,        // zonosGetData レスポンス
       copiedFields: {},  // { 'fullName': true, 'phone': true, ... }
     },
- 
+
     /**
      * 画面を開く
      * @param {string} orderId
@@ -211,10 +211,10 @@
       this.state.orderId = orderId;
       this.state.data = null;
       this.state.copiedFields = {};
- 
+
       showScreen('screen-zonos');
       this._renderLoading();
- 
+
       try {
         const data = await this._fetchData(orderId);
         if (data.error) {
@@ -227,7 +227,7 @@
         this._renderError(err.message || String(err));
       }
     },
- 
+
     async _fetchData(orderId) {
       // API.config を使う (既存パターン)
       const url = API.config.url + '?action=zonosGetData&orderId=' + encodeURIComponent(orderId);
@@ -235,29 +235,29 @@
       if (!res.ok) throw new Error('Zonos API error: ' + res.status);
       return res.json();
     },
- 
+
     _renderLoading() {
       const root = document.getElementById('zonos-content');
       if (root) root.innerHTML = '<div class="loader">読み込み中...</div>';
     },
- 
+
     _renderError(msg) {
       const root = document.getElementById('zonos-content');
       if (root) {
         root.innerHTML = '<div class="empty" style="padding:24px;">⚠ ' + escapeHtmlZ_(msg) + '</div>';
       }
     },
- 
+
     _render() {
       const d = this.state.data;
       if (!d) return;
       const root = document.getElementById('zonos-content');
       if (!root) return;
- 
+
       const r = d.recipient;
       const isDoukon = d.isDoukon && d.doukonCount > 1;
       const existingDdp = d.existingDeclaration && d.existingDeclaration.declarationId;
- 
+
       // 各コピペフィールドのHTML
       const fields = [
         { key: 'fullName', label: 'FULL NAME', value: r.fullName, required: true },
@@ -269,9 +269,9 @@
         { key: 'postalCode', label: 'POSTAL CODE', value: r.postalCode, required: true },
         { key: 'country', label: 'COUNTRY', value: r.countryFull, required: true }
       ];
- 
+
       let html = '';
- 
+
       // 同梱インフォボックス
       if (isDoukon) {
         html += '<div class="doukon-info">' +
@@ -283,7 +283,7 @@
           '</ul>' +
         '</div>';
       }
- 
+
       // 進捗
       const totalFields = fields.filter(f => !f.skipIfEmpty || f.value).length +
                            d.items.length * 3;  // each item: description, value, quantity
@@ -300,7 +300,7 @@
       '<div class="zonos-progress-bar" style="margin: 0 14px 12px;">' +
         '<div class="zonos-progress-fill" style="width:' + progressPct + '%;"></div>' +
       '</div>';
- 
+
       // RECIPIENT カード
       html += '<div class="zonos-card">' +
         '<div class="zonos-card-head">▍ RECIPIENT (受取人' + (isDoukon ? ' = 同梱先' : '') + ')</div>';
@@ -309,7 +309,7 @@
         html += this._renderField(f.key, f.label, f.value);
       });
       html += '</div>';
- 
+
       // ITEMS カード (同梱なら1/N, 2/N...)
       d.items.forEach((it, idx) => {
         const label = isDoukon ? ('ITEM ' + (idx + 1) + '/' + d.items.length) : 'ITEM';
@@ -321,7 +321,7 @@
         html += this._renderField('quantity_' + idx, 'QUANTITY', String(it.quantity));
         html += '</div>';
       });
- 
+
       // 商品画像 (タップで写真ライブラリへ保存)
       if (d.items.length > 0 && d.items.some(it => it.imageUrl)) {
         html += '<div class="zonos-card">' +
@@ -348,14 +348,14 @@
           '</div>' +
         '</div>';
       }
- 
+
       // 合計金額 (同梱のみ)
       if (isDoukon) {
         html += '<div style="margin: 12px 14px; padding: 10px 12px; background: #E1F5EE; ' +
           'border-radius: 8px; font-size: 11.5px; color: #0F6E56;">' +
           '💡 <strong>合計: ' + d.totalValue.toFixed(2) + ' USD × 1パッケージ</strong></div>';
       }
- 
+
       // Declaration ID 入力
       const titleText = existingDdp
         ? '✓ Declaration ID 入力済'
@@ -377,17 +377,17 @@
           ' (' + escapeHtmlZ_(m.label) + ')</div>';
       }
       html += '</div>';
- 
+
       // Zonosアプリを開くボタン
       html += '<button class="primary-btn" id="zonos-open-app-btn">📲 Zonosアプリを開く</button>';
       html += '<div style="height: 24px;"></div>';
- 
+
       root.innerHTML = html;
- 
+
       // イベントバインド
       this._bindEvents();
     },
- 
+
     _renderField(key, label, value, isAiTranslated) {
       if (!value && value !== 0) return '';
       const isCopied = !!this.state.copiedFields[key];
@@ -408,11 +408,11 @@
           'data-copy-key="' + escapeAttrZ_(key) + '">' + btnText + '</button>' +
       '</div>';
     },
- 
+
     _bindEvents() {
       const root = document.getElementById('zonos-content');
       if (!root) return;
- 
+
       // コピペボタン
       root.querySelectorAll('.copy-btn[data-copy-value]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -421,7 +421,7 @@
           this._copyToClipboard(val, key, btn);
         });
       });
- 
+
       // 商品画像タップ → 写真ライブラリへ保存
       root.querySelectorAll('[data-zonos-img-url]').forEach(el => {
         el.addEventListener('click', (e) => {
@@ -431,20 +431,20 @@
           this._downloadImage(url, filename, el);
         });
       });
- 
+
       // 保存ボタン
       const saveBtn = document.getElementById('zonos-save-btn');
       if (saveBtn) {
         saveBtn.addEventListener('click', () => this._saveDeclaration());
       }
- 
+
       // Zonosアプリを開く
       const openBtn = document.getElementById('zonos-open-app-btn');
       if (openBtn) {
         openBtn.addEventListener('click', () => this._openZonosApp());
       }
     },
- 
+
     /**
      * 商品画像を iPhone 写真ライブラリへ保存
      *  - Tier 1: fetch + Web Share API (ワンタップ・iOS 15+)
@@ -453,10 +453,10 @@
      */
     async _downloadImage(imageUrl, filename, el) {
       if (!imageUrl) return;
- 
+
       // ビジュアル: ダウンロード中表示
       if (el) el.classList.add('downloading');
- 
+
       try {
         // Tier 1: fetch を試す
         let blob = null;
@@ -469,11 +469,11 @@
           // CORS失敗等 — 後でTier 3 (新タブ) にフォールバック
           console.warn('Zonos image fetch failed (CORS等):', fetchErr.message);
         }
- 
+
         if (blob) {
           // File オブジェクトを作成
           const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
- 
+
           // Tier 1: Web Share API (iOS 15+ で「写真に保存」が選べる)
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
@@ -489,7 +489,7 @@
               // フォールバックへ
             }
           }
- 
+
           // Tier 2: Blob URLでダウンロード (Web Shareが無い場合)
           const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -503,7 +503,7 @@
           if (typeof showToast === 'function') showToast('ダウンロード開始');
           return;
         }
- 
+
         // Tier 3: 画像URLを新タブで開く (CORSで取得不可な場合のフォールバック)
         // iOS Safari は画像を全画面表示するので、ユーザーが長押し→「写真に保存」可能
         const a = document.createElement('a');
@@ -516,7 +516,7 @@
         if (typeof showToast === 'function') {
           showToast('画像を長押し→「写真に保存」を選んでください');
         }
- 
+
       } catch (e) {
         console.error('Image download error:', e);
         if (typeof showToast === 'function') {
@@ -526,7 +526,7 @@
         if (el) el.classList.remove('downloading');
       }
     },
- 
+
     async _copyToClipboard(value, key, btn) {
       try {
         await navigator.clipboard.writeText(value);
@@ -543,7 +543,7 @@
         if (typeof showToast === 'function') showToast('コピー失敗: ' + e.message);
       }
     },
- 
+
     _updateProgress() {
       const d = this.state.data;
       if (!d) return;
@@ -555,7 +555,7 @@
       const num = document.querySelector('#zonos-content .zonos-progress-num');
       if (num) num.textContent = copiedCount + ' / ' + totalFields + ' 完了';
     },
- 
+
     async _saveDeclaration() {
       const input = document.getElementById('zonos-declaration-input');
       if (!input) return;
@@ -568,13 +568,13 @@
         if (typeof showToast === 'function') showToast('形式が不正です (DDP-XXXX...)');
         return;
       }
- 
+
       const saveBtn = document.getElementById('zonos-save-btn');
       if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.textContent = '保存中...';
       }
- 
+
       try {
         const body = {
           action: 'zonosSaveDeclaration',
@@ -609,7 +609,7 @@
         }
       }
     },
- 
+
     _openZonosApp() {
       // URLスキーム試行 → 失敗ならApp Store誘導
       const scheme = 'zonos-prepay://';
@@ -624,11 +624,11 @@
       }, 2000);
     }
   };
- 
+
   // ============================================================
   // ユーティリティ (escapeHtml系はapp.jsに既存だが、独立して持つ)
   // ============================================================
- 
+
   function escapeHtmlZ_(s) {
     if (s == null) return '';
     return String(s)
@@ -657,7 +657,7 @@
       return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     } catch (e) { return ''; }
   }
- 
+
   // ============================================================
   // showScreen ヘルパー (app.js の同名関数が存在しない場合のフォールバック)
   // ============================================================
@@ -666,7 +666,7 @@
     const target = document.getElementById(id);
     if (target) target.classList.remove('hidden');
   }
- 
+
   // ============================================================
   // グローバルエクスポート
   // ============================================================
@@ -679,5 +679,5 @@
     Screen: ZonosScreen,
     ECONOMY_POLICIES: ECONOMY_POLICIES
   };
- 
+
 })();
