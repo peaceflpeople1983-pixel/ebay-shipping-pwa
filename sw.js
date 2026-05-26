@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-18-14-z1: ★ Zonos PrePay 連携追加 (zonos.js, zonos.css をプリキャッシュ)
  * v3-17-7: 「The string did not match the expected pattern」エラー対策
  *          - computeDeadlineMeta/_formatDeadlineJst/_buildDeadlineBadge を完全防御化
  *          - YYYY/MM/DD や space 区切り日時を ISO に正規化してから new Date()
@@ -62,39 +63,41 @@
  * v3-9: ツールバーのボタン押下を touchstart 経由でも動かす（iOS click抑止対策）
  * 商品画像はブラウザ標準のHTTPキャッシュに任せる（iOS Safari互換性のため）
  */
-const CACHE_NAME = 'ebay-ship-v3-18-14';
-
+const CACHE_NAME = 'ebay-ship-v3-18-14-z1';
+ 
 const STATIC_FILES = [
   './',
   './index.html',
   './style.css',
+  './zonos.css',
   './app.js',
   './api.js',
   './calculator.js',
   './ocr.js',
+  './zonos.js',
   './manifest.webmanifest'
 ];
-
+ 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_FILES)));
   self.skipWaiting();
 });
-
+ 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
     Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
-
+ 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-
+ 
   // eBay画像CDN: SWで一切触らない（ブラウザ標準処理）
   if (url.hostname.indexOf('ebay') !== -1 || url.hostname.indexOf('ebaystatic') !== -1) {
     return;
   }
-
+ 
   // v3.16.1: Apps Script API は SW で一切触らない (リダイレクト処理 + null Response 防止)
   // script.google.com → script.googleusercontent.com の redirect を SW で intercept すると壊れる
   if (url.hostname.includes('script.google.com') ||
@@ -103,7 +106,7 @@ self.addEventListener('fetch', e => {
       url.hostname.includes('keepa.com')) {
     return;
   }
-
+ 
   // CDN はネットワーク優先 (失敗時はキャッシュ、それも無ければ最小エラー Response)
   if (url.hostname.includes('cdnjs.cloudflare.com')) {
     e.respondWith(
@@ -113,7 +116,7 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
+ 
   // 静的ファイルはキャッシュ優先 (キャッシュ無ければネットワーク、それも失敗時はエラー Response)
   e.respondWith(
     caches.match(e.request).then(r =>
