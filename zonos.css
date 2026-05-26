@@ -1,0 +1,330 @@
+/* ====================================================
+ * zonos.css — Zonos PrePay 連携機能 (PWA新規CSS / v1.0)
+ *
+ * 既存 style.css を変更せず、新規ファイルとして追加する。
+ * index.html で <link rel="stylesheet" href="style.css"> の直後に
+ * <link rel="stylesheet" href="zonos.css"> を追加する。
+ *
+ * 既存変数 (--primary, --accent, --warning, --danger, --border 等)
+ * は style.css の :root で定義済み、ここでは参照のみ。
+ * ==================================================== */
+
+
+/* ===== Zonosバッジ (注文一覧カードに追加表示) ===== */
+
+.badge.zonos-pending {
+  background: #E8EEFF;
+  color: #1F3864;
+  border: 0.5px solid #4472C4;
+}
+.badge.zonos-urgent {
+  background: #FFE4CC;
+  color: #8A4310;
+  border: 0.5px solid #EF9F27;
+  animation: zonos-pulse 1.5s infinite;
+}
+.badge.zonos-critical {
+  background: #FDE0E0;
+  color: #8A1A1A;
+  border: 0.5px solid #F09595;
+  animation: zonos-pulse 1.5s infinite;
+}
+.badge.zonos-done {
+  background: #E1F5EE;
+  color: #0F6E56;
+  border: 0.5px solid #97C459;
+}
+
+@keyframes zonos-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* 対象外注記 */
+.sub-note.zonos-na {
+  font-size: 10.5px;
+  color: #909090;
+  font-style: italic;
+}
+
+/* ===== バナー ===== */
+
+.banner.zonos-expire {
+  background: #FDE0E0;
+  border-left: 4px solid #A32D2D;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.banner.zonos-expire .banner-icon { font-size: 20px; flex-shrink: 0; }
+.banner.zonos-expire .banner-body { flex: 1; min-width: 0; }
+.banner.zonos-expire .banner-main { color: #8A1A1A; font-size: 13px; font-weight: 500; }
+.banner.zonos-expire .banner-sub  { color: #8A1A1A; font-size: 11px; margin-top: 2px; }
+
+.banner.zonos-pending {
+  background: #FFF1E6;
+  border-left: 4px solid #BA7517;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.banner.zonos-pending .banner-icon { font-size: 20px; flex-shrink: 0; }
+.banner.zonos-pending .banner-body { flex: 1; min-width: 0; }
+.banner.zonos-pending .banner-main { color: #8A4310; font-size: 13px; font-weight: 500; }
+.banner.zonos-pending .banner-sub  { color: #8A4310; font-size: 11px; margin-top: 2px; }
+
+/* ===== Zonos送信画面 (screen-zonos) ===== */
+
+#screen-zonos .content {
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.zonos-card {
+  background: #fff;
+  margin: 0 14px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+.zonos-card-head {
+  background: #F0F2F7;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1F3864;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+/* 進捗バー */
+.zonos-progress {
+  background: #fff;
+  margin: 12px 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.zonos-progress-text { font-size: 12px; color: #606060; }
+.zonos-progress-num {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: #1F3864;
+  font-weight: 600;
+  font-size: 13px;
+}
+.zonos-progress-bar {
+  height: 4px;
+  background: #E5E7EB;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.zonos-progress-fill {
+  height: 100%;
+  background: #1F3864;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+/* コピペフィールド */
+.copy-field {
+  display: flex;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  align-items: center;
+  gap: 8px;
+}
+.copy-field:last-child { border-bottom: none; }
+.copy-field.active {
+  background: #E8EEFF;
+  border-left: 3px solid #1F3864;
+}
+.copy-field.done { background: #F4FAF7; }
+.copy-field-info { flex: 1; min-width: 0; }
+.copy-field-key {
+  font-size: 10px;
+  color: #606060;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.copy-field-key.next { color: #1F3864; font-weight: 600; }
+.copy-field-value {
+  font-size: 13.5px;
+  font-weight: 500;
+  word-break: break-word;
+}
+.copy-field-value .ai-tag {
+  background: #E1F5EE;
+  color: #0F6E56;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+.copy-field-value .warn-tag {
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+.copy-btn {
+  background: #1F3864;
+  color: #fff;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+.copy-btn.done {
+  background: #fff;
+  color: #0F6E56;
+  border: 1px solid #0F6E56;
+}
+.copy-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* 大ボタン */
+#screen-zonos .primary-btn {
+  width: calc(100% - 28px);
+  margin: 12px 14px 0;
+  background: #1F3864;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* 商品画像 */
+#screen-zonos .product-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 12px;
+}
+#screen-zonos .product-img {
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, #f0f1f3, #d8dadf);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 24px;
+  position: relative;
+  overflow: hidden;
+}
+#screen-zonos .product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#screen-zonos .product-img-label {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  background: rgba(255,255,255,0.85);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #555;
+  font-family: ui-monospace, monospace;
+}
+
+/* Declaration ID 入力 */
+.declaration-block {
+  background: #FFF8E6;
+  margin: 12px 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #FAC775;
+}
+.declaration-block-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B4500;
+  margin-bottom: 8px;
+}
+.declaration-input { display: flex; gap: 6px; }
+.declaration-input input {
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.declaration-input button {
+  background: #1F3864;
+  color: #fff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.declaration-input button:disabled { opacity: 0.6; }
+
+/* 同梱インフォボックス */
+.doukon-info {
+  background: #E3DCFB;
+  margin: 12px 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-left: 4px solid #2E2280;
+  font-size: 12px;
+  color: #2E2280;
+}
+.doukon-info-title { font-weight: 700; margin-bottom: 6px; }
+.doukon-info-list { padding-left: 18px; margin: 4px 0 0; }
+
+/* フィルタトグル: Zonos用 */
+.filter-toggle.zonos {
+  background: #E8EEFF;
+  color: #1F3864;
+}
+.filter-toggle.zonos.checked-yes {
+  background: #1F3864;
+  color: #fff;
+}
+
+/* 注文カード内のZonosへ送信ボタン */
+.zonos-card-btn {
+  background: #1F3864;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  margin-top: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.zonos-card-btn:active { background: #2d4a8a; }
