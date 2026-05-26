@@ -251,6 +251,56 @@
   font-family: ui-monospace, monospace;
 }
 
+/* ===== タップ可能な商品画像 (写真ライブラリ保存用) ===== */
+#screen-zonos .product-img.clickable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.15s, opacity 0.15s;
+}
+#screen-zonos .product-img.clickable:active {
+  transform: scale(0.94);
+  opacity: 0.85;
+}
+
+/* ダウンロードアイコン (右上にバッジ表示) */
+#screen-zonos .product-img-icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(31, 56, 100, 0.92);
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ダウンロード中の状態 */
+#screen-zonos .product-img.downloading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+#screen-zonos .product-img.downloading::after {
+  content: '⏳';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 4px 10px;
+  border-radius: 6px;
+  z-index: 2;
+}
+
 /* Declaration ID 入力 */
 .declaration-block {
   background: #FFF8E6;

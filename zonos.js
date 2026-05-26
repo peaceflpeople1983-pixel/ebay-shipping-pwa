@@ -321,19 +321,31 @@
         html += '</div>';
       });
 
-      // 商品画像
+      // 商品画像 (タップで写真ライブラリへ保存)
       if (d.items.length > 0 && d.items.some(it => it.imageUrl)) {
         html += '<div class="zonos-card">' +
-          '<div class="zonos-card-head">▍ 商品画像 (Zonosアプリで撮影)</div>' +
+          '<div class="zonos-card-head">▍ 商品画像 (タップで写真に保存)</div>' +
           '<div class="product-images">';
         d.items.forEach((it, idx) => {
           if (it.imageUrl) {
-            html += '<div class="product-img"><img src="' + escapeAttrZ_(it.imageUrl) +
+            // ファイル名: zonos_<orderId>_<idx>.jpg
+            const safeOrderId = String(d.orderId || 'item').replace(/[^a-zA-Z0-9-]/g, '_');
+            const filename = 'zonos_' + safeOrderId + '_' + (idx + 1) + '.jpg';
+            html += '<div class="product-img clickable" ' +
+              'data-zonos-img-url="' + escapeAttrZ_(it.imageUrl) + '" ' +
+              'data-zonos-img-filename="' + escapeAttrZ_(filename) + '">' +
+              '<img src="' + escapeAttrZ_(it.imageUrl) +
               '" alt="" loading="lazy" onerror="this.style.display=&quot;none&quot;">' +
-              '<div class="product-img-label">IMG ' + (idx + 1) + '</div></div>';
+              '<div class="product-img-icon">📥</div>' +
+              '<div class="product-img-label">IMG ' + (idx + 1) + '</div>' +
+            '</div>';
           }
         });
-        html += '</div></div>';
+        html += '</div>' +
+          '<div style="font-size:10.5px; color:var(--text-secondary); padding:8px 12px 10px; line-height:1.5;">' +
+            '💡 タップで写真ライブラリへ保存 → Zonosアプリで「写真を選択」から取り込めます' +
+          '</div>' +
+        '</div>';
       }
 
       // 合計金額 (同梱のみ)
@@ -409,6 +421,16 @@
         });
       });
 
+      // 商品画像タップ → 写真ライブラリへ保存
+      root.querySelectorAll('[data-zonos-img-url]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          const url = el.getAttribute('data-zonos-img-url');
+          const filename = el.getAttribute('data-zonos-img-filename') || 'zonos_image.jpg';
+          this._downloadImage(url, filename, el);
+        });
+      });
+
       // 保存ボタン
       const saveBtn = document.getElementById('zonos-save-btn');
       if (saveBtn) {
@@ -419,6 +441,88 @@
       const openBtn = document.getElementById('zonos-open-app-btn');
       if (openBtn) {
         openBtn.addEventListener('click', () => this._openZonosApp());
+      }
+    },
+
+    /**
+     * 商品画像を iPhone 写真ライブラリへ保存
+     *  - Tier 1: fetch + Web Share API (ワンタップ・iOS 15+)
+     *  - Tier 2: fetchが成功してShareが使えない場合はBlob URL経由ダウンロード
+     *  - Tier 3: fetchがCORSで失敗したら画像URLを新タブで開く (ユーザーが長押しで保存)
+     */
+    async _downloadImage(imageUrl, filename, el) {
+      if (!imageUrl) return;
+
+      // ビジュアル: ダウンロード中表示
+      if (el) el.classList.add('downloading');
+
+      try {
+        // Tier 1: fetch を試す
+        let blob = null;
+        try {
+          const response = await fetch(imageUrl, { mode: 'cors' });
+          if (response.ok) {
+            blob = await response.blob();
+          }
+        } catch (fetchErr) {
+          // CORS失敗等 — 後でTier 3 (新タブ) にフォールバック
+          console.warn('Zonos image fetch failed (CORS等):', fetchErr.message);
+        }
+
+        if (blob) {
+          // File オブジェクトを作成
+          const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+
+          // Tier 1: Web Share API (iOS 15+ で「写真に保存」が選べる)
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: filename });
+              if (typeof showToast === 'function') showToast('共有シートを開きました');
+              return;
+            } catch (shareErr) {
+              if (shareErr.name === 'AbortError') {
+                // ユーザーがキャンセル — トースト不要
+                return;
+              }
+              console.warn('Web Share API failed:', shareErr);
+              // フォールバックへ
+            }
+          }
+
+          // Tier 2: Blob URLでダウンロード (Web Shareが無い場合)
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          // Blob URLは少し残してから開放 (iOS Safariで navigation を確実にするため)
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+          if (typeof showToast === 'function') showToast('ダウンロード開始');
+          return;
+        }
+
+        // Tier 3: 画像URLを新タブで開く (CORSで取得不可な場合のフォールバック)
+        // iOS Safari は画像を全画面表示するので、ユーザーが長押し→「写真に保存」可能
+        const a = document.createElement('a');
+        a.href = imageUrl;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (typeof showToast === 'function') {
+          showToast('画像を長押し→「写真に保存」を選んでください');
+        }
+
+      } catch (e) {
+        console.error('Image download error:', e);
+        if (typeof showToast === 'function') {
+          showToast('画像保存失敗: ' + e.message);
+        }
+      } finally {
+        if (el) el.classList.remove('downloading');
       }
     },
 
