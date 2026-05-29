@@ -126,15 +126,12 @@ const App = {
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
-      // v3.17: 発送期日フィルタ
-      this._bind('filter-overdue-only', 'onchange', () => this.renderOrders());
-      this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
-      // v3.17: 発送期日フィルタ
-      this._bind('filter-overdue-only', 'onchange', () => this.renderOrders());
-      this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
+
       // ★ Zonos未送信フィルタ                              ← ここに追加
       this._bind('filter-zonos-pending', 'onchange', () => this.renderOrders());
-
+      // ★ 追跡スキャン待ちフィルタ
+      this._bind('filter-tracking-pending', 'onchange', () => this.renderOrders());
+      
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
@@ -527,46 +524,33 @@ const App = {
     // v3.13: 発送済（追跡番号あり）を隠すトグル。要素が無い古い HTML には防御的に対応
     const hideShippedEl = document.getElementById('filter-hide-shipped');
     const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
-    // v3.17: 発送期日フィルタ
-    const overdueOnlyEl = document.getElementById('filter-overdue-only');
-    const overdueOnly = overdueOnlyEl ? overdueOnlyEl.checked : false;
-    const urgentOnlyEl = document.getElementById('filter-urgent-only');
-    const urgentOnly = urgentOnlyEl ? urgentOnlyEl.checked : false;
+
     const list = document.getElementById('order-list');
 
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
-    // v3.17: 期限フィルタ (computeDeadlineMeta は完全防御化済み)
-    if (overdueOnly) {
-      const self = this;
-      orders = orders.filter(function(o) {
-        try {
-          const m = self.computeDeadlineMeta(o.shipByDate);
-          return m && m.level === 'red';
-        } catch (e) { return false; }
-      });
-    }
-    if (urgentOnly) {
-      const self = this;
-      orders = orders.filter(function(o) {
-        try {
-          const m = self.computeDeadlineMeta(o.shipByDate);
-          return m && (m.level === 'red' || m.level === 'orange');
-        } catch (e) { return false; }
-      });
-    }
-    // ★ Zonos未送信フィルタ
+
+// ★ Zonos未送信 / 追跡スキャン待ち の OR フィルタ
     const zonosPendingEl = document.getElementById('filter-zonos-pending');
     const zonosPendingOnly = zonosPendingEl ? zonosPendingEl.checked : false;
-    if (zonosPendingOnly) {
+    const trackingPendingEl = document.getElementById('filter-tracking-pending');
+    const trackingPendingOnly = trackingPendingEl ? trackingPendingEl.checked : false;
+
+    if (zonosPendingOnly || trackingPendingOnly) {
       orders = orders.filter(function(o) {
-        if (!window.Zonos || !window.Zonos.isZonosTargetOrder(o)) return false;
-        if (o.declarationId) return false;
-        if (o.trackingNumber) return false;
-        if (o.doukonRole === 'sub') return false;
-        return true;
+        // Zonos未送信判定 (Zonos対象 + DDP未取得 + 未発送 + 代表/単独)
+        if (zonosPendingOnly && window.Zonos && window.Zonos.isZonosTargetOrder(o)
+            && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub') {
+          return true;
+        }
+        // 追跡スキャン待ち判定 (Zonos対象 + DDP取得済 + 未発送 + 代表/単独)
+        if (trackingPendingOnly && window.TrackingScan
+            && window.TrackingScan.isTrackingTargetOrder(o)) {
+          return true;
+        }
+        return false;
       });
     }
     const todayBar = document.getElementById('today-bar');
