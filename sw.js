@@ -1,6 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-14-z7: ★ 追跡番号アップロード機能追加 (tracking_scan.js, tracking_scan.css)
+ * v3-18-14-z8: ★ フィルタバー改修 (残2日/残4日削除 + 追跡スキャン待ち追加)
+ * v3-18-14-z7: 追跡番号アップロード機能追加 (tracking_scan.js, tracking_scan.css)
  * v3-18-14-z6: Declaration ID 形式緩和 (zonos.js 更新)
  * v3-18-14-z5: 商品画像→写真ライブラリ保存機能
  * v3-18-14-z4: appsscript_tracking_sync.gs 更新反映
@@ -9,7 +10,7 @@
  * v3-18-14-z1: Zonos PrePay 連携追加
  * (以前の v3-17-7 までのバージョン履歴は省略)
  */
-const CACHE_NAME = 'ebay-ship-v3-18-14-z7';
+const CACHE_NAME = 'ebay-ship-v3-18-14-z8';
  
 const STATIC_FILES = [
   './',
