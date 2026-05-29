@@ -13,6 +13,7 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="zonos.css">
+<link rel="stylesheet" href="tracking_scan.css">
 <title>eBay Ship Optimizer</title>
 </head>
 <body>
@@ -36,7 +37,6 @@
     <header class="head">
       <h1>未発送の注文</h1>
       <div class="head-actions">
-        <!-- v3.16: 一括印刷ボタン -->
         <button class="scan-pill print-pill" id="btn-bulk-print" title="ピックアップシート一括印刷">
           <span class="scan-pill-icon">🖨</span>
           <span class="scan-pill-label">印刷</span>
@@ -56,7 +56,6 @@
       <button class="today-bar-btn secondary" id="btn-today-clear" title="本日グループをクリア">クリア</button>
     </div>
  
-    <!-- v3.15: CPaSS バナー (Inbox 取込待機 / 未取込警告) -->
     <div class="cpass-banner hidden" id="cpass-banner">
       <div class="cpass-inbox-alert hidden" id="cpass-inbox-alert">
         <span class="cpass-banner-icon">📂</span>
@@ -74,7 +73,6 @@
       </div>
     </div>
  
-    <!-- v3.18.8: 発送期日警告バナー (残り7日以内の未発送が1件でもあれば表示) -->
     <div class="deadline-banner hidden" id="deadline-banner">
       <span class="deadline-banner-icon">⏰</span>
       <div class="deadline-banner-body">
@@ -83,7 +81,6 @@
       </div>
     </div>
  
-    <!-- ★ Zonos: 期限切迫バナーコンテナ (JSが動的に挿入) -->
     <div id="zonos-expire-banner-container"></div>
  
     <div class="filter-bar">
@@ -98,14 +95,12 @@
       <label class="filter-toggle">
         <input type="checkbox" id="filter-hide-shipped" checked> 発送済を隠す
       </label>
-      <!-- v3.18.8: 発送期日フィルタ (4分割に合わせてラベル更新) -->
       <label class="filter-toggle deadline-red">
         <input type="checkbox" id="filter-overdue-only"> ⛔ 残2日〜超過
       </label>
       <label class="filter-toggle deadline-orange">
         <input type="checkbox" id="filter-urgent-only"> ⚠ 残4日以内
       </label>
-      <!-- ★ Zonos: 未送信フィルタ -->
       <label class="filter-toggle zonos">
         <input type="checkbox" id="filter-zonos-pending"> 🆕 Zonos未送信
       </label>
@@ -143,14 +138,12 @@
       <label>発送先国</label>
       <select id="input-country"></select>
  
-      <!-- v3.14: CPaSS パッケージ番号表示 (取込済み) -->
       <div class="input-cpass-row hidden" id="input-cpass-row">
         <span class="input-cpass-icon">📦</span>
         <span class="input-cpass-label">CPaSS #</span>
         <span class="input-cpass-no" id="input-cpass-no">—</span>
       </div>
  
-      <!-- v3.15: CPaSS 未取込警告 -->
       <div class="input-cpass-warning hidden" id="input-cpass-warning">
         <span class="input-cpass-warning-icon">⚠</span>
         <div class="input-cpass-warning-body">
@@ -228,7 +221,7 @@
     <div id="print-preview-area" class="content print-preview-area"></div>
   </section>
  
-  <!-- ★ Zonos PrePay 送信画面 (新規) -->
+  <!-- Zonos PrePay 送信画面 -->
   <section id="screen-zonos" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-zonos" title="戻る">←</button>
@@ -237,13 +230,77 @@
     <div id="zonos-content" class="content"></div>
   </section>
  
+  <!-- ★ 追跡番号スキャン画面 (新規 v1.0) -->
+  <section id="screen-tracking-scan" class="screen hidden">
+    <header class="head">
+      <button class="icon" id="btn-back-tracking">←</button>
+      <h1>📮 追跡番号スキャン</h1>
+    </header>
+    <div class="tracking-scan-viewport" id="tracking-video-wrap">
+      <video id="tracking-video" playsinline autoplay muted></video>
+      <canvas id="tracking-canvas" class="hidden"></canvas>
+      <div class="tracking-scan-status" id="tracking-scan-status">カメラ準備中...</div>
+      <div class="tracking-scan-roi">
+        <div class="tracking-roi-corner tl"></div>
+        <div class="tracking-roi-corner tr"></div>
+        <div class="tracking-roi-corner bl"></div>
+        <div class="tracking-roi-corner br"></div>
+      </div>
+    </div>
+    <div class="tracking-scan-controls">
+      <div class="tracking-target-info">
+        <div class="tracking-target-label">SCANNING FOR ORDER</div>
+        <div class="tracking-target-order" id="tracking-target-order">—</div>
+        <div class="tracking-target-title" id="tracking-target-title"></div>
+      </div>
+      <div class="tracking-scan-buttons">
+        <button class="tracking-scan-btn" id="btn-tracking-manual">⌨ 手動入力</button>
+        <button class="tracking-scan-btn primary" id="btn-tracking-capture">📷 撮影してAI解析</button>
+      </div>
+    </div>
+ 
+    <!-- 確認ダイアログ (オーバーレイ) -->
+    <div id="tracking-confirm-overlay" class="tracking-dialog-overlay hidden">
+      <div class="tracking-dialog">
+        <div class="tracking-dialog-icon">✓</div>
+        <div class="tracking-dialog-title">読み取り成功</div>
+        <div class="tracking-dialog-body" id="tracking-confirm-source">バーコード自動検出</div>
+        <div class="tracking-dialog-tracking">
+          <div class="tracking-dialog-label">TRACKING NUMBER</div>
+          <div class="tracking-dialog-number" id="tracking-confirm-number">—</div>
+        </div>
+        <div id="tracking-confirm-doukon" class="tracking-dialog-doukon hidden"></div>
+        <div class="tracking-dialog-body" style="font-size:11.5px; color:#666;">
+          この番号を eBay に発送マークとして登録しますか？
+        </div>
+        <div class="tracking-dialog-buttons">
+          <button class="tracking-dialog-btn secondary" id="btn-tracking-rescan">再スキャン</button>
+          <button class="tracking-dialog-btn primary" id="btn-tracking-confirm">eBayへ登録</button>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- 手動入力ボトムシート -->
+    <div id="tracking-manual-overlay" class="tracking-manual-overlay hidden">
+      <div class="tracking-manual-sheet">
+        <div class="tracking-manual-title">追跡番号を手動入力</div>
+        <div class="tracking-manual-sub" id="tracking-manual-sub">—</div>
+        <input type="text" class="tracking-manual-field" id="tracking-manual-input" placeholder="EE000000000JP" maxlength="13" autocapitalize="characters" autocomplete="off">
+        <div class="tracking-manual-hint">📋 Japan Post 形式: 2文字 + 9桁数字 + JP</div>
+        <div class="tracking-manual-buttons">
+          <button class="tracking-dialog-btn secondary" id="btn-tracking-manual-cancel">キャンセル</button>
+          <button class="tracking-dialog-btn primary" id="btn-tracking-manual-submit">eBayへ登録</button>
+        </div>
+      </div>
+    </div>
+  </section>
+ 
   <!-- v3.16: 注文カード長押しメニュー -->
   <div id="card-action-overlay" class="overlay hidden">
     <div class="card-action-menu">
       <div class="card-action-target" id="card-action-target">—</div>
       <button class="card-action-btn" id="card-action-print">🖨 個別印刷</button>
       <button class="card-action-btn" id="card-action-unmark">🗑 印刷済を解除</button>
-      <!-- ★ Zonos: Declaration ID 解除ボタン -->
       <button class="card-action-btn hidden" id="card-action-zonos-clear">🗑 Declaration IDを解除</button>
       <button class="card-action-btn secondary" id="card-action-cancel">キャンセル</button>
     </div>
@@ -268,7 +325,7 @@
   <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
  
-  <!-- 数値入力用フローティングツールバー（キーボード上に表示） -->
+  <!-- 数値入力用フローティングツールバー -->
   <div id="kb-toolbar" class="kb-toolbar hidden">
     <button class="kb-btn" id="kb-prev">◀ 前へ</button>
     <button class="kb-btn kb-btn-primary" id="kb-next">次へ ▶</button>
@@ -280,6 +337,7 @@
 <script src="calculator.js"></script>
 <script src="ocr.js"></script>
 <script src="zonos.js"></script>
+<script src="tracking_scan.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
