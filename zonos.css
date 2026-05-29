@@ -358,14 +358,18 @@
 .doukon-info-title { font-weight: 700; margin-bottom: 6px; }
 .doukon-info-list { padding-left: 18px; margin: 4px 0 0; }
 
-/* フィルタトグル: Zonos用 */
+/* フィルタトグル: Zonos用 (未選択時の薄青背景) */
 .filter-toggle.zonos {
   background: #E8EEFF;
   color: #1F3864;
+  border-color: #C5D4F0;
 }
-.filter-toggle.zonos.checked-yes {
+/* ★ 選択中状態: 紺地 + 白文字 (style.css の :has() ルールを上書き) */
+.filter-toggle.zonos:has(input[type="checkbox"]:checked) {
   background: #1F3864;
+  border-color: #1F3864;
   color: #fff;
+  font-weight: 500;
 }
 
 /* 注文カード内のZonosへ送信ボタン */

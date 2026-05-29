@@ -144,27 +144,45 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   flex-wrap: wrap;
 }
 .filter-bar select { flex: 1; min-width: 140px; }
+/* v3-18-14-z9: フィルタトグルをチップ型に拡張 + 選択状態の視覚化 */
 .filter-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
   white-space: nowrap;
   cursor: pointer;
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.filter-toggle:active {
+  transform: scale(0.96);
+}
+/* チェックボックス本体は非表示 (装飾は label 全体で表現) */
 .filter-toggle input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-  padding: 0;
-  accent-color: var(--primary);
+  display: none;
 }
-/* v3.17: 期限フィルタリンク (緊急色付き) */
-.filter-toggle.deadline-red    { color: #8A1A1A; font-weight: 500; }
-.filter-toggle.deadline-orange { color: #8A4310; font-weight: 500; }
-.filter-toggle.deadline-red input[type="checkbox"]    { accent-color: #8A1A1A; }
-.filter-toggle.deadline-orange input[type="checkbox"] { accent-color: #8A4310; }
+/* ★ 選択中状態: 紺地 + 白文字 + ✓ マーク (4ボタン共通) */
+.filter-toggle:has(input[type="checkbox"]:checked) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 500;
+}
+.filter-toggle:has(input[type="checkbox"]:checked)::before {
+  content: '✓';
+  font-weight: 700;
+  margin-right: 2px;
+}
+/* (v3.17の deadline-red/orange は v3-18-14-z8 で要素削除済、CSS は無効化された残骸として保持) */
 
 /* 本日の作業バー */
 .today-bar {
