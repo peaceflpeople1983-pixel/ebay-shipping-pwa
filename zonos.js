@@ -285,8 +285,12 @@
       }
 
       // 進捗
+      // 1 ITEM あたりのフィールド数: description / value / countryOfOrigin / quantity
+      //   + weightG が有効なら weight も加算 (同梱は全 ITEM 同じ weightG なので 0/N の二択)
+      const hasWeight = d.items.some(it => it.weightG && it.weightG > 0);
+      const fieldsPerItem = 4 + (hasWeight ? 1 : 0);
       const totalFields = fields.filter(f => !f.skipIfEmpty || f.value).length +
-                           d.items.length * 3;  // each item: description, value, quantity
+                           d.items.length * fieldsPerItem;
       const copiedCount = Object.keys(this.state.copiedFields).length;
       const progressPct = totalFields > 0 ? Math.round(copiedCount / totalFields * 100) : 0;
       html += '<div class="zonos-progress">' +
@@ -319,6 +323,11 @@
         html += this._renderField('value_' + idx, 'VALUE', it.value.toFixed(2) + ' USD');
         html += this._renderField('origin_' + idx, 'COUNTRY OF ORIGIN', it.countryOfOrigin);
         html += this._renderField('quantity_' + idx, 'QUANTITY', String(it.quantity));
+        // WEIGHT: 表示 "850 g" / コピー "850" (g単位、同梱の全ITEMに同じ値が入る)
+        // 重量未入力 (weightG=0/undefined) は行ごと非表示
+        if (it.weightG && it.weightG > 0) {
+          html += this._renderField('weight_' + idx, 'WEIGHT', String(it.weightG), false, ' g');
+        }
         html += '</div>';
       });
 
@@ -388,13 +397,23 @@
       this._bindEvents();
     },
 
-    _renderField(key, label, value, isAiTranslated) {
+    /**
+     * @param {string} key       - 識別キー (進捗管理用)
+     * @param {string} label     - 表示ラベル (例: 'WEIGHT')
+     * @param {string} value     - 表示値 兼 コピー値 (両者を分けたい場合は displaySuffix を使う)
+     * @param {boolean} [isAiTranslated]
+     * @param {string} [displaySuffix] - 表示にのみ付加する単位等 (例: ' g')。コピーには含まれない
+     */
+    _renderField(key, label, value, isAiTranslated, displaySuffix) {
       if (!value && value !== 0) return '';
       const isCopied = !!this.state.copiedFields[key];
       const cls = isCopied ? 'done' : '';
       const btnText = isCopied ? '✓ 済' : '📋';
       const btnCls = isCopied ? 'done' : '';
       const escapedValue = escapeHtmlZ_(String(value));
+      const suffixHtml = displaySuffix
+        ? '<span class="copy-field-unit">' + escapeHtmlZ_(displaySuffix) + '</span>'
+        : '';
       const aiTag = isAiTranslated ? '<span class="ai-tag">AI英訳</span>' : '';
       const warnTag = containsNonAscii_(String(value))
         ? '<span class="warn-tag">⚠ 要確認</span>'
@@ -402,7 +421,7 @@
       return '<div class="copy-field ' + cls + '" data-field-key="' + escapeAttrZ_(key) + '">' +
         '<div class="copy-field-info">' +
           '<div class="copy-field-key">' + escapeHtmlZ_(label) + '</div>' +
-          '<div class="copy-field-value">' + escapedValue + aiTag + warnTag + '</div>' +
+          '<div class="copy-field-value">' + escapedValue + suffixHtml + aiTag + warnTag + '</div>' +
         '</div>' +
         '<button class="copy-btn ' + btnCls + '" data-copy-value="' + escapeAttrZ_(String(value)) + '" ' +
           'data-copy-key="' + escapeAttrZ_(key) + '">' + btnText + '</button>' +
@@ -547,7 +566,10 @@
     _updateProgress() {
       const d = this.state.data;
       if (!d) return;
-      const totalFields = 8 + d.items.length * 3;  // approximate
+      // 1 ITEM あたり: description / value / countryOfOrigin / quantity (+weight if present)
+      const hasWeight = d.items.some(it => it.weightG && it.weightG > 0);
+      const fieldsPerItem = 4 + (hasWeight ? 1 : 0);
+      const totalFields = 8 + d.items.length * fieldsPerItem;
       const copiedCount = Object.keys(this.state.copiedFields).length;
       const progressPct = totalFields > 0 ? Math.round(copiedCount / totalFields * 100) : 0;
       const fill = document.querySelector('#zonos-content .zonos-progress-fill');
