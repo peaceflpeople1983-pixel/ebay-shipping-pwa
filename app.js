@@ -174,6 +174,30 @@ const App = {
       this._bind('btn-back-zonos', 'onclick', () => this.goHome());
       // ★ Zonos: Declaration ID 解除ボタン
       this._bind('card-action-zonos-clear', 'onclick', () => this.zonosClearDeclaration(this.state.longPressOrderId));
+
+      // ★ 追跡番号スキャン: 画面遷移・撮影・確認・手動入力 のイベント
+      this._bind('btn-back-tracking', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.close();
+        this.goHome();
+      });
+      this._bind('btn-tracking-capture', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.capture();
+      });
+      this._bind('btn-tracking-manual', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.showManualInput();
+      });
+      this._bind('btn-tracking-rescan', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.rescan();
+      });
+      this._bind('btn-tracking-confirm', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.confirmUpload();
+      });
+      this._bind('btn-tracking-manual-cancel', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.hideManualInput();
+      });
+      this._bind('btn-tracking-manual-submit', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.submitManualInput();
+      });
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
         if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
@@ -625,6 +649,9 @@ const App = {
             ? `<button class="zonos-card-btn" data-zonos-order-id="${escapeAttr(o.orderId)}">📦 Zonosへ送信${(o.doukonRole === 'lead' && o.doukonCount > 1) ? ' (' + o.doukonCount + '点まとめて)' : ''}</button>`
             : ''}
           ${(window.Zonos && !window.Zonos.isZonosTargetOrder(o) && o.country && o.shippingPolicy) ? window.Zonos.buildZonosScopeNote(o) : ''}
+          ${(window.TrackingScan && window.TrackingScan.isTrackingTargetOrder)
+            ? window.TrackingScan.buildTrackingButton(o)
+            : ''}
           ${this.renderCpassInfo(o.cpass)}
           ${dk.breakdownHtml}
         </div>
@@ -643,6 +670,20 @@ const App = {
       });
     });
 
+    // ★ 追跡番号スキャン: ボタンのクリックハンドラ (イベント委譲)
+    list.querySelectorAll('[data-tracking-order-id]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const orderId = btn.getAttribute('data-tracking-order-id');
+        if (window.TrackingScan && window.TrackingScan.openForTracking) {
+          // 注文データを渡す (同梱情報含む)
+          const orderData = (this.state.orders || []).find(x => x.orderId === orderId);
+          window.TrackingScan.openForTracking(orderId, orderData);
+        }
+      });
+    });
+    
     // v3.16: 長押し対応 + 通常クリック
     list.querySelectorAll('.order-item').forEach(el => {
       const orderId = el.dataset.id;
