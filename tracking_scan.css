@@ -1,0 +1,347 @@
+/* ====================================================
+ * tracking_scan.css — 追跡番号スキャン機能 (PWA新規CSS / v1.0)
+ *
+ * 既存 style.css / zonos.css を変更せず、新規ファイルとして追加。
+ * index.html で <link rel="stylesheet" href="zonos.css"> の直後に
+ * <link rel="stylesheet" href="tracking_scan.css"> を追加する。
+ * ==================================================== */
+
+/* ===== 注文カード内の「📮 追跡番号スキャン」ボタン ===== */
+.tracking-scan-card-btn {
+  background: #1F3864;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  margin-top: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tracking-scan-card-btn:active { background: #2d4a8a; }
+
+/* ===== screen-tracking-scan (スキャン画面) ===== */
+#screen-tracking-scan {
+  background: #000;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+#screen-tracking-scan .head {
+  background: #1F3864;
+  color: #fff;
+}
+
+/* カメラビューポート */
+.tracking-scan-viewport {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  max-height: 480px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+.tracking-scan-viewport video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ステータス表示 */
+.tracking-scan-status {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 3;
+  text-align: center;
+  max-width: 90%;
+  pointer-events: none;
+}
+
+/* ROI ガイド枠 */
+.tracking-scan-roi {
+  position: absolute;
+  top: 34%;
+  left: 8%;
+  right: 8%;
+  height: 32%;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 6px;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+}
+.tracking-roi-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #4472C4;
+}
+.tracking-roi-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+.tracking-roi-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+.tracking-roi-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+.tracking-roi-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+/* コントロール (下部) */
+.tracking-scan-controls {
+  background: #000;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tracking-target-info {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.tracking-target-label {
+  color: #999;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.tracking-target-order {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 500;
+  margin-top: 2px;
+}
+.tracking-target-title {
+  font-size: 11px;
+  color: #bbb;
+  margin-top: 2px;
+}
+.tracking-scan-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.tracking-scan-btn {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tracking-scan-btn:active { opacity: 0.7; }
+.tracking-scan-btn.primary {
+  background: #fff;
+  color: #1F3864;
+  font-weight: 600;
+  flex: 1;
+}
+
+/* ===== 確認ダイアログ (オーバーレイ) ===== */
+.tracking-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.tracking-dialog-overlay.hidden { display: none; }
+
+.tracking-dialog {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+}
+.tracking-dialog-icon {
+  font-size: 32px;
+  text-align: center;
+  margin-bottom: 8px;
+  color: #0F6E56;
+}
+.tracking-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+.tracking-dialog-body {
+  font-size: 13px;
+  color: #606060;
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.tracking-dialog-tracking {
+  background: #F0F2F7;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.tracking-dialog-label {
+  font-size: 10px;
+  color: #606060;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.tracking-dialog-number {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1F3864;
+  letter-spacing: 2px;
+}
+.tracking-dialog-doukon {
+  background: #FFF8E6;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 11.5px;
+  color: #6B4500;
+  text-align: left;
+}
+.tracking-dialog-doukon ul {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+}
+.tracking-dialog-doukon.hidden { display: none; }
+.tracking-dialog-buttons {
+  display: flex;
+  gap: 8px;
+}
+.tracking-dialog-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tracking-dialog-btn.primary { background: #1F3864; color: #fff; }
+.tracking-dialog-btn.primary:active { background: #2d4a8a; }
+.tracking-dialog-btn.secondary { background: #F0F2F7; color: #1A1A1A; }
+.tracking-dialog-btn.secondary:active { background: #E0E2E7; }
+
+/* ===== 手動入力ボトムシート ===== */
+.tracking-manual-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.tracking-manual-overlay.hidden { display: none; }
+
+.tracking-manual-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 24px 20px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.25);
+}
+.tracking-manual-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #1A1A1A;
+}
+.tracking-manual-sub {
+  font-size: 12px;
+  color: #606060;
+  margin-bottom: 14px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.tracking-manual-field {
+  background: #F0F2F7;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 14px;
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-align: center;
+  text-transform: uppercase;
+  color: #1F3864;
+  font-weight: 600;
+}
+.tracking-manual-field:focus {
+  outline: none;
+  border-color: #1F3864;
+  background: #fff;
+}
+.tracking-manual-hint {
+  font-size: 10.5px;
+  color: #606060;
+  text-align: center;
+  margin-top: 8px;
+}
+.tracking-manual-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ===== アップロード進捗トースト ===== */
+.tracking-upload-toast {
+  position: fixed;
+  top: calc(80px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(31, 56, 100, 0.95);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 2000;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 90vw;
+}
+.tracking-upload-toast.hidden { display: none; }
+.tracking-upload-toast.success { background: rgba(15, 110, 86, 0.95); }
+.tracking-upload-toast.error { background: rgba(163, 45, 45, 0.95); }
+.tracking-upload-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  animation: tracking-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes tracking-spin {
+  100% { transform: rotate(360deg); }
+}
