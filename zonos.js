@@ -374,7 +374,7 @@
       html += '<div class="declaration-block">' +
         '<div class="declaration-block-title">' + titleText + '</div>' +
         '<div class="declaration-input">' +
-          '<input type="text" id="zonos-declaration-input" placeholder="DDP-XXXXXXXXXXXXX" value="' + escapeAttrZ_(inputValue) + '">' +
+          '<input type="text" id="zonos-declaration-input" placeholder="Declaration IDを入力" value="' + escapeAttrZ_(inputValue) + '">' +
           '<button id="zonos-save-btn">' + saveText + '</button>' +
         '</div>';
       if (existingDdp) {
@@ -586,8 +586,8 @@
         if (typeof showToast === 'function') showToast('Declaration IDを入力してください');
         return;
       }
-      if (!/^DDP-?[A-Z0-9]+$/i.test(declarationId)) {
-        if (typeof showToast === 'function') showToast('形式が不正です (DDP-XXXX...)');
+      if (declarationId.length < 5) {
+        if (typeof showToast === 'function') showToast('Declaration IDが短すぎます (5文字以上)');
         return;
       }
 
