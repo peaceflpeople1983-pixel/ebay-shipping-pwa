@@ -180,6 +180,13 @@
   margin-left: 4px;
   font-weight: 600;
 }
+/* 表示用サフィックス (例: " g") — 値の隣に淡色で添え、コピー対象には含まれない */
+.copy-field-value .copy-field-unit {
+  color: var(--text-secondary, #6B7280);
+  font-size: 11.5px;
+  font-weight: 400;
+  margin-left: 3px;
+}
 .copy-btn {
   background: #1F3864;
   color: #fff;
