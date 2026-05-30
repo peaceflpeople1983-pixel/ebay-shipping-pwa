@@ -419,6 +419,16 @@
             }
           }, RETURN_DELAY_MS);
         } else {
+          // ★ needsManual (eBay側でorderが認識されない稀ケース) を最優先で表示
+          const needsManualResults = (result.results || []).filter(r => r.needsManual);
+          if (needsManualResults.length > 0) {
+            this._showUploadToast(
+              '⚠ eBay側で更新不可。Seller Hubで手動アップロードしてください',
+              'error'
+            );
+            return;
+          }
+
           // 部分失敗
           const failedCount = (result.results || []).filter(r => !r.success).length;
           const msg = '部分失敗: ' + failedCount + '件失敗 (' + (result.results || [])
