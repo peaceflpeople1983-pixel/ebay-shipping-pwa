@@ -1,6 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-15-z11: ★ キャンセル通知機能追加 (cancel_notice.js, cancel_notice.css)
+ * v3-18-15-z12: ★ 印刷プレビュー白紙バグ修正 (ポータル方式に変更)
+ * v3-18-15-z11: キャンセル通知機能追加 (cancel_notice.js, cancel_notice.css)
  * v3-18-14-z10: needsManualフラグ対応 (Invalid Order Id 専用エラートースト)
  * v3-18-14-z9: フィルタトグル視覚化 (チップ型 + ✓マーク + 紺地選択中表示)
  * v3-18-14-z8: フィルタバー改修 (残2日/残4日削除 + 追跡スキャン待ち追加)
@@ -11,10 +12,9 @@
  * v3-18-14-z3: 新policy Economy Shipping from outside US 対応
  * v3-18-14-z2: 商品画像保存改善
  * v3-18-14-z1: Zonos PrePay 連携追加
- * (以前の v3-17-7 までのバージョン履歴は省略)
  */
-const CACHE_NAME = 'ebay-ship-v3-18-15-z11';
- 
+const CACHE_NAME = 'ebay-ship-v3-18-15-z12';
+
 const STATIC_FILES = [
   './',
   './index.html',
@@ -31,27 +31,27 @@ const STATIC_FILES = [
   './cancel_notice.js',
   './manifest.webmanifest'
 ];
- 
+
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_FILES)));
   self.skipWaiting();
 });
- 
+
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
     Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
- 
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
- 
+
   // eBay画像CDN: SWで一切触らない
   if (url.hostname.indexOf('ebay') !== -1 || url.hostname.indexOf('ebaystatic') !== -1) {
     return;
   }
- 
+
   // Apps Script API は SW で一切触らない
   if (url.hostname.includes('script.google.com') ||
       url.hostname.includes('script.googleusercontent.com') ||
@@ -59,7 +59,7 @@ self.addEventListener('fetch', e => {
       url.hostname.includes('keepa.com')) {
     return;
   }
- 
+
   // CDN はネットワーク優先
   if (url.hostname.includes('cdnjs.cloudflare.com')) {
     e.respondWith(
@@ -69,7 +69,7 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
- 
+
   // 静的ファイルはキャッシュ優先
   e.respondWith(
     caches.match(e.request).then(r =>
@@ -77,4 +77,3 @@ self.addEventListener('fetch', e => {
     )
   );
 });
- 
