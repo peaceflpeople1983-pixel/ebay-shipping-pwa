@@ -1,6 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-14-z10: ★ needsManualフラグ対応 (Invalid Order Id 専用エラートースト)
+ * v3-18-15-z11: ★ キャンセル通知機能追加 (cancel_notice.js, cancel_notice.css)
+ * v3-18-14-z10: needsManualフラグ対応 (Invalid Order Id 専用エラートースト)
  * v3-18-14-z9: フィルタトグル視覚化 (チップ型 + ✓マーク + 紺地選択中表示)
  * v3-18-14-z8: フィルタバー改修 (残2日/残4日削除 + 追跡スキャン待ち追加)
  * v3-18-14-z7: 追跡番号アップロード機能追加 (tracking_scan.js, tracking_scan.css)
@@ -12,7 +13,7 @@
  * v3-18-14-z1: Zonos PrePay 連携追加
  * (以前の v3-17-7 までのバージョン履歴は省略)
  */
-const CACHE_NAME = 'ebay-ship-v3-18-14-z10';
+const CACHE_NAME = 'ebay-ship-v3-18-15-z11';
  
 const STATIC_FILES = [
   './',
@@ -20,12 +21,14 @@ const STATIC_FILES = [
   './style.css',
   './zonos.css',
   './tracking_scan.css',
+  './cancel_notice.css',
   './app.js',
   './api.js',
   './calculator.js',
   './ocr.js',
   './zonos.js',
   './tracking_scan.js',
+  './cancel_notice.js',
   './manifest.webmanifest'
 ];
  
