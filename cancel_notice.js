@@ -106,16 +106,43 @@
      * 注文カード用バッジ HTML (app.js renderOrders から呼ぶ)
      */
     buildBadge(o) {
-      if (!o || !this.isCancelPending(o.orderId)) return '';
-      return '<span class="badge cancel-notice-badge">🚨 キャンセル通知未印刷</span>';
+      if (!o) return '';
+      // 1. 印刷済 + キャンセル + 通知未印刷 → "🚨 キャンセル通知未印刷" (赤点滅)
+      if (this.isCancelPending(o.orderId)) {
+        return '<span class="badge cancel-notice-badge">🚨 キャンセル通知未印刷</span>';
+      }
+      // 2. 印刷済 + キャンセル + 通知済 → "✓ 通知済" (グレー)
+      if (o.cancelledAt && o.printedAt && o.cancelNoticePrintedAt) {
+        return '<span class="badge cancel-done-badge">✓ 通知済</span>';
+      }
+      // 3. 未印刷 + キャンセル → "⊘ キャンセル済" (履歴保持、グレー)
+      if (o.cancelledAt && !o.printedAt) {
+        return '<span class="badge cancel-history-badge">⊘ キャンセル済</span>';
+      }
+      return '';
     },
 
     /**
-     * 注文カード用 root クラス追記 (赤ボーダー装飾)
+     * 注文カード用 root クラス追記 (装飾)
      */
     buildItemClass(o) {
-      if (!o || !this.isCancelPending(o.orderId)) return '';
-      return ' cancel-notice';
+      if (!o) return '';
+      if (this.isCancelPending(o.orderId)) return ' cancel-notice';
+      if (o.cancelledAt && !o.printedAt) return ' cancel-history';
+      return '';
+    },
+
+    /**
+     * 「キャンセル済を隠す」フィルタ判定
+     * @return {boolean} true なら表示、false なら非表示
+     */
+    shouldShowOrder(o, hideCancelHistory) {
+      if (!o) return false;
+      if (hideCancelHistory) {
+        // 未印刷 + キャンセル の order は隠す
+        if (o.cancelledAt && !o.printedAt) return false;
+      }
+      return true;
     },
 
     // ============================================================

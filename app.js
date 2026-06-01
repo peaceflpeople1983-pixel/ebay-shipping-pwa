@@ -129,6 +129,8 @@ const App = {
       // v3.17: 発送期日フィルタ
       this._bind('filter-overdue-only', 'onchange', () => this.renderOrders());
       this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
+      // ★ v1.0 キャンセル通知: キャンセル済隠すフィルタ
+      this._bind('filter-hide-cancel', 'onchange', () => this.renderOrders());
 
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
@@ -511,6 +513,12 @@ const App = {
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
+    // ★ v1.0 キャンセル通知: キャンセル済 (未印刷 + AP列マーク済) を隠す
+    const hideCancelHistoryEl = document.getElementById('filter-hide-cancel');
+    const hideCancelHistory = hideCancelHistoryEl ? hideCancelHistoryEl.checked : false;
+    if (hideCancelHistory) {
+      orders = orders.filter(o => !(o.cancelledAt && !o.printedAt));
+    }
     // v3.17: 期限フィルタ (computeDeadlineMeta は完全防御化済み)
     if (overdueOnly) {
       const self = this;

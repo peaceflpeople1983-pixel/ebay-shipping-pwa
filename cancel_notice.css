@@ -112,6 +112,30 @@
   animation: cancel-pulse 1.5s ease-in-out infinite;
 }
 
+/* ★ キャンセル済バッジ (未印刷 + AP列マーク済、履歴保持状態) */
+.badge.cancel-history-badge {
+  background: #6B6B6B;
+  color: #fff !important;
+  border: none;
+}
+
+/* ★ 通知済バッジ (印刷済 + AP列 + AQ列マーク済) */
+.badge.cancel-done-badge {
+  background: #E0E0E0;
+  color: #5A5A5A !important;
+  border: none;
+}
+
+/* キャンセル済カードの装飾 (薄いグレー背景) */
+.order-item.cancel-history {
+  background: #F8F8F8 !important;
+  opacity: 0.85;
+}
+.order-item.cancel-history .order-title,
+.order-item.cancel-history .order-meta {
+  color: #707070 !important;
+}
+
 /* ============================================================
    4. 印刷画面 (screen-cancel-print)
    ============================================================ */
