@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="zonos.css">
 <link rel="stylesheet" href="tracking_scan.css">
+<link rel="stylesheet" href="cancel_notice.css">
 <title>eBay Ship Optimizer</title>
 </head>
 <body>
@@ -41,6 +42,12 @@
           <span class="scan-pill-icon">🖨</span>
           <span class="scan-pill-label">印刷</span>
           <span class="print-pill-badge hidden" id="bulk-print-badge">0</span>
+        </button>
+        <!-- ★ キャンセル通知 v1.0: ヘッダーボタン -->
+        <button class="scan-pill" id="btn-cancel-check" title="キャンセル状態をチェック">
+          <span class="scan-pill-icon">🚨</span>
+          <span class="scan-pill-label">キャンセル</span>
+          <span id="cancel-check-badge" class="hidden">0</span>
         </button>
         <button class="scan-pill" id="btn-scan-list" title="スキャンして開く">
           <span class="scan-pill-icon">📷</span>
@@ -80,6 +87,9 @@
         <div class="deadline-banner-sub" id="deadline-banner-sub">1週間以内の未発送があります</div>
       </div>
     </div>
+ 
+    <!-- ★ キャンセル通知 v1.0: バナー (注文一覧上部) -->
+    <div id="banner-cancel-notice" class="hidden"></div>
  
     <div id="zonos-expire-banner-container"></div>
  
@@ -227,7 +237,7 @@
     <div id="zonos-content" class="content"></div>
   </section>
  
-  <!-- ★ 追跡番号スキャン画面 (新規 v1.0) -->
+  <!-- ★ 追跡番号スキャン画面 (v1.0) -->
   <section id="screen-tracking-scan" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-tracking">←</button>
@@ -256,7 +266,6 @@
       </div>
     </div>
  
-    <!-- 確認ダイアログ (オーバーレイ) -->
     <div id="tracking-confirm-overlay" class="tracking-dialog-overlay hidden">
       <div class="tracking-dialog">
         <div class="tracking-dialog-icon">✓</div>
@@ -277,7 +286,6 @@
       </div>
     </div>
  
-    <!-- 手動入力ボトムシート -->
     <div id="tracking-manual-overlay" class="tracking-manual-overlay hidden">
       <div class="tracking-manual-sheet">
         <div class="tracking-manual-title">追跡番号を手動入力</div>
@@ -289,6 +297,20 @@
           <button class="tracking-dialog-btn primary" id="btn-tracking-manual-submit">eBayへ登録</button>
         </div>
       </div>
+    </div>
+  </section>
+ 
+  <!-- ★ キャンセル通知印刷画面 (新規 v1.0) -->
+  <section id="screen-cancel-print" class="screen hidden">
+    <header class="head cancel-print-header">
+      <button id="btn-cancel-back">← 戻る</button>
+      <h1>🚨 キャンセル通知 印刷</h1>
+    </header>
+    <div id="cancel-print-loader">読み込み中...</div>
+    <div id="cancel-print-content"></div>
+    <div id="cancel-print-actions">
+      <button id="btn-cancel-do-print">🖨 ブラウザ印刷</button>
+      <button id="btn-cancel-confirm">✅ 通知印刷完了</button>
     </div>
   </section>
  
@@ -335,6 +357,7 @@
 <script src="ocr.js"></script>
 <script src="zonos.js"></script>
 <script src="tracking_scan.js"></script>
+<script src="cancel_notice.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
