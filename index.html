@@ -19,7 +19,6 @@
 </head>
 <body>
 <div id="app">
-  <!-- 設定画面（初回のみ） -->
   <section id="screen-setup" class="screen">
     <header class="head"><h1>初期設定</h1></header>
     <div class="content">
@@ -33,7 +32,6 @@
     </div>
   </section>
  
-  <!-- 注文一覧画面 -->
   <section id="screen-list" class="screen hidden">
     <header class="head">
       <h1>未発送の注文</h1>
@@ -43,7 +41,6 @@
           <span class="scan-pill-label">印刷</span>
           <span class="print-pill-badge hidden" id="bulk-print-badge">0</span>
         </button>
-        <!-- ★ キャンセル通知 v1.0: ヘッダーボタン -->
         <button class="scan-pill" id="btn-cancel-check" title="キャンセル状態をチェック">
           <span class="scan-pill-icon">🚨</span>
           <span class="scan-pill-label">キャンセル</span>
@@ -88,7 +85,6 @@
       </div>
     </div>
  
-    <!-- ★ キャンセル通知 v1.0: バナー (注文一覧上部) -->
     <div id="banner-cancel-notice" class="hidden"></div>
  
     <div id="zonos-expire-banner-container"></div>
@@ -111,13 +107,16 @@
       <label class="filter-toggle zonos">
         <input type="checkbox" id="filter-tracking-pending"> 📮 追跡スキャン待ち
       </label>
+      <!-- ★ v1.0 キャンセル通知: キャンセル済を隠す -->
+      <label class="filter-toggle">
+        <input type="checkbox" id="filter-hide-cancel" checked> ⊘ キャンセル済を隠す
+      </label>
       <button class="secondary" id="btn-new">+ 手動入力</button>
     </div>
     <div id="order-list" class="content"></div>
     <div class="loader hidden" id="list-loader">読み込み中...</div>
   </section>
  
-  <!-- 入力画面 -->
   <section id="screen-input" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-input" title="ホームへ戻る">🏠</button>
@@ -191,7 +190,6 @@
     </div>
   </section>
  
-  <!-- 結果画面 -->
   <section id="screen-result" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-result" title="ホームへ戻る">🏠</button>
@@ -210,7 +208,6 @@
     </div>
   </section>
  
-  <!-- v3.16: 印刷プレビュー画面 -->
   <section id="screen-print" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-print" title="ホームへ戻る">🏠</button>
@@ -228,7 +225,6 @@
     <div id="print-preview-area" class="content print-preview-area"></div>
   </section>
  
-  <!-- Zonos PrePay 送信画面 -->
   <section id="screen-zonos" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-zonos" title="戻る">←</button>
@@ -237,7 +233,6 @@
     <div id="zonos-content" class="content"></div>
   </section>
  
-  <!-- ★ 追跡番号スキャン画面 (v1.0) -->
   <section id="screen-tracking-scan" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-tracking">←</button>
@@ -300,7 +295,6 @@
     </div>
   </section>
  
-  <!-- ★ キャンセル通知印刷画面 (新規 v1.0) -->
   <section id="screen-cancel-print" class="screen hidden">
     <header class="head cancel-print-header">
       <button id="btn-cancel-back">← 戻る</button>
@@ -314,7 +308,6 @@
     </div>
   </section>
  
-  <!-- v3.16: 注文カード長押しメニュー -->
   <div id="card-action-overlay" class="overlay hidden">
     <div class="card-action-menu">
       <div class="card-action-target" id="card-action-target">—</div>
@@ -325,7 +318,6 @@
     </div>
   </div>
  
-  <!-- カメラ／OCRオーバーレイ -->
   <section id="ocr-overlay" class="overlay hidden">
     <div class="ocr-status" id="ocr-status">カメラ準備中...</div>
     <div class="ocr-stage">
@@ -341,10 +333,8 @@
     </div>
   </section>
  
-  <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
  
-  <!-- 数値入力用フローティングツールバー -->
   <div id="kb-toolbar" class="kb-toolbar hidden">
     <button class="kb-btn" id="kb-prev">◀ 前へ</button>
     <button class="kb-btn kb-btn-primary" id="kb-next">次へ ▶</button>
@@ -361,4 +351,3 @@
 <script src="app.js"></script>
 </body>
 </html>
- 
