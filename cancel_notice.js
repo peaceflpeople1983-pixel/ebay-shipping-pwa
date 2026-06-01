@@ -340,16 +340,38 @@
 
     /**
      * window.print() を呼んで物理印刷
+     *
+     * ★ ポータル方式: 印刷対象のHTMLを body 直下の隠し div にクローンしてから印刷。
+     *   理由: visibility:hidden 方式だと隠した要素もスペースを消費し、A4シートが
+     *         2ページ目以降の見えない位置に押し出されて1ページ目が白紙になる問題を回避。
      */
     triggerPrint() {
-      // 印刷モード用クラスを <body> に追加 (CSSで他要素を隠す)
+      const content = document.getElementById('cancel-print-content');
+      if (!content || !content.innerHTML.trim()) {
+        showToastC_('印刷対象がありません');
+        return;
+      }
+
+      // ポータル (body 直下) を準備
+      let portal = document.getElementById('cancel-print-portal');
+      if (!portal) {
+        portal = document.createElement('div');
+        portal.id = 'cancel-print-portal';
+        document.body.appendChild(portal);
+      }
+      // HTMLをクローン (innerHTML コピーで十分)
+      portal.innerHTML = content.innerHTML;
+
+      // 印刷モード起動
       document.body.classList.add('cancel-print-active');
+
       // setTimeout で確実にCSS反映後に印刷
       setTimeout(() => {
         window.print();
-        // 印刷ダイアログを閉じた後、クラス除去
+        // 印刷ダイアログを閉じた後、クラス除去 + ポータルクリア
         setTimeout(() => {
           document.body.classList.remove('cancel-print-active');
+          if (portal) portal.innerHTML = '';
         }, 1000);
       }, 100);
     },

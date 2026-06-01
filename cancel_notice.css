@@ -383,37 +383,60 @@
 
 /* ============================================================
    6. @media print (実印刷用)
-   ============================================================ */
+   ============================================================
+   ポータル方式: 印刷時のみ body 直下の #cancel-print-portal に
+   A4シートをクローンして表示。他は display:none で完全に消す。
+   visibility:hidden 方式と異なり、レイアウトスペースを消費しない。
+*/
+
+/* ポータルは平常時は非表示 */
+#cancel-print-portal {
+  display: none;
+}
 
 @media print {
-  body.cancel-print-active * {
-    visibility: hidden;
-  }
-  body.cancel-print-active #cancel-print-content,
-  body.cancel-print-active #cancel-print-content * {
-    visibility: visible;
-  }
-  body.cancel-print-active #cancel-print-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 0;
-  }
-  body.cancel-print-active .cancel-a4-paper {
-    box-shadow: none;
-    margin: 0;
-    page-break-after: always;
-    border: 4px solid var(--cancel-danger);
-  }
-  body.cancel-print-active #cancel-print-actions {
-    display: none !important;
-  }
-  body.cancel-print-active .cancel-print-header {
-    display: none !important;
-  }
   @page {
     size: A4;
     margin: 0;
+  }
+
+  /* 印刷モード時: body 直下の全要素を非表示 */
+  body.cancel-print-active > * {
+    display: none !important;
+  }
+
+  /* ポータルだけ表示 (body 直下のみ) */
+  body.cancel-print-active > #cancel-print-portal {
+    display: block !important;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+
+  /* ポータル内の A4 シートをページ単位で配置 */
+  body.cancel-print-active #cancel-print-portal .cancel-a4-paper {
+    width: 100%;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 8mm;
+    border: 4px solid var(--cancel-danger);
+    box-shadow: none;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    gap: 4mm;
+    box-sizing: border-box;
+    background: #fff;
+  }
+
+  /* 最後のページは page-break 不要 */
+  body.cancel-print-active #cancel-print-portal .cancel-a4-paper:last-child {
+    page-break-after: auto;
+  }
+
+  /* リンク色を黒に (印刷時の見栄え) */
+  body.cancel-print-active #cancel-print-portal a {
+    color: inherit;
+    text-decoration: none;
   }
 }
