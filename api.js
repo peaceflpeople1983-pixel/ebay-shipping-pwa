@@ -124,6 +124,44 @@ const API = {
     return this._post({ action: 'extractOrderId', secret: this.config.secret, image: base64Image });
   },
 
+  /**
+   * v1.0 キャンセル通知: 未印刷通知件数 + orderId一覧
+   *   戻り値: { unprintedCancellations, byAccount, hasItems, orderIds }
+   */
+  async getCancelTargets() {
+    return this._get('?action=cancelGetTargets');
+  },
+
+  /**
+   * v1.0 キャンセル通知: 印刷用詳細データ
+   *   戻り値: { orders, count, byAccount }
+   */
+  async getCancelPrintData() {
+    return this._get('?action=cancelGetPrintData');
+  },
+
+  /**
+   * v1.0 キャンセル通知: 印刷完了マーク (AQ列セット)
+   *   @param {string[]} orderIds 印刷完了した orderId 群
+   */
+  async markCancelPrinted(orderIds) {
+    return this._post({
+      action: 'cancelMarkPrinted',
+      secret: this.config.secret,
+      orderIds: orderIds || []
+    });
+  },
+
+  /**
+   * v1.0 キャンセル通知: 手動キャンセルチェック (PWAボタンから)
+   */
+  async detectCancelNow() {
+    return this._post({
+      action: 'cancelDetectNow',
+      secret: this.config.secret
+    });
+  },
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);
