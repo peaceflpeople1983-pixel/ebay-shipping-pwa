@@ -243,7 +243,7 @@
     },
 
     /**
-     * 印刷シートを描画 (A4 2スリップ/ページ)
+     * 印刷シートを描画 (v1.5: 2スリップ/A4ページ 維持、内容コンパクト化)
      */
     renderPrintSheets(data) {
       const content = document.getElementById('cancel-print-content');
@@ -254,14 +254,16 @@
       }
 
       const orders = data.orders;
-      // 2件ずつにまとめる
+      // 2件ずつA4にまとめる
       const pages = [];
       for (let i = 0; i < orders.length; i += 2) {
         pages.push(orders.slice(i, i + 2));
       }
 
       const html = pages.map((pageOrders, pageIdx) => {
-        const slipsHtml = pageOrders.map((o, slipIdx) => this._buildSlip(o, pageIdx * 2 + slipIdx + 1, orders.length)).join(
+        const slipsHtml = pageOrders.map((o, slipIdx) =>
+          this._buildSlip(o, pageIdx * 2 + slipIdx + 1, orders.length)
+        ).join(
           '<div class="cancel-cut">- - - - - - - - 切　離　線 - - - - - - - -</div>'
         );
         return '<div class="cancel-a4-paper">' + slipsHtml + '</div>';
@@ -346,14 +348,14 @@
      *   - @media print ルールを JS から動的に <style> として注入 (最高特異性)
      *   - style.css の既存ルールと共存可能
      *
-     *   診断ログ: console (F12) で「[CancelNotice v1.3]」を確認できれば新コード稼働中。
+     *   診断ログ: console (F12) で「[CancelNotice v1.5]」を確認できれば新コード稼働中。
      */
     triggerPrint() {
-      console.log('[CancelNotice v1.3] triggerPrint called');
+      console.log('[CancelNotice v1.5] triggerPrint called');
 
       const content = document.getElementById('cancel-print-content');
       if (!content || !content.innerHTML.trim()) {
-        console.warn('[CancelNotice v1.3] content empty');
+        console.warn('[CancelNotice v1.5] content empty');
         showToastC_('印刷対象がありません');
         return;
       }
@@ -364,11 +366,11 @@
         portal = document.createElement('div');
         portal.id = 'cancel-print-portal';
         document.body.appendChild(portal);
-        console.log('[CancelNotice v1.3] Portal created');
+        console.log('[CancelNotice v1.5] Portal created');
       }
       portal.innerHTML = content.innerHTML;
       const a4Count = portal.querySelectorAll('.cancel-a4-paper').length;
-      console.log('[CancelNotice v1.3] Portal populated with', a4Count, 'A4 sheets');
+      console.log('[CancelNotice v1.5] Portal populated with', a4Count, 'A4 sheets');
 
       // ★ 動的 CSS 注入 (キャッシュ無関係に最新ルール適用 + 最高特異性で他CSS上書き)
       let dynStyle = document.getElementById('cancel-print-dyn-style');
@@ -377,6 +379,7 @@
         dynStyle.id = 'cancel-print-dyn-style';
         document.head.appendChild(dynStyle);
       }
+      // ★ v1.5: 2スリップ/A4ページ + 全要素コンパクト化 (各スリップ約105mm目標)
       dynStyle.textContent = [
         '@media print {',
         '  @page { size: A4; margin: 0; }',
@@ -388,84 +391,116 @@
         '    overflow: visible !important; visibility: visible !important;',
         '  }',
         '  html body.cancel-print-active #cancel-print-portal * { visibility: visible !important; }',
-        '  /* ★ A4 1ページ = 297mm 厳密固定 (2スリップ縦並び) */',
+        '  /* A4 ラッパー: 高さ 297mm 固定 + 2スリップ縦並び */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-a4-paper {',
         '    display: flex !important; flex-direction: column !important;',
         '    width: 210mm !important; max-width: 210mm !important;',
         '    height: 297mm !important; max-height: 297mm !important;',
-        '    margin: 0 auto !important; padding: 4mm 6mm !important;',
+        '    margin: 0 auto !important; padding: 3mm 5mm !important;',
         '    border: 3px solid #A32D2D !important;',
         '    box-shadow: none !important;',
         '    page-break-after: always !important;',
         '    page-break-inside: avoid !important;',
-        '    gap: 3mm !important; box-sizing: border-box !important;',
+        '    gap: 2mm !important; box-sizing: border-box !important;',
         '    background: #fff !important; overflow: hidden !important;',
         '  }',
         '  html body.cancel-print-active #cancel-print-portal .cancel-a4-paper:last-child {',
         '    page-break-after: auto !important;',
         '  }',
-        '  /* ★ 各スリップ = 138mm 固定 (A4 縦半分弱、内容溢れたら overflow:hidden) */',
+        '  /* 各スリップ = 140mm 固定 (内容溢れたら overflow:hidden) */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip {',
-        '    flex: 0 0 138mm !important;',
-        '    height: 138mm !important; max-height: 138mm !important;',
+        '    flex: 0 0 140mm !important;',
+        '    height: 140mm !important; max-height: 140mm !important;',
         '    overflow: hidden !important;',
         '    box-sizing: border-box !important;',
-        '    padding: 0 4mm 4mm 4mm !important;',
+        '    padding: 0 3mm 3mm 3mm !important;',
         '    border: 2px solid #A32D2D !important;',
-        '    border-radius: 4px !important;',
-        '    position: relative !important;',
+        '    border-radius: 3px !important;',
         '    display: flex !important; flex-direction: column !important;',
+        '    background: #fff !important;',
         '  }',
-        '  /* 切離線 = 4mm 固定 */',
+        '  /* 切離線 = 3mm */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-cut {',
-        '    flex: 0 0 4mm !important;',
-        '    height: 4mm !important;',
-        '    margin: 0 !important;',
-        '    padding: 1mm 0 !important;',
+        '    flex: 0 0 3mm !important;',
+        '    height: 3mm !important;',
+        '    margin: 0 !important; padding: 0 !important;',
         '    box-sizing: border-box !important;',
         '    text-align: center !important;',
-        '    font-size: 8pt !important;',
+        '    font-size: 7pt !important;',
         '    color: #888 !important;',
         '    border-top: 1px dashed #888 !important;',
-        '    letter-spacing: 3px !important;',
+        '    letter-spacing: 2px !important;',
+        '    line-height: 3mm !important;',
         '  }',
-        '  /* スリップ内部要素のコンパクト化 (138mm 内に収める) */',
+        '  /* === スリップ内部要素を強くコンパクト化 === */',
+        '  /* ヘッダー: 小さく */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip-header {',
-        '    min-height: 8mm !important; padding: 2mm 0 !important; margin: 0 0 2mm 0 !important;',
+        '    min-height: 7mm !important; padding: 1.5mm 0 !important; margin: 0 0 1.5mm 0 !important;',
+        '    border-bottom: 2px solid #A32D2D !important;',
         '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-title {',
+        '    font-size: 10pt !important; line-height: 1.1 !important;',
+        '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-meta {',
+        '    font-size: 7.5pt !important;',
+        '  }',
+        '  /* Order ID 枠: 小さく */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip-orderid {',
-        '    padding: 1mm 3mm !important; margin-bottom: 2mm !important;',
+        '    padding: 1mm 3mm !important; margin-bottom: 1.5mm !important;',
+        '    border-width: 2px !important;',
         '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-orderid-label {',
+        '    font-size: 6pt !important;',
+        '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-orderid-value {',
+        '    font-size: 12pt !important; line-height: 1.1 !important;',
+        '  }',
+        '  /* 商品情報: 画像 20mm、テキスト 7.5pt */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip-body {',
-        '    grid-template-columns: 24mm 1fr !important; gap: 3mm !important; margin-bottom: 2mm !important;',
+        '    grid-template-columns: 20mm 1fr !important; gap: 2.5mm !important; margin-bottom: 1.5mm !important;',
         '  }',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip-thumb,',
         '  html body.cancel-print-active #cancel-print-portal .cancel-slip-thumb-placeholder {',
-        '    width: 24mm !important; height: 24mm !important;',
+        '    width: 20mm !important; height: 20mm !important;',
         '  }',
-        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-info { font-size: 8.5pt !important; line-height: 1.45 !important; }',
-        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-times { font-size: 7.5pt !important; margin: 1mm 0 !important; }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-info {',
+        '    font-size: 7.5pt !important; line-height: 1.3 !important;',
+        '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-info .label {',
+        '    font-size: 6pt !important; margin-top: 0.5mm !important;',
+        '  }',
+        '  /* 日時情報: 小さく */',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-slip-times {',
+        '    font-size: 6.5pt !important; margin: 0.5mm 0 !important; line-height: 1.3 !important;',
+        '  }',
+        '  /* 警告ボックス: 小さく */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-warning-box {',
-        '    padding: 2mm !important; font-size: 11pt !important; margin: 1mm 0 !important; line-height: 1.3 !important;',
+        '    padding: 1.5mm !important; font-size: 10pt !important;',
+        '    margin: 1mm 0 !important; line-height: 1.2 !important;',
+        '    border-width: 2px !important;',
         '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-warning-box span {',
+        '    font-size: 13pt !important;',
+        '  }',
+        '  /* 指示文: 小さく */',
         '  html body.cancel-print-active #cancel-print-portal .cancel-instruction {',
-        '    padding: 1.5mm 2mm !important; font-size: 7.5pt !important; line-height: 1.4 !important;',
+        '    padding: 1mm 2mm !important; font-size: 6.5pt !important; line-height: 1.3 !important;',
         '  }',
         '}'
       ].join('\n');
 
       document.body.classList.add('cancel-print-active');
-      console.log('[CancelNotice v1.3] Class added, dynStyle injected. Calling print() in 300ms...');
+      console.log('[CancelNotice v1.5] Class added, dynStyle injected. Calling print() in 300ms...');
 
       // setTimeout で確実にレイアウト反映後に印刷 (300ms = 余裕を持って)
       setTimeout(() => {
-        console.log('[CancelNotice v1.3] Calling window.print()');
+        console.log('[CancelNotice v1.5] Calling window.print()');
         window.print();
         // 印刷ダイアログを閉じた後、クリーンアップ
         setTimeout(() => {
           document.body.classList.remove('cancel-print-active');
           if (portal) portal.innerHTML = '';
-          console.log('[CancelNotice v1.3] Cleanup done');
+          console.log('[CancelNotice v1.5] Cleanup done');
         }, 1000);
       }, 300);
     },
