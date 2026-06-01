@@ -341,13 +341,19 @@
     /**
      * window.print() を呼んで物理印刷
      *
-     * ★ ポータル方式: 印刷対象のHTMLを body 直下の隠し div にクローンしてから印刷。
-     *   理由: visibility:hidden 方式だと隠した要素もスペースを消費し、A4シートが
-     *         2ページ目以降の見えない位置に押し出されて1ページ目が白紙になる問題を回避。
+     * ★ v1.2 ポータル方式 + 動的CSS注入: キャッシュ状態に依存しない確実な印刷。
+     *   - 印刷対象 HTML を body 直下の隠し div にクローン
+     *   - @media print ルールを JS から動的に <style> として注入 (最高特異性)
+     *   - style.css の既存ルールと共存可能
+     *
+     *   診断ログ: console (F12) で「[CancelNotice v1.2]」を確認できれば新コード稼働中。
      */
     triggerPrint() {
+      console.log('[CancelNotice v1.2] triggerPrint called');
+
       const content = document.getElementById('cancel-print-content');
       if (!content || !content.innerHTML.trim()) {
+        console.warn('[CancelNotice v1.2] content empty');
         showToastC_('印刷対象がありません');
         return;
       }
@@ -358,22 +364,59 @@
         portal = document.createElement('div');
         portal.id = 'cancel-print-portal';
         document.body.appendChild(portal);
+        console.log('[CancelNotice v1.2] Portal created');
       }
-      // HTMLをクローン (innerHTML コピーで十分)
       portal.innerHTML = content.innerHTML;
+      const a4Count = portal.querySelectorAll('.cancel-a4-paper').length;
+      console.log('[CancelNotice v1.2] Portal populated with', a4Count, 'A4 sheets');
 
-      // 印刷モード起動
+      // ★ 動的 CSS 注入 (キャッシュ無関係に最新ルール適用 + 最高特異性で他CSS上書き)
+      let dynStyle = document.getElementById('cancel-print-dyn-style');
+      if (!dynStyle) {
+        dynStyle = document.createElement('style');
+        dynStyle.id = 'cancel-print-dyn-style';
+        document.head.appendChild(dynStyle);
+      }
+      dynStyle.textContent = [
+        '@media print {',
+        '  @page { size: A4; margin: 0; }',
+        '  html body.cancel-print-active > * { display: none !important; }',
+        '  html body.cancel-print-active > #cancel-print-portal {',
+        '    display: block !important; position: static !important;',
+        '    margin: 0 !important; padding: 0 !important;',
+        '    width: 100% !important; height: auto !important;',
+        '    overflow: visible !important; visibility: visible !important;',
+        '  }',
+        '  html body.cancel-print-active #cancel-print-portal * { visibility: visible !important; }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-a4-paper {',
+        '    display: flex !important; flex-direction: column !important;',
+        '    width: 100% !important; max-width: 210mm !important;',
+        '    margin: 0 auto !important; padding: 8mm !important;',
+        '    border: 4px solid #A32D2D !important;',
+        '    box-shadow: none !important; page-break-after: always !important;',
+        '    gap: 4mm !important; box-sizing: border-box !important;',
+        '    background: #fff !important;',
+        '  }',
+        '  html body.cancel-print-active #cancel-print-portal .cancel-a4-paper:last-child {',
+        '    page-break-after: auto !important;',
+        '  }',
+        '}'
+      ].join('\n');
+
       document.body.classList.add('cancel-print-active');
+      console.log('[CancelNotice v1.2] Class added, dynStyle injected. Calling print() in 300ms...');
 
-      // setTimeout で確実にCSS反映後に印刷
+      // setTimeout で確実にレイアウト反映後に印刷 (300ms = 余裕を持って)
       setTimeout(() => {
+        console.log('[CancelNotice v1.2] Calling window.print()');
         window.print();
-        // 印刷ダイアログを閉じた後、クラス除去 + ポータルクリア
+        // 印刷ダイアログを閉じた後、クリーンアップ
         setTimeout(() => {
           document.body.classList.remove('cancel-print-active');
           if (portal) portal.innerHTML = '';
+          console.log('[CancelNotice v1.2] Cleanup done');
         }, 1000);
-      }, 100);
+      }, 300);
     },
 
     /**
