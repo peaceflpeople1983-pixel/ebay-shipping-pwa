@@ -4,7 +4,7 @@
 const API = {
   config: { url: '', secret: '' },
   MASTER_CACHE_TTL: 24 * 60 * 60 * 1000, // 24時間
-  DEFAULT_DAYS_BACK: 15,                  // 直近15日分のみ表示
+  DEFAULT_DAYS_BACK: 60,                  // 直近60日分を表示 (メール救済orderも含めて表示)
 
   loadConfig() {
     const saved = localStorage.getItem('app_config');
