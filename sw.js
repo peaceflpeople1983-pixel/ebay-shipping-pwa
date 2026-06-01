@@ -1,6 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-15-z12: ★ 印刷プレビュー白紙バグ修正 (ポータル方式に変更)
+ * v3-18-15-z13: ★ 印刷白紙バグ再修正 (動的CSS注入方式 + 診断ログ追加)
+ * v3-18-15-z12: 印刷プレビュー白紙バグ修正 (ポータル方式に変更)
  * v3-18-15-z11: キャンセル通知機能追加 (cancel_notice.js, cancel_notice.css)
  * v3-18-14-z10: needsManualフラグ対応 (Invalid Order Id 専用エラートースト)
  * v3-18-14-z9: フィルタトグル視覚化 (チップ型 + ✓マーク + 紺地選択中表示)
@@ -13,7 +14,7 @@
  * v3-18-14-z2: 商品画像保存改善
  * v3-18-14-z1: Zonos PrePay 連携追加
  */
-const CACHE_NAME = 'ebay-ship-v3-18-15-z12';
+const CACHE_NAME = 'ebay-ship-v3-18-15-z13';
 
 const STATIC_FILES = [
   './',
