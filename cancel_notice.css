@@ -1,0 +1,419 @@
+/**
+ * cancel_notice.css — キャンセル通知ピッキングリスト機能 (v1.0)
+ *
+ * 構成:
+ *   1. 共通カラー変数
+ *   2. 注文一覧バナー (banner-cancel-notice)
+ *   3. ヘッダーボタン (btn-cancel-check + バッジ)
+ *   4. 注文カード装飾 (.order-item.cancel-notice + .cancel-notice-badge)
+ *   5. 印刷画面 (screen-cancel-print)
+ *   6. A4 印刷シート (.cancel-a4-paper / .cancel-slip)
+ *   7. @media print (実印刷用)
+ */
+
+:root {
+  --cancel-danger: #A32D2D;
+  --cancel-bg-soft: #FDE0E0;
+  --cancel-bg-card: #FFFAFA;
+  --cancel-warning: #BA7517;
+  --cancel-warning-bg: #FFF8E6;
+}
+
+/* ============================================================
+   1. キャンセル通知バナー (注文一覧の上部に表示)
+   ============================================================ */
+
+#banner-cancel-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin: 8px 12px;
+  background: var(--cancel-bg-soft);
+  border-left: 4px solid var(--cancel-danger);
+  animation: cancel-pulse 2.5s ease-in-out infinite;
+}
+#banner-cancel-notice.hidden {
+  display: none;
+}
+#banner-cancel-notice .banner-icon { font-size: 20px; flex-shrink: 0; }
+#banner-cancel-notice .banner-body { flex: 1; min-width: 0; }
+#banner-cancel-notice .banner-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8A1A1A;
+}
+#banner-cancel-notice .banner-sub {
+  font-size: 11px;
+  margin-top: 2px;
+  color: #8A1A1A;
+}
+#banner-cancel-notice .banner-btn {
+  background: var(--cancel-danger);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@keyframes cancel-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(163, 45, 45, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(163, 45, 45, 0.15); }
+}
+
+/* ============================================================
+   2. ヘッダーボタン (🚨 キャンセル + 件数バッジ)
+   ============================================================ */
+
+#btn-cancel-check {
+  position: relative;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+#btn-cancel-check:disabled { opacity: 0.5; }
+
+#cancel-check-badge {
+  background: var(--cancel-danger);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  text-align: center;
+}
+#cancel-check-badge.hidden { display: none; }
+
+/* ============================================================
+   3. 注文カード装飾
+   ============================================================ */
+
+.order-item.cancel-notice {
+  border-left: 4px solid var(--cancel-danger) !important;
+  background: var(--cancel-bg-card);
+}
+
+.badge.cancel-notice-badge {
+  background: var(--cancel-danger);
+  color: #fff !important;
+  border: none;
+  animation: cancel-pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================================
+   4. 印刷画面 (screen-cancel-print)
+   ============================================================ */
+
+#screen-cancel-print {
+  background: #E5E7EB;
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+#screen-cancel-print.hidden { display: none; }
+
+#screen-cancel-print .cancel-print-header {
+  background: var(--cancel-danger);
+  color: #fff;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+#screen-cancel-print .cancel-print-header h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  flex: 1;
+}
+#screen-cancel-print .cancel-print-header button {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#cancel-print-loader {
+  text-align: center;
+  padding: 40px 20px;
+  color: #606060;
+  font-size: 14px;
+}
+#cancel-print-loader.hidden { display: none; }
+
+#cancel-print-content {
+  padding: 16px;
+}
+
+.cancel-empty {
+  background: #fff;
+  padding: 32px 20px;
+  text-align: center;
+  border-radius: 10px;
+  color: #606060;
+}
+.cancel-error {
+  background: #FDE0E0;
+  padding: 16px;
+  border-radius: 10px;
+  color: #8A1A1A;
+  border-left: 4px solid var(--cancel-danger);
+}
+
+#cancel-print-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #E0E0E0;
+  z-index: 20;
+}
+#cancel-print-actions.hidden { display: none; }
+#cancel-print-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+}
+#btn-cancel-do-print {
+  background: var(--cancel-danger);
+  color: #fff;
+}
+#btn-cancel-confirm {
+  background: #0F6E56;
+  color: #fff;
+}
+#btn-cancel-confirm:disabled { opacity: 0.5; }
+
+/* ============================================================
+   5. A4 印刷シート (画面プレビュー時)
+   ============================================================ */
+
+.cancel-a4-paper {
+  background: #fff;
+  width: 100%;
+  max-width: 210mm;
+  margin: 0 auto 16px;
+  padding: 8mm;
+  border: 4px solid var(--cancel-danger);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+  font-size: 11pt;
+  box-sizing: border-box;
+}
+
+.cancel-cut {
+  text-align: center;
+  color: #888;
+  font-size: 9pt;
+  border-top: 1px dashed #888;
+  padding: 1mm 0;
+  letter-spacing: 4px;
+}
+
+.cancel-slip {
+  flex: 1;
+  border: 2px solid var(--cancel-danger);
+  border-radius: 4px;
+  padding: 0 4mm 4mm 4mm;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.cancel-slip.is-doukon-warn {
+  border-color: var(--cancel-warning);
+}
+
+.cancel-slip-header {
+  background: #fff;
+  color: var(--cancel-danger);
+  border-bottom: 3px solid var(--cancel-danger);
+  padding: 3mm 0;
+  margin: 0 0 4mm 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  gap: 4mm;
+  flex-wrap: nowrap;
+  min-height: 10mm;
+}
+.cancel-slip.is-doukon-warn .cancel-slip-header {
+  color: var(--cancel-warning);
+  border-bottom-color: var(--cancel-warning);
+}
+.cancel-slip-title {
+  font-size: 12pt;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex: 1;
+  line-height: 1.2;
+}
+.cancel-slip-meta {
+  font-size: 9pt;
+  font-family: ui-monospace, monospace;
+  color: var(--cancel-danger);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cancel-slip-orderid {
+  border: 2.5px solid var(--cancel-danger);
+  border-radius: 3px;
+  padding: 2mm 4mm;
+  background: #FEF2F2;
+  margin-bottom: 3mm;
+}
+.cancel-slip.is-doukon-warn .cancel-slip-orderid {
+  border-color: var(--cancel-warning);
+  background: var(--cancel-warning-bg);
+}
+.cancel-slip-orderid-label {
+  font-size: 7pt;
+  color: var(--cancel-danger);
+  font-weight: 600;
+}
+.cancel-slip.is-doukon-warn .cancel-slip-orderid-label {
+  color: var(--cancel-warning);
+}
+.cancel-slip-orderid-value {
+  font-family: ui-monospace, monospace;
+  font-size: 14pt;
+  font-weight: 600;
+  color: var(--cancel-danger);
+  letter-spacing: 0.5px;
+}
+.cancel-slip.is-doukon-warn .cancel-slip-orderid-value {
+  color: var(--cancel-warning);
+}
+
+.cancel-slip-body {
+  display: grid;
+  grid-template-columns: 28mm 1fr;
+  gap: 4mm;
+  margin-bottom: 4mm;
+}
+.cancel-slip-thumb,
+.cancel-slip-thumb-placeholder {
+  width: 28mm;
+  height: 28mm;
+  background: linear-gradient(135deg, #f0f1f3, #d8dadf);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18pt;
+  color: #888;
+  object-fit: cover;
+}
+.cancel-slip-info {
+  font-size: 9pt;
+  line-height: 1.6;
+}
+.cancel-slip-info .label {
+  font-size: 7pt;
+  color: #555;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 1mm;
+}
+
+.cancel-slip-times {
+  font-size: 8pt;
+  margin: 2mm 0;
+  color: #333;
+}
+
+.cancel-warning-box {
+  background: #fff;
+  color: var(--cancel-danger);
+  border: 3px solid var(--cancel-danger);
+  padding: 4mm;
+  border-radius: 3px;
+  text-align: center;
+  margin: 2mm 0;
+  font-weight: 700;
+  font-size: 13pt;
+  line-height: 1.4;
+}
+.cancel-slip.is-doukon-warn .cancel-warning-box {
+  color: var(--cancel-warning);
+  border-color: var(--cancel-warning);
+}
+
+.cancel-instruction {
+  background: var(--cancel-warning-bg);
+  border-left: 3px solid var(--cancel-warning);
+  padding: 2mm 3mm;
+  font-size: 8pt;
+  color: #6B4500;
+  margin-top: auto;
+}
+.cancel-instruction code {
+  background: #fff;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-family: ui-monospace, monospace;
+}
+
+/* ============================================================
+   6. @media print (実印刷用)
+   ============================================================ */
+
+@media print {
+  body.cancel-print-active * {
+    visibility: hidden;
+  }
+  body.cancel-print-active #cancel-print-content,
+  body.cancel-print-active #cancel-print-content * {
+    visibility: visible;
+  }
+  body.cancel-print-active #cancel-print-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+  }
+  body.cancel-print-active .cancel-a4-paper {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+    border: 4px solid var(--cancel-danger);
+  }
+  body.cancel-print-active #cancel-print-actions {
+    display: none !important;
+  }
+  body.cancel-print-active .cancel-print-header {
+    display: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
