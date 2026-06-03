@@ -1,13 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-15-z19: ★ 注文取得リカバリ機能 (recovery.js/css 追加) + ヘッダー縦積み是正 (RECOVERY_PLAN v1.2)
+ * v3-18-15-z20: ★ Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」(app.js/recovery.js 更新)
+ * v3-18-15-z19: 注文取得リカバリ機能 (recovery.js/css) + ヘッダー縦積み是正
  * v3-18-15-z18: キャンセル済バッジ + フィルタ追加
  * v3-18-15-z17: DEFAULT_DAYS_BACK 15→60日
- * v3-18-15-z16: 2スリップ/A4ページ復活 + 全要素コンパクト化
- * v3-18-15-z13〜z15: 印刷バグ修正
- * v3-18-15-z11: キャンセル通知機能追加
  */
-const CACHE_NAME = 'ebay-ship-v3-18-15-z19';
+const CACHE_NAME = 'ebay-ship-v3-18-15-z20';
 
 const STATIC_FILES = [
   './',
