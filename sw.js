@@ -1,13 +1,14 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
- * v3-18-15-z18: ★ キャンセル済バッジ + フィルタ追加 (getOrders拡張、PWA表示)
+ * v3-18-15-z19: ★ 注文取得リカバリ機能 (recovery.js/css 追加) + ヘッダー縦積み是正 (RECOVERY_PLAN v1.2)
+ * v3-18-15-z18: キャンセル済バッジ + フィルタ追加
  * v3-18-15-z17: DEFAULT_DAYS_BACK 15→60日
  * v3-18-15-z16: 2スリップ/A4ページ復活 + 全要素コンパクト化
  * v3-18-15-z13〜z15: 印刷バグ修正
  * v3-18-15-z11: キャンセル通知機能追加
  */
-const CACHE_NAME = 'ebay-ship-v3-18-15-z18';
- 
+const CACHE_NAME = 'ebay-ship-v3-18-15-z19';
+
 const STATIC_FILES = [
   './',
   './index.html',
@@ -15,6 +16,7 @@ const STATIC_FILES = [
   './zonos.css',
   './tracking_scan.css',
   './cancel_notice.css',
+  './recovery.css',
   './app.js',
   './api.js',
   './calculator.js',
@@ -22,14 +24,15 @@ const STATIC_FILES = [
   './zonos.js',
   './tracking_scan.js',
   './cancel_notice.js',
+  './recovery.js',
   './manifest.webmanifest'
 ];
- 
+
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_FILES)));
 });
- 
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -37,7 +40,7 @@ self.addEventListener('activate', e => {
     ).then(() => self.clients.claim())
   );
 });
- 
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.hostname.indexOf('ebay') !== -1 || url.hostname.indexOf('ebaystatic') !== -1) return;
