@@ -48,7 +48,7 @@ window.addEventListener('error', function (e) {
       <button class="secondary" id="btn-clear-cache" style="margin-top: 12px; width: 100%;">マスタキャッシュをクリア（強制再取得）</button>
     </div>
   </section>
-
+ 
   <section id="screen-list" class="screen hidden">
     <header class="head">
       <h1>未発送の注文</h1>
@@ -81,7 +81,7 @@ window.addEventListener('error', function (e) {
       <button class="today-bar-btn" id="btn-batch-scan">📷 連続スキャン</button>
       <button class="today-bar-btn secondary" id="btn-today-clear" title="本日グループをクリア">クリア</button>
     </div>
-
+ 
     <div class="cpass-banner hidden" id="cpass-banner">
       <div class="cpass-inbox-alert hidden" id="cpass-inbox-alert">
         <span class="cpass-banner-icon">📂</span>
@@ -98,7 +98,7 @@ window.addEventListener('error', function (e) {
         </div>
       </div>
     </div>
-
+ 
     <div class="deadline-banner hidden" id="deadline-banner">
       <span class="deadline-banner-icon">⏰</span>
       <div class="deadline-banner-body">
@@ -106,11 +106,20 @@ window.addEventListener('error', function (e) {
         <div class="deadline-banner-sub" id="deadline-banner-sub">1週間以内の未発送があります</div>
       </div>
     </div>
-
+ 
     <div id="banner-cancel-notice" class="hidden"></div>
-
+ 
     <div id="zonos-expire-banner-container"></div>
-
+ 
+    <!-- v3.18.16: 発送ポリシー不明バナー (H列空の未発送があれば表示 / Seller Hub CSV取込を促す) -->
+    <div class="policy-banner hidden" id="policy-banner">
+      <span class="policy-banner-icon">🏷️</span>
+      <div class="policy-banner-body">
+        <div class="policy-banner-main">発送ポリシー不明: <strong id="policy-banner-count">0</strong>件</div>
+        <div class="policy-banner-sub">Seller Hub の CSV を取り込んでください</div>
+      </div>
+    </div>
+ 
     <div class="filter-bar">
       <select id="filter-account">
         <option value="">すべてのアカウント</option>
@@ -138,7 +147,7 @@ window.addEventListener('error', function (e) {
     <div id="order-list" class="content"></div>
     <div class="loader hidden" id="list-loader">読み込み中...</div>
   </section>
-
+ 
   <section id="screen-input" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-input" title="ホームへ戻る">🏠</button>
@@ -156,22 +165,22 @@ window.addEventListener('error', function (e) {
           <div class="account-title" id="input-item-title"></div>
         </div>
       </div>
-
+ 
       <label>注文ID</label>
       <div class="input-with-action">
         <input type="text" id="input-order-id" placeholder="14-12345-67890">
         <button class="icon" id="btn-ocr" title="撮影で取り込み">📷</button>
       </div>
-
+ 
       <label>発送先国</label>
       <select id="input-country"></select>
-
+ 
       <div class="input-cpass-row hidden" id="input-cpass-row">
         <span class="input-cpass-icon">📦</span>
         <span class="input-cpass-label">CPaSS #</span>
         <span class="input-cpass-no" id="input-cpass-no">—</span>
       </div>
-
+ 
       <div class="input-cpass-warning hidden" id="input-cpass-warning">
         <span class="input-cpass-warning-icon">⚠</span>
         <div class="input-cpass-warning-body">
@@ -179,10 +188,10 @@ window.addEventListener('error', function (e) {
           <div class="input-cpass-warning-detail">CPaSS で xlsx をダウンロード後、注文一覧画面の [📥 取込実行] を押してください</div>
         </div>
       </div>
-
+ 
       <label>梱包後重量 (g)</label>
       <input type="number" id="input-weight" inputmode="numeric" enterkeyhint="next" placeholder="例: 850">
-
+ 
       <label>サイズ (cm)</label>
       <div class="dim-row">
         <input type="number" id="input-length" inputmode="decimal" enterkeyhint="next" placeholder="長">
@@ -191,7 +200,7 @@ window.addEventListener('error', function (e) {
         <span class="dim-sep">×</span>
         <input type="number" id="input-height" inputmode="decimal" enterkeyhint="go" placeholder="高">
       </div>
-
+ 
       <div class="card tariff-card hidden" id="input-tariff-card">
         <div class="muted">通関情報（米国向け）</div>
         <div class="tariff-row">
@@ -207,11 +216,11 @@ window.addEventListener('error', function (e) {
           <span class="tariff-value" id="t-tariff-rate">—</span>
         </div>
       </div>
-
+ 
       <button class="primary" id="btn-calculate">最適な発送方法を提案</button>
     </div>
   </section>
-
+ 
   <section id="screen-result" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-result" title="ホームへ戻る">🏠</button>
@@ -229,7 +238,7 @@ window.addEventListener('error', function (e) {
       <button class="primary hidden" id="btn-confirm">この発送方法で確定</button>
     </div>
   </section>
-
+ 
   <section id="screen-print" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-home-print" title="ホームへ戻る">🏠</button>
@@ -246,7 +255,7 @@ window.addEventListener('error', function (e) {
     </div>
     <div id="print-preview-area" class="content print-preview-area"></div>
   </section>
-
+ 
   <section id="screen-zonos" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-zonos" title="戻る">←</button>
@@ -254,7 +263,7 @@ window.addEventListener('error', function (e) {
     </header>
     <div id="zonos-content" class="content"></div>
   </section>
-
+ 
   <section id="screen-tracking-scan" class="screen hidden">
     <header class="head">
       <button class="icon" id="btn-back-tracking">←</button>
@@ -282,7 +291,7 @@ window.addEventListener('error', function (e) {
         <button class="tracking-scan-btn primary" id="btn-tracking-capture">📷 撮影してAI解析</button>
       </div>
     </div>
-
+ 
     <div id="tracking-confirm-overlay" class="tracking-dialog-overlay hidden">
       <div class="tracking-dialog">
         <div class="tracking-dialog-icon">✓</div>
@@ -302,7 +311,7 @@ window.addEventListener('error', function (e) {
         </div>
       </div>
     </div>
-
+ 
     <div id="tracking-manual-overlay" class="tracking-manual-overlay hidden">
       <div class="tracking-manual-sheet">
         <div class="tracking-manual-title">追跡番号を手動入力</div>
@@ -316,7 +325,7 @@ window.addEventListener('error', function (e) {
       </div>
     </div>
   </section>
-
+ 
   <section id="screen-cancel-print" class="screen hidden">
     <header class="head cancel-print-header">
       <button id="btn-cancel-back">← 戻る</button>
@@ -329,7 +338,7 @@ window.addEventListener('error', function (e) {
       <button id="btn-cancel-confirm">✅ 通知印刷完了</button>
     </div>
   </section>
-
+ 
   <!-- ★ RECOVERY v1.2: 未取得order 取込画面 -->
   <section id="screen-recovery" class="screen hidden">
     <header class="head">
@@ -340,7 +349,7 @@ window.addEventListener('error', function (e) {
     <div id="recovery-loader" class="hidden">API確認中...</div>
     <div id="recovery-content" class="content"></div>
   </section>
-
+ 
   <div id="card-action-overlay" class="overlay hidden">
     <div class="card-action-menu">
       <div class="card-action-target" id="card-action-target">—</div>
@@ -356,7 +365,7 @@ window.addEventListener('error', function (e) {
       <button class="card-action-btn secondary" id="card-action-cancel">キャンセル</button>
     </div>
   </div>
-
+ 
   <section id="ocr-overlay" class="overlay hidden">
     <div class="ocr-status" id="ocr-status">カメラ準備中...</div>
     <div class="ocr-stage">
@@ -371,16 +380,16 @@ window.addEventListener('error', function (e) {
       <button class="primary" id="btn-ocr-capture">撮影</button>
     </div>
   </section>
-
+ 
   <div id="toast" class="toast hidden"></div>
-
+ 
   <div id="kb-toolbar" class="kb-toolbar hidden">
     <button class="kb-btn" id="kb-prev">◀ 前へ</button>
     <button class="kb-btn kb-btn-primary" id="kb-next">次へ ▶</button>
     <button class="kb-btn" id="kb-done">完了</button>
   </div>
 </div>
-
+ 
 <script src="api.js"></script>
 <script src="calculator.js"></script>
 <script src="ocr.js"></script>
@@ -391,3 +400,4 @@ window.addEventListener('error', function (e) {
 <script src="app.js"></script>
 </body>
 </html>
+ 
