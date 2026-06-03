@@ -17,6 +17,22 @@
 <link rel="stylesheet" href="cancel_notice.css">
 <link rel="stylesheet" href="recovery.css">
 <title>eBay Ship Optimizer</title>
+<!-- ★ 一時デバッグ: JSエラーを画面下部に赤帯で表示 (原因特定後に削除) -->
+<script>
+window.addEventListener('error', function (e) {
+  try {
+    var d = document.getElementById('__jsdbg');
+    if (!d) {
+      d = document.createElement('div');
+      d.id = '__jsdbg';
+      d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:999999;background:#A32D2D;color:#fff;font:12px/1.4 monospace;padding:10px;white-space:pre-wrap;max-height:45vh;overflow:auto;';
+      (document.body || document.documentElement).appendChild(d);
+    }
+    var file = (e.filename || '').split('/').pop();
+    d.textContent += 'JS ERROR: ' + (e.message || '') + '\n  @ ' + file + ' : line ' + (e.lineno || '?') + ' col ' + (e.colno || '?') + '\n';
+  } catch (_) {}
+}, true);
+</script>
 </head>
 <body>
 <div id="app">
