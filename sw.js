@@ -4,8 +4,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-18-15-z21';
-
+const CACHE_NAME = 'ebay-ship-v3-18-16';
+ 
 const STATIC_FILES = [
   './',
   './index.html',
@@ -24,12 +24,12 @@ const STATIC_FILES = [
   './recovery.js',
   './manifest.webmanifest'
 ];
-
+ 
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_FILES)));
 });
-
+ 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -37,7 +37,7 @@ self.addEventListener('activate', e => {
     ).then(() => self.clients.claim())
   );
 });
-
+ 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.hostname.indexOf('ebay') !== -1 || url.hostname.indexOf('ebaystatic') !== -1) return;
@@ -59,3 +59,4 @@ self.addEventListener('fetch', e => {
     )
   );
 });
+ 
