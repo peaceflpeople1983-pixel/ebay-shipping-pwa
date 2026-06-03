@@ -168,6 +168,9 @@ const App = {
       // ★ Phase B: 発送済にする / 解除 (表示フラグのみ・eBay非送信)
       this._bind('card-action-ship', 'onclick', () => this.markShippedAndReload(this.state.longPressOrderId, true));
       this._bind('card-action-unship', 'onclick', () => this.markShippedAndReload(this.state.longPressOrderId, false));
+      // ★ 手動キャンセル: キャンセル済にする / 解除 (表示フラグのみ・eBay非送信)
+      this._bind('card-action-cancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, true));
+      this._bind('card-action-uncancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, false));
       this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
 
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
@@ -1954,6 +1957,13 @@ const App = {
     if (shipBtn) shipBtn.style.display = (!hasTracking && !isFulfilled) ? '' : 'none';
     if (unshipBtn) unshipBtn.style.display = (!hasTracking && isFulfilled) ? '' : 'none';
 
+    // ★ 手動キャンセル: 未キャンセルなら「キャンセル済にする」、キャンセル済なら「解除」
+    const cancelMarkBtn = document.getElementById('card-action-cancelmark');
+    const uncancelBtn = document.getElementById('card-action-uncancelmark');
+    const isCancelled = !!(order && order.cancelledAt);
+    if (cancelMarkBtn) cancelMarkBtn.style.display = isCancelled ? 'none' : '';
+    if (uncancelBtn) uncancelBtn.style.display = isCancelled ? '' : 'none';
+
     overlay.classList.remove('hidden');
     // オーバーレイ外タップで閉じる
     overlay.onclick = (e) => {
@@ -1979,6 +1989,27 @@ const App = {
       const r = await API.recoveryMarkShipped(orderId, shipped);
       if (r && r.ok) {
         showToast(shipped ? '✓ 発送済にしました' : '↩ 発送済を解除しました');
+        this.loadAll();
+      } else {
+        showToast('失敗: ' + ((r && r.reason) || 'unknown'));
+      }
+    } catch (e) {
+      showToast('エラー: ' + (e.message || e));
+    }
+  },
+
+  // ★ 手動「キャンセル済にする / 解除」(表示フラグのみ・eBay非送信)
+  async markCancelledAndReload(orderId, cancelled) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    const msg = cancelled
+      ? orderId + ' を「キャンセル済」にしますか？\n\n※ 表示フラグのみで、eBay には何も送信しません。\nAPI で確認できない注文を手動でキャンセル扱いにし、一覧から隠します。'
+      : orderId + ' の「キャンセル済」を解除しますか？';
+    if (!window.confirm(msg)) return;
+    try {
+      const r = await API.recoveryMarkCancelled(orderId, cancelled);
+      if (r && r.ok) {
+        showToast(cancelled ? '⊘ キャンセル済にしました' : '↩ キャンセルを解除しました');
         this.loadAll();
       } else {
         showToast('失敗: ' + ((r && r.reason) || 'unknown'));

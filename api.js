@@ -204,6 +204,18 @@ const API = {
     });
   },
 
+  /**
+   * 手動「キャンセル済にする/解除」(AP=cancelledAt)。eBay非送信・表示フラグのみ。
+   */
+  async recoveryMarkCancelled(orderId, cancelled) {
+    return this._post({
+      action: 'recoveryMarkCancelled',
+      secret: this.config.secret,
+      orderId: orderId,
+      cancelled: cancelled
+    });
+  },
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);
