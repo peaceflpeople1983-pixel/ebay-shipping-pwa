@@ -192,6 +192,18 @@ const API = {
     });
   },
 
+  /**
+   * Phase B: 手動「発送済にする/解除」(AS=FULFILLED/'')。eBay非送信・表示フラグのみ。
+   */
+  async recoveryMarkShipped(orderId, shipped) {
+    return this._post({
+      action: 'recoveryMarkShipped',
+      secret: this.config.secret,
+      orderId: orderId,
+      shipped: shipped
+    });
+  },
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);

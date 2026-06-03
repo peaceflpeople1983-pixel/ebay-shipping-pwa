@@ -126,15 +126,12 @@
       const cards = cands.map(c => this._buildCard(c)).join('');
       content.innerHTML = note + cards;
 
-      // ボタンにイベントを bind
+      // ボタンにイベントを bind（api_ok / api_shipped / api_cancelled は rec-api-、api_missing は rec-email-）
       cands.forEach(c => {
-        if (c.status === 'api_ok') {
-          const b = document.getElementById('rec-api-' + c.orderId);
-          if (b) b.onclick = () => this.fetchOne(c.orderId, b);
-        } else if (c.status === 'api_missing') {
-          const b = document.getElementById('rec-email-' + c.orderId);
-          if (b) b.onclick = () => this.addFromEmail(c.orderId, b);
-        }
+        const apiBtn = document.getElementById('rec-api-' + c.orderId);
+        if (apiBtn) apiBtn.onclick = () => this.fetchOne(c.orderId, apiBtn);
+        const emailBtn = document.getElementById('rec-email-' + c.orderId);
+        if (emailBtn) emailBtn.onclick = () => this.addFromEmail(c.orderId, emailBtn);
       });
     },
 
@@ -176,6 +173,32 @@
           '</div>'
         );
       }
+      if (c.status === 'api_shipped') {
+        return (
+          '<div class="rec-card ok" data-oid="' + escAttrR_(c.orderId) + '">' +
+            '<div class="rec-card-top"><span class="rec-status ok">✓ 発送済</span>' +
+              '<span class="rec-oid">' + oid + '</span></div>' +
+            '<div class="rec-acc">' + escHtmlR_(c.account) + ' · eBay上で発送済 (FULFILLED)</div>' +
+            '<div class="rec-line">この注文は発送済みです。記録すると一覧に「✓ 発送済」で入り、「発送済を隠す」で隠せます。</div>' +
+            '<div class="rec-actions">' +
+              '<button class="rec-btn rec-btn-api" id="rec-api-' + escAttrR_(c.orderId) + '">✓ 取込（発送済として記録）</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      if (c.status === 'api_cancelled') {
+        return (
+          '<div class="rec-card unknown" data-oid="' + escAttrR_(c.orderId) + '">' +
+            '<div class="rec-card-top"><span class="rec-status unknown">⊘ キャンセル済</span>' +
+              '<span class="rec-oid">' + oid + '</span></div>' +
+            '<div class="rec-acc">' + escHtmlR_(c.account) + ' · eBay上でキャンセル</div>' +
+            '<div class="rec-line">この注文はキャンセル済みです。記録すると一覧に「⊘ キャンセル済」で入り、「キャンセル済を隠す」で隠せます。</div>' +
+            '<div class="rec-actions">' +
+              '<button class="rec-btn rec-btn-disabled" id="rec-api-' + escAttrR_(c.orderId) + '" style="background:#5A5A5A;color:#fff;cursor:pointer;">⊘ 取込（キャンセル済として記録）</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
       // unknown
       return (
         '<div class="rec-card unknown" data-oid="' + escAttrR_(c.orderId) + '">' +
@@ -191,22 +214,25 @@
     async fetchOne(orderId, btn) {
       if (state.busy) return;
       state.busy = true;
+      const origLabel = btn ? btn.textContent : '';
       if (btn) { btn.disabled = true; btn.textContent = '取込中...'; }
       try {
         const r = await API.recoveryFetchOne(orderId);
-        if (r && r.ok) {
-          toastR_('✓ API取込しました: ' + orderId);
+        if (r && r.ok && (r.added || 0) > 0) {
+          const label = r.sub === 'cancelled' ? 'キャンセル済として記録'
+            : (r.sub === 'shipped' ? '発送済として記録' : 'API取込');
+          toastR_('✓ ' + label + ': ' + orderId);
           this._removeCard(orderId);
           this._decrementCount();
           if (window.App && typeof App.loadAll === 'function') App.loadAll();
         } else {
           const reason = (r && r.reason) || 'unknown';
           toastR_('取込できませんでした (' + reason + ')');
-          if (btn) { btn.disabled = false; btn.textContent = '⬇ API取込（フル情報）'; }
+          if (btn) { btn.disabled = false; btn.textContent = origLabel; }
         }
       } catch (e) {
         toastR_('取込エラー: ' + (e.message || e));
-        if (btn) { btn.disabled = false; btn.textContent = '⬇ API取込（フル情報）'; }
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
       } finally {
         state.busy = false;
       }

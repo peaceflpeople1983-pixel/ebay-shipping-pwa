@@ -165,6 +165,9 @@ const App = {
       this._bind('btn-print-mark', 'onclick', () => this.markPrintedAndReturn());
       this._bind('card-action-print', 'onclick', () => this.openIndividualPrint(this.state.longPressOrderId));
       this._bind('card-action-unmark', 'onclick', () => this.unmarkPrintedAndReload(this.state.longPressOrderId));
+      // ★ Phase B: 発送済にする / 解除 (表示フラグのみ・eBay非送信)
+      this._bind('card-action-ship', 'onclick', () => this.markShippedAndReload(this.state.longPressOrderId, true));
+      this._bind('card-action-unship', 'onclick', () => this.markShippedAndReload(this.state.longPressOrderId, false));
       this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
 
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
@@ -516,7 +519,7 @@ const App = {
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
-    if (hideShipped) orders = orders.filter(o => !o.trackingNumber);
+    if (hideShipped) orders = orders.filter(o => !(o.trackingNumber || o.fulfillmentStatus === 'FULFILLED'));
     // ★ v1.0 キャンセル通知: キャンセル済 (未印刷 + AP列マーク済) を隠す
     const hideCancelHistoryEl = document.getElementById('filter-hide-cancel');
     const hideCancelHistory = hideCancelHistoryEl ? hideCancelHistoryEl.checked : false;
@@ -574,7 +577,7 @@ const App = {
         ? `<img class="order-thumb" src="${escapeAttr(o.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;order-thumb-placeholder&quot;>&#128230;</div>'">`
         : `<div class="order-thumb-placeholder">&#128230;</div>`;
       // v3.13: 発送済情報の組み立て
-      const isShipped = !!o.trackingNumber;
+      const isShipped = !!(o.trackingNumber || o.fulfillmentStatus === 'FULFILLED');
       const shippedBadge = isShipped ? '<span class="badge shipped">✓ 発送済</span>' : '';
       // v3.15: CPaSS 未取込警告バッジ (発送済かつ未取込のみ)
       const cpassUnimportedBadge = o.cpass_unimported ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
@@ -1261,7 +1264,7 @@ const App = {
       var total = 0;
       for (var i = 0; i < orders.length; i++) {
         var o = orders[i];
-        if (!o || o.trackingNumber) continue;            // 発送済は対象外
+        if (!o || o.trackingNumber || o.fulfillmentStatus === 'FULFILLED') continue;  // 発送済は対象外
         var oid = String(o.orderId || '');
         if (!oid || seen[oid]) continue;                  // orderId 単位でユニーク
         var meta;
@@ -1941,6 +1944,16 @@ const App = {
       }
     }
 
+    // ★ Phase B: 発送済にする / 解除 の表示制御
+    //   - 発送済にする: まだ発送済でない (追跡なし AND FULFILLEDでない)
+    //   - 発送済を解除 : 手動/API で FULFILLED かつ 追跡番号なし (=手動マーク相当)
+    const shipBtn = document.getElementById('card-action-ship');
+    const unshipBtn = document.getElementById('card-action-unship');
+    const hasTracking = !!(order && order.trackingNumber);
+    const isFulfilled = !!(order && order.fulfillmentStatus === 'FULFILLED');
+    if (shipBtn) shipBtn.style.display = (!hasTracking && !isFulfilled) ? '' : 'none';
+    if (unshipBtn) unshipBtn.style.display = (!hasTracking && isFulfilled) ? '' : 'none';
+
     overlay.classList.remove('hidden');
     // オーバーレイ外タップで閉じる
     overlay.onclick = (e) => {
@@ -1952,6 +1965,27 @@ const App = {
     const overlay = document.getElementById('card-action-overlay');
     if (overlay) overlay.classList.add('hidden');
     this.state.longPressOrderId = null;
+  },
+
+  // ★ Phase B: 手動「発送済にする / 解除」(表示フラグのみ・eBay非送信)
+  async markShippedAndReload(orderId, shipped) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    const msg = shipped
+      ? orderId + ' を「発送済」にしますか？\n\n※ これは PWA の表示フラグのみで、eBay には何も送信しません。\neBay へ追跡番号を登録するには「追跡スキャン」を使ってください。'
+      : orderId + ' の「発送済」を解除しますか？';
+    if (!window.confirm(msg)) return;
+    try {
+      const r = await API.recoveryMarkShipped(orderId, shipped);
+      if (r && r.ok) {
+        showToast(shipped ? '✓ 発送済にしました' : '↩ 発送済を解除しました');
+        this.loadAll();
+      } else {
+        showToast('失敗: ' + ((r && r.reason) || 'unknown'));
+      }
+    } catch (e) {
+      showToast('エラー: ' + (e.message || e));
+    }
   },
 
   doBrowserPrint() {
