@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="zonos.css">
 <link rel="stylesheet" href="tracking_scan.css">
 <link rel="stylesheet" href="cancel_notice.css">
+<link rel="stylesheet" href="recovery.css">
 <title>eBay Ship Optimizer</title>
 </head>
 <body>
@@ -45,6 +46,11 @@
           <span class="scan-pill-icon">🚨</span>
           <span class="scan-pill-label">キャンセル</span>
           <span id="cancel-check-badge" class="hidden">0</span>
+        </button>
+        <button class="scan-pill" id="btn-recovery" title="未取得order を取込">
+          <span class="scan-pill-icon">📥</span>
+          <span class="scan-pill-label">未取得</span>
+          <span id="recovery-badge" class="hidden">0</span>
         </button>
         <button class="scan-pill" id="btn-scan-list" title="スキャンして開く">
           <span class="scan-pill-icon">📷</span>
@@ -308,6 +314,17 @@
     </div>
   </section>
  
+  <!-- ★ RECOVERY v1.2: 未取得order 取込画面 -->
+  <section id="screen-recovery" class="screen hidden">
+    <header class="head">
+      <button class="icon" id="btn-recovery-back">←</button>
+      <h1>📥 未取得order 取込</h1>
+      <button class="icon" id="btn-recovery-reload" title="再確認">⟳</button>
+    </header>
+    <div id="recovery-loader" class="hidden">API確認中...</div>
+    <div id="recovery-content" class="content"></div>
+  </section>
+ 
   <div id="card-action-overlay" class="overlay hidden">
     <div class="card-action-menu">
       <div class="card-action-target" id="card-action-target">—</div>
@@ -348,6 +365,8 @@
 <script src="zonos.js"></script>
 <script src="tracking_scan.js"></script>
 <script src="cancel_notice.js"></script>
+<script src="recovery.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
+ 
