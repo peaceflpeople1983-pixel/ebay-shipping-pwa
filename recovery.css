@@ -1,0 +1,98 @@
+/**
+ * recovery.css — 注文取得リカバリ機能スタイル (新規 / RECOVERY_PLAN v1.2)
+ * 既存 style.css を上書きせず追加で読み込む。配色は既存 PWA に合わせる。
+ */
+
+/* ヘッダーボタンのバッジ (キャンセル通知バッジと同系) */
+#recovery-badge {
+  background: #E8A33D;
+  color: #3a2600;
+  border-radius: 999px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 16px;
+  text-align: center;
+  margin-left: 2px;
+}
+#recovery-badge.hidden { display: none; }
+
+/* 取込画面 */
+#screen-recovery .recovery-screen-note {
+  font-size: 12px;
+  color: #4a5568;
+  background: #E8EEF9;
+  border-left: 3px solid #4472C4;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+#recovery-loader { padding: 24px; text-align: center; color: #888; }
+.recovery-empty { padding: 24px; text-align: center; color: #5a5a5a; }
+.recovery-error { padding: 16px; color: #A32D2D; }
+
+.rec-card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.rec-card.ok { border-left: 4px solid #0F6E56; }
+.rec-card.missing { border-left: 4px solid #A32D2D; }
+.rec-card.unknown { border-left: 4px solid #909090; }
+
+.rec-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rec-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.rec-status.ok { background: #E1F5EE; color: #0F6E56; }
+.rec-status.missing { background: #FDE0E0; color: #A32D2D; }
+.rec-status.unknown { background: #ECECEC; color: #606060; }
+.rec-oid { font-family: ui-monospace, monospace; font-size: 13.5px; font-weight: 600; flex: 1; word-break: break-all; }
+.rec-acc { font-size: 11px; color: #606060; }
+.rec-line { font-size: 12px; color: #606060; margin: 3px 0; }
+
+.rec-preview { background: #F7F8FA; border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 11.5px; line-height: 1.7; }
+.rec-preview .pv-row { display: grid; grid-template-columns: 56px 1fr; gap: 6px; }
+.rec-preview .pv-label { color: #909090; font-size: 10px; }
+
+.rec-actions { display: flex; gap: 8px; margin-top: 8px; }
+.rec-btn { border: none; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 600; flex: 1; cursor: pointer; }
+.rec-btn-api { background: #0F6E56; color: #fff; }
+.rec-btn-email { background: #fff; color: #A32D2D; border: 1.5px solid #A32D2D; }
+.rec-btn-disabled { background: #ECECEC; color: #909090; cursor: default; }
+.rec-warn-note { font-size: 10.5px; color: #BA7517; margin-top: 6px; }
+
+/* ★ ヘッダー「未発送の注文」縦積み是正 (RECOVERY_PLAN G2)
+   タイトル行とアクション行を分離。タイトルは横表示固定、ボタン行は横スクロール。
+   #screen-list のヘッダーにのみ適用 (他画面のヘッダーは不変)。 */
+#screen-list > .head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  align-items: center;
+}
+#screen-list > .head > h1 {
+  flex: 1 1 100%;        /* タイトルを単独行に */
+  white-space: nowrap;   /* 1文字ずつの縦折れを防止 */
+  min-width: 0;
+}
+#screen-list > .head > .head-actions {
+  flex: 1 1 100%;        /* ボタンを次の行へ */
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;      /* ボタンが増えても横スクロール */
+  -webkit-overflow-scrolling: touch;
+  gap: 6px;
+}
+#screen-list > .head > .head-actions::-webkit-scrollbar { display: none; }
+#screen-list > .head > .head-actions > * { flex-shrink: 0; }
+
+/* 注文カードの「メール由来(仮)」バッジ + 装飾 */
+.badge.recovery-email-badge {
+  background: #FFF1D6;
+  color: #8A5A00;
+  border: 1px dashed #BA7517;
+}
+.order-item.recovery-provisional {
+  border-left: 4px solid #BA7517;
+  background: #FFFDF7;
+}
