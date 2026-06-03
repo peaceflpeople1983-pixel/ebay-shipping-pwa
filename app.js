@@ -51,7 +51,7 @@ const App = {
     _longPressTimer: null,
     _longPressTriggered: false
   },
- 
+
   async init() {
     // 設定画面のボタンは常にバインド（後で歯車アイコンから設定変更したい時のため）
     this.bindSetup();
@@ -62,12 +62,12 @@ const App = {
     this.bindAll();
     await this.loadAll();
   },
- 
+
   show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
   },
- 
+
   bindSetup() {
     const saveBtn = document.getElementById('btn-save-config');
     if (saveBtn) {
@@ -91,7 +91,7 @@ const App = {
         saveBtn.style.opacity = '1';
       }, { passive: true });
     }
- 
+
     const clearBtn = document.getElementById('btn-clear-cache');
     if (clearBtn) {
       clearBtn.textContent = '✓ マスタキャッシュをクリア';
@@ -111,13 +111,13 @@ const App = {
       }, { passive: true });
     }
   },
- 
+
   /** 要素が存在する場合のみハンドラを設定（防御） */
   _bind(id, eventName, handler) {
     const el = document.getElementById(id);
     if (el) el[eventName] = handler;
   },
- 
+
   bindAll() {
     try {
       this._bind('btn-sync', 'onclick', () => this.sync());
@@ -131,15 +131,15 @@ const App = {
       this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
       // ★ v1.0 キャンセル通知: キャンセル済隠すフィルタ
       this._bind('filter-hide-cancel', 'onchange', () => this.renderOrders());
- 
+
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
       this._bind('btn-home-input', 'onclick', () => this.goHome());
       this._bind('btn-home-result', 'onclick', () => this.goHome());
- 
+
       this._bind('btn-calculate', 'onclick', () => this.calculate());
       this._bind('btn-confirm', 'onclick', () => this.confirmShipment());
- 
+
       this._bind('btn-ocr', 'onclick', () => {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => {
@@ -152,10 +152,10 @@ const App = {
         OCR.setKnownOrders(this.state.orders);
         OCR.open(orderId => this.handleScanFromList(orderId));
       });
- 
+
       // v3.15: CPaSS 取込実行ボタン
       this._bind('btn-cpass-import', 'onclick', () => this.runCpassImport());
- 
+
       // v3.16: 印刷機能
       this._bind('btn-bulk-print', 'onclick', () => this.openBulkPrint());
       this._bind('btn-back-print', 'onclick', () => this.goHome());
@@ -172,7 +172,7 @@ const App = {
       this._bind('card-action-cancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, true));
       this._bind('card-action-uncancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, false));
       this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
- 
+
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
         if (confirm('本日の作業グループをクリアしますか？（発送履歴は残ります）')) {
@@ -181,7 +181,7 @@ const App = {
           showToast('本日グループをクリアしました');
         }
       });
- 
+
       this._bind('btn-ocr-cancel', 'onclick', () => {
         this.state.batchScanActive = false;
         OCR.keepOpen = false;
@@ -189,7 +189,7 @@ const App = {
         this.renderOrders();
       });
       this._bind('btn-ocr-capture', 'onclick', () => OCR.capture());
- 
+
       // 数値入力用フローティングツールバー（重量→長→幅→高、最終フィールドで完了）
       this.bindNumericToolbar();
     } catch (err) {
@@ -197,9 +197,9 @@ const App = {
       showToast('初期化エラー: ' + err.message);
     }
   },
- 
+
   NUMERIC_CHAIN: ['input-weight', 'input-length', 'input-width', 'input-height'],
- 
+
   /**
    * 数値入力用フローティングツールバーをバインド。
    * iPhone数値キーパッドには「次へ」キーが構造的に無いため、
@@ -215,7 +215,7 @@ const App = {
     const doneBtn = document.getElementById('kb-done');
     if (!toolbar || !prevBtn || !nextBtn || !doneBtn) return;
     const chain = this.NUMERIC_CHAIN;
- 
+
     // ===== ツールバーをキーボードの真上に固定するための VisualViewport 連動 =====
     // iOS Safari は position:fixed bottom:0 がキーボード裏に隠れるため、
     // 見えている領域（visualViewport）の下端に合わせて動的に top を設定する
@@ -235,18 +235,18 @@ const App = {
       toolbar.style.left = vv.offsetLeft + 'px';
       toolbar.style.width = vv.width + 'px';
     };
- 
+
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', syncPosition);
       window.visualViewport.addEventListener('scroll', syncPosition);
     }
     window.addEventListener('resize', syncPosition);
     window.addEventListener('orientationchange', () => setTimeout(syncPosition, 100));
- 
+
     // 最後にフォーカスされていた数値フィールドのインデックスを保持
     // （ボタンタップ時に activeElement が body 等になるため、これを信頼ソースに使う）
     let lastFocusedIdx = -1;
- 
+
     const updateToolbar = () => {
       const active = document.activeElement;
       const idx = active ? chain.indexOf(active.id) : -1;
@@ -269,7 +269,7 @@ const App = {
       setTimeout(syncPosition, 100);
       setTimeout(syncPosition, 300);
     };
- 
+
     const focusByIndex = (idx) => {
       if (idx < 0 || idx >= chain.length) return;
       const el = document.getElementById(chain[idx]);
@@ -279,7 +279,7 @@ const App = {
       try { el.select(); } catch (_) {}
       updateToolbar();
     };
- 
+
     // 各数値フィールドのフォーカス/ブラー監視
     chain.forEach((id, idx) => {
       const el = document.getElementById(id);
@@ -302,7 +302,7 @@ const App = {
         }
       });
     });
- 
+
     // 共通ボタンハンドラ。
     // iOS では touchstart で preventDefault するとクリックも止まるので、
     // touchstart で直接アクションを起こし、その後の click 重複発火はフラグでブロック。
@@ -322,11 +322,11 @@ const App = {
         action();
       });
     };
- 
+
     wireButton(prevBtn, () => {
       if (lastFocusedIdx > 0) focusByIndex(lastFocusedIdx - 1);
     });
- 
+
     wireButton(nextBtn, () => {
       if (lastFocusedIdx === -1) return;
       if (lastFocusedIdx === chain.length - 1) {
@@ -340,7 +340,7 @@ const App = {
         focusByIndex(lastFocusedIdx + 1);
       }
     });
- 
+
     wireButton(doneBtn, () => {
       const idx = (lastFocusedIdx !== -1) ? lastFocusedIdx : (document.activeElement ? chain.indexOf(document.activeElement.id) : -1);
       if (idx !== -1) {
@@ -352,7 +352,7 @@ const App = {
       this.calculate();
     });
   },
- 
+
   goHome() {
     this.show('screen-list');
     this.renderOrders();
@@ -360,7 +360,7 @@ const App = {
       showToast('Sheetsへ書込み中... (' + this.state.pendingWrites + '件)');
     }
   },
- 
+
   handleScanFromList(orderId) {
     const found = this.state.orders.find(o => o.orderId === orderId);
     if (found) {
@@ -371,7 +371,7 @@ const App = {
       showToast('注文ID ' + orderId + ' が見つかりません');
     }
   },
- 
+
   startBatchScan() {
     this.state.batchScanActive = true;
     OCR.setKnownOrders(this.state.orders);
@@ -386,7 +386,7 @@ const App = {
       this.renderOrders();
     }, { keepOpen: true });
   },
- 
+
   async loadAll() {
     this.show('screen-list');
     this.setLoader(true);
@@ -437,7 +437,7 @@ const App = {
       this.setLoader(false);
     }
   },
- 
+
   pruneTodayGroup() {
     const g = TodayGroup.load();
     if (!g.ids.length) return;
@@ -448,11 +448,11 @@ const App = {
     });
     if (removed > 0) showToast(removed + '件の発送完了を本日グループから除外しました');
   },
- 
+
   setLoader(show) {
     document.getElementById('list-loader').classList.toggle('hidden', !show);
   },
- 
+
   populateCountrySelect() {
     const sel = document.getElementById('input-country');
     sel.innerHTML = '';
@@ -486,12 +486,12 @@ const App = {
     });
     sel.appendChild(og2);
   },
- 
+
   recordRecentCountry(code) {
     this.recentCountries = [code, ...this.recentCountries.filter(c => c !== code)].slice(0, 10);
     localStorage.setItem('recent_countries', JSON.stringify(this.recentCountries));
   },
- 
+
   renderOrders() {
     try {
       this._renderOrdersImpl();
@@ -505,7 +505,7 @@ const App = {
       }
     }
   },
- 
+
   _renderOrdersImpl() {
     const filterAcc = document.getElementById('filter-account').value;
     const hideDone = document.getElementById('filter-hide-done').checked;
@@ -518,7 +518,7 @@ const App = {
     const urgentOnlyEl = document.getElementById('filter-urgent-only');
     const urgentOnly = urgentOnlyEl ? urgentOnlyEl.checked : false;
     const list = document.getElementById('order-list');
- 
+
     let orders = this.state.orders;
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
@@ -548,7 +548,7 @@ const App = {
         } catch (e) { return false; }
       });
     }
- 
+
     const todayBar = document.getElementById('today-bar');
     const todayCount = TodayGroup.count();
     if (todayCount > 0) {
@@ -557,22 +557,25 @@ const App = {
     } else {
       todayBar.classList.add('hidden');
     }
- 
+
     // v3.18.8: 発送期日警告バナーを更新 (フィルタに依らず全注文で集計)
     this._updateDeadlineBanner();
- 
+
+    // v3.18.16: 発送ポリシー不明バナーを更新 (H列空の未発送があれば Seller Hub CSV取込を促す)
+    this._updatePolicyBanner();
+
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近60日／入力済を隠す／発送済を隠す）</span></div>';
       return;
     }
- 
+
     const todaySet = new Set(TodayGroup.load().ids);
     const sortedOrders = orders.slice().sort((a, b) => {
       const ta = todaySet.has(a.orderId) ? 0 : 1;
       const tb = todaySet.has(b.orderId) ? 0 : 1;
       return ta - tb;
     });
- 
+
     list.innerHTML = sortedOrders.slice().reverse().map(o => {
       const inToday = todaySet.has(o.orderId);
       const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
@@ -593,15 +596,15 @@ const App = {
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
             <div class="ship-tracking">${escapeHtml(o.trackingNumber)}</div>
           </div>` : '';
- 
+
       // v3.18: 同梱関連の要素を組み立て
       const dk = this._buildDoukonElements(o);
- 
+
       // OrderID 表示: 同梱代表/サブは枠付き、それ以外は素のテキスト
       const orderIdHtml = dk.idBoxHtml
         ? dk.idBoxHtml
         : `<div class="order-id">${escapeHtml(o.orderId)}</div>`;
- 
+
       // ★ キャンセル通知 v1.0: バッジ + class 追記
       const cancelClass = (window.CancelNotice && CancelNotice.buildItemClass)
         ? CancelNotice.buildItemClass(o)
@@ -616,7 +619,7 @@ const App = {
       const recoveryBadge = (window.Recovery && Recovery.buildBadge)
         ? Recovery.buildBadge(o)
         : '';
- 
+
       return `
       <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}${dk.itemClass}${cancelClass}${recoveryClass}" data-id="${escapeAttr(o.orderId)}" data-line-item-id="${escapeAttr(o.lineItemId || '')}">
         ${dk.bannerHtml}
@@ -645,14 +648,14 @@ const App = {
         </div>
       </div>`;
     }).join('');
- 
+
     // v3.16: 長押し対応 + 通常クリック
     list.querySelectorAll('.order-item').forEach(el => {
       const orderId = el.dataset.id;
       this._bindCardLongPress(el, orderId);
     });
   },
- 
+
   /**
    * v3.16: カードの長押し検出 (500ms) + 通常クリック
    * - 長押し: 個別印刷/印刷済解除メニューを開く
@@ -663,7 +666,7 @@ const App = {
     let pressTimer = null;
     let triggered = false;
     let startY = 0;
- 
+
     const cleanup = () => {
       if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
     };
@@ -683,26 +686,26 @@ const App = {
       cleanup();
       // triggered フラグは showCardActionMenu 内で参照される
     };
- 
+
     // Touch
     el.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientY), { passive: true });
     el.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientY), { passive: true });
     el.addEventListener('touchend', handleEnd, { passive: true });
     el.addEventListener('touchcancel', cleanup, { passive: true });
- 
+
     // Mouse (PC)
     el.addEventListener('mousedown', (e) => handleStart(e.clientY));
     el.addEventListener('mousemove', (e) => { if (pressTimer) handleMove(e.clientY); });
     el.addEventListener('mouseup', handleEnd);
     el.addEventListener('mouseleave', cleanup);
- 
+
     // 右クリック (PC) でも長押しメニューを開く
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       triggered = true;
       this.showCardActionMenu(orderId);
     });
- 
+
     // クリック: 長押しでなければ openInput
     el.addEventListener('click', (e) => {
       if (triggered) {
@@ -715,12 +718,12 @@ const App = {
       this.openInput(orderId);
     });
   },
- 
+
   openInput(orderId) {
     let order = orderId ? this.state.orders.find(o => o.orderId === orderId) : null;
     this.state.currentOrder = order;
     document.getElementById('input-account').textContent = order ? order.account : '（手動入力）';
- 
+
     // サムネ画像＋商品名（index.htmlが旧版なら要素なし→スキップ）
     const thumbWrap = document.getElementById('input-thumb-wrap');
     const titleEl = document.getElementById('input-item-title');
@@ -733,10 +736,10 @@ const App = {
       }
     }
     if (titleEl) titleEl.textContent = (order && order.itemTitle) ? order.itemTitle : '';
- 
+
     document.getElementById('input-order-id').value = order ? order.orderId : '';
     document.getElementById('input-country').value = order ? order.country : '';
- 
+
     // v3.14/v3.15: CPaSS パッケージ番号 または 未取込警告 (発送先国と梱包後重量の間)
     const cpassRow = document.getElementById('input-cpass-row');
     const cpassNo = document.getElementById('input-cpass-no');
@@ -757,7 +760,7 @@ const App = {
         if (cpassWarning) cpassWarning.classList.add('hidden');
       }
     }
- 
+
     // v3.12: order.weightG は実際は kg 単位（Apps Script の getOrders が I列=weightKg を weightG 名で返している）
     // 入力欄は g 単位なので kg→g 変換。1未満なら kg と判断して1000倍、それ以上ならそのまま g として扱う
     const wRaw = order && order.weightG;
@@ -789,7 +792,7 @@ const App = {
       } catch (_) {}
     }
   },
- 
+
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -797,7 +800,7 @@ const App = {
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
   },
- 
+
   calculate() {
     const order = this.state.currentOrder;
     const country = document.getElementById('input-country').value;
@@ -805,9 +808,9 @@ const App = {
     const lengthCm = this._readNum('input-length');
     const widthCm = this._readNum('input-width');
     const heightCm = this._readNum('input-height');
- 
+
     if (!country) return showToast('発送先国を選択してください');
- 
+
     // v3.12: 重量が極端に小さい（< 10g）場合は kg 入力と判断して救済
     if (weightG !== null && weightG > 0 && weightG < 10) {
       const corrected = Math.round(weightG * 1000);
@@ -816,7 +819,7 @@ const App = {
         document.getElementById('input-weight').value = weightG;
       }
     }
- 
+
     const missing = [];
     if (!weightG || weightG <= 0) missing.push('重量');
     if (!lengthCm || lengthCm <= 0) missing.push('長');
@@ -826,7 +829,7 @@ const App = {
       console.log('[Validation NG]', { country, weightG, lengthCm, widthCm, heightCm });
       return showToast(missing.join('・') + ' が未入力または0です');
     }
- 
+
     const input = {
       country: country,
       weightG: Math.round(weightG),
@@ -844,13 +847,13 @@ const App = {
     this.renderResult(result);
     this.show('screen-result');
   },
- 
+
   renderResult(result) {
     document.getElementById('m-actual').textContent = result.context.actualG + ' g';
     document.getElementById('m-vol8').textContent = result.context.vol8000G + ' g';
     document.getElementById('m-vol5').textContent = result.context.vol5000G + ' g';
     document.getElementById('m-country').textContent = result.context.country;
- 
+
     const list = document.getElementById('result-list');
     if (result.candidates.length === 0) {
       list.innerHTML = '<div class="empty">利用可能な発送方法がありません<br>サイズ・重量を確認してください</div>';
@@ -864,7 +867,7 @@ const App = {
     const hintHtml = (recommendedTypes.length > 0)
       ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
       : '';
- 
+
     const legendHtml = `
       <div class="legend">
         <div class="legend-item"><span class="carrier-circle c-epacket"></span>ePacketライト</div>
@@ -878,7 +881,7 @@ const App = {
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
       const isRecommended = this.isRecommendedCarrier(c.carrier, recommendedTypes);
- 
+
       let breakdownHtml = '';
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
         breakdownHtml = `
@@ -892,7 +895,7 @@ const App = {
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
       }
- 
+
       return `
         <div class="result-card${isRecommended ? ' recommended' : ''}" data-idx="${i}">
           <div class="card-header">
@@ -923,7 +926,7 @@ const App = {
     const first = list.querySelector('.result-card');
     if (first) first.classList.add('selected');
     document.getElementById('btn-confirm').classList.remove('hidden');
- 
+
     if (result.context.tariffJPY > 0) {
       const order = this.state.currentOrder;
       const hsCode = order ? order.hsCode : '';
@@ -939,7 +942,7 @@ const App = {
       `;
       list.appendChild(summary);
     }
- 
+
     // v3.11: 除外された配送会社と理由を末尾に表示（デバッグ可視化）
     if (result.excluded && result.excluded.length > 0) {
       const exDiv = document.createElement('div');
@@ -951,7 +954,7 @@ const App = {
       list.appendChild(exDiv);
     }
   },
- 
+
   getCarrierColorClass(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'c-epacket';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'c-dhl';
@@ -959,7 +962,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'c-eco';
     return 'c-eco';
   },
- 
+
   /**
    * v3.10: shipping policy から推奨する配送会社タイプ群を返す
    * v3.17.6: DHL/FedEx は既知の全 shipping policy で常時推奨表示する
@@ -978,7 +981,7 @@ const App = {
     if (policy.indexOf('Economy') !== -1) return ['epacket', 'dhl', 'fedex'];
     return [];
   },
- 
+
   /** v3.10: carrier 名と推奨タイプ群から、ハイライト対象か判定 */
   isRecommendedCarrier(carrier, types) {
     if (!types || types.length === 0) return false;
@@ -989,7 +992,7 @@ const App = {
     if (types.indexOf('fedex') !== -1 && c.indexOf('Ship via FedEx') !== -1) return true;
     return false;
   },
- 
+
   /**
    * v3.13: 発送日 "YYYY-MM-DD" → "M/D" 形式に整形
    * 不正な値や空はそのまま返す（カードで表示しないかは呼び出し元判断）
@@ -1000,7 +1003,7 @@ const App = {
     if (!m) return String(s);
     return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
   },
- 
+
   /**
    * v3.17: shipByDate (ISO 8601 UTC) を JST に変換し、緊急度メタデータを返す
    * v3.17.7: iOS Safari の任意例外 (RangeError "The string did not match...") を完全に捕捉
@@ -1048,7 +1051,7 @@ const App = {
       return grayResult;
     }
   },
- 
+
   /**
    * v3.17: Date を JST の "M/D(曜) HH:MM" に整形 (例: "5/22(金) 23:59")
    * v3.17.7: 完全例外捕捉 (Invalid Date のメソッド呼出も安全に)
@@ -1072,7 +1075,7 @@ const App = {
       return '';
     }
   },
- 
+
   /**
    * v3.18: 同梱グループラベル (A/B/C/D/E) → 色定義
    */
@@ -1083,7 +1086,7 @@ const App = {
     D: { bg: '#F0E5D3', fg: '#5C3A0E', border: '#C9A86E' }, // Sand
     E: { bg: '#DBF0F2', fg: '#0E5460', border: '#7AC0CC' }  // Cyan
   },
- 
+
   /**
    * v3.18: 同梱カードのHTML部品を一括で組み立て
    *  - 引数: order (doukonGroupLabel, doukonGroupSize, doukonRole, doukonGroupLeadId が必須)
@@ -1102,12 +1105,12 @@ const App = {
       const colors = this._doukonColors[label] || this._doukonColors.A;
       const isPattern2 = String(o.doukonGroupId).indexOf('P2-') === 0;
       const leadOrderId = String(o.doukonGroupLeadId || '');
- 
+
       // 1) カードに付与するクラス（左ボーダー色＋背景）
       const itemClass = isLead
         ? ' doukon doukon-lead doukon-' + label.toLowerCase()
         : (isSub ? ' doukon doukon-sub' : '');
- 
+
       // 2) 上部バナー
       const bannerLabel = isLead
         ? '📦 同梱グループ' + label + ' ・代表 ・' + groupSize + '点まとめて計測'
@@ -1116,16 +1119,16 @@ const App = {
         ? 'background:' + colors.bg + ';color:' + colors.fg + ';border:0.5px solid ' + colors.border + ';'
         : 'background:#ECECEC;color:#5A5A5A;border:0.5px solid #B4B2A9;';
       const bannerHtml = '<div class="doukon-banner" style="' + bannerStyle + '">' + escapeHtml(bannerLabel) + '</div>';
- 
+
       // 3) 📦 同梱X×N バッジ
       const badgeStyle = 'background:' + colors.bg + ';color:' + colors.fg + ';';
       const badgeHtml = '<span class="badge doukon-badge" style="' + badgeStyle + '">📦 同梱' + escapeHtml(label) + ' ×' + groupSize + '</span>';
- 
+
       // 4) サブタグ
       const subTagHtml = isSub
         ? '<span class="badge doukon-sub-tag">サブ' + (isPattern2 && leadOrderId ? ' → ' + escapeHtml(leadOrderId.substring(0, 8)) : '') + '</span>'
         : '';
- 
+
       // 5) ORDER ID 枠: 代表=実線+モノスペース、サブ=破線+取消線
       let idBoxHtml = '';
       if (isLead) {
@@ -1139,15 +1142,15 @@ const App = {
           + '<div class="doukon-id-value">' + escapeHtml(o.orderId) + '</div>'
           + '</div>';
       }
- 
+
       // 6) パターン2サブの赤警告バー
       const warningBarHtml = (isSub && isPattern2 && leadOrderId)
         ? '<div class="doukon-warning-bar">⚠️ このOrderIDはスキャン対象外 ・代表は <strong>' + escapeHtml(leadOrderId) + '</strong></div>'
         : '';
- 
+
       // 7) 同梱内訳ボックス（同グループの他メンバーをリスト）
       const breakdownHtml = this._buildDoukonBreakdown(o, colors, isPattern2, label);
- 
+
       return {
         itemClass: itemClass,
         bannerHtml: bannerHtml,
@@ -1162,7 +1165,7 @@ const App = {
       return empty;
     }
   },
- 
+
   /**
    * v3.18: 同梱内訳ボックスを構築
    *  - 同じ doukonGroupId に属する全注文（this.state.orders から）を列挙
@@ -1175,7 +1178,7 @@ const App = {
       // 同グループのメンバー
       const members = this.state.orders.filter(x => x && x.doukonGroupId === gid);
       if (members.length === 0) return '';
- 
+
       // 表示順: 代表→サブ。代表が複数いる場合はOrderId昇順
       members.sort((a, b) => {
         const ra = a.doukonRole === 'lead' ? 0 : 1;
@@ -1183,7 +1186,7 @@ const App = {
         if (ra !== rb) return ra - rb;
         return String(a.orderId).localeCompare(String(b.orderId));
       });
- 
+
       // 各行を HTML 化
       const rows = members.map((m, i) => {
         const isSelf = (m.orderId === o.orderId) && (String(m.lineItemId || '') === String(o.lineItemId || ''));
@@ -1200,15 +1203,15 @@ const App = {
           + tag
           + '</div>';
       }).join('');
- 
+
       const headLabel = isPattern2
         ? '📦 同梱' + label + ' 内訳 (' + members.length + '点・別OrderID/同一買主)'
         : '📦 同梱' + label + ' 内訳 (' + members.length + '点・同一OrderID)';
- 
+
       const buyerLine = (isPattern2 && o.buyerUsername)
         ? '<div class="dk-buyer">👤 buyer: <span class="dk-mono">' + escapeHtml(o.buyerUsername) + '</span></div>'
         : '';
- 
+
       const style = 'background:' + colors.bg + ';border:0.5px solid ' + colors.border + ';color:' + colors.fg + ';';
       return '<div class="doukon-breakdown" style="' + style + '">'
         + '<div class="dk-breakdown-head">' + escapeHtml(headLabel) + '</div>'
@@ -1220,7 +1223,7 @@ const App = {
       return '';
     }
   },
- 
+
   /**
    * v3.17: 一覧カード右上に表示する発送期日バッジHTMLを生成
    * v3.17.7: 完全防御 — 何があってもバッジを返す (空文字含む)
@@ -1250,7 +1253,7 @@ const App = {
       return '';
     }
   },
- 
+
   /**
    * v3.18.8: 発送期日警告バナーの表示制御
    *  - 残り7日以内(level: green/yellow/orange/red)の「未発送」注文が1件でもあれば表示
@@ -1292,7 +1295,7 @@ const App = {
       else if (counts.orange) subText = '⚠ 残り3〜4日が ' + counts.orange + '件あります';
       else if (counts.yellow) subText = '残り5〜6日が ' + counts.yellow + '件あります';
       else subText = '残り7日が ' + counts.green + '件あります';
- 
+
       var countEl = document.getElementById('deadline-banner-count');
       var subEl = document.getElementById('deadline-banner-sub');
       if (countEl) countEl.textContent = total + '件';
@@ -1304,7 +1307,43 @@ const App = {
       try { console.warn('_updateDeadlineBanner error:', e); } catch (_) {}
     }
   },
- 
+
+  /**
+   * v3.18.16: 発送ポリシー不明バナーの表示制御
+   *  - 「未発送」かつ shippingPolicy(H列)が空 の注文が1件でもあれば表示
+   *  - 同梱の重複を避けるため orderId 単位でユニークカウント
+   *  - Seller Hub の CSV を取り込むと H が埋まり、次回ロードで自動的に消える
+   */
+  _updatePolicyBanner() {
+    try {
+      var banner = document.getElementById('policy-banner');
+      if (!banner) return;
+      var orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+      var seen = {};
+      var total = 0;
+      for (var i = 0; i < orders.length; i++) {
+        var o = orders[i];
+        if (!o || o.trackingNumber || o.fulfillmentStatus === 'FULFILLED') continue; // 発送済は対象外
+        var oid = String(o.orderId || '');
+        if (!oid || seen[oid]) continue;                  // orderId 単位でユニーク
+        var policy = String(o.shippingPolicy || '').trim();
+        if (policy === '') {
+          seen[oid] = true;
+          total++;
+        }
+      }
+      if (total === 0) {
+        banner.classList.add('hidden');
+        return;
+      }
+      var countEl = document.getElementById('policy-banner-count');
+      if (countEl) countEl.textContent = total;
+      banner.classList.remove('hidden');
+    } catch (e) {
+      try { console.warn('_updatePolicyBanner error:', e); } catch (_) {}
+    }
+  },
+
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -1312,7 +1351,7 @@ const App = {
     if (carrier.indexOf('SpeedPAK Economy') !== -1) return 'SpeedPAK Eco';
     return carrier;
   },
- 
+
   /**
    * v3.14: CPaSS パッケージ番号 / ASIN を注文カードに描画
    * 引数: order.cpass オブジェクト (Apps Script の getOrders が JOIN して返す)
@@ -1321,7 +1360,7 @@ const App = {
   renderCpassInfo(cpass) {
     if (!cpass) return '';
     const parts = [];
- 
+
     if (cpass.package_no) {
       const sibling = cpass.sibling_count > 0
         ? '<span class="sibling-badge">同梱 +' + cpass.sibling_count + '</span>'
@@ -1335,7 +1374,7 @@ const App = {
         '</div>'
       );
     }
- 
+
     if (cpass.asin && cpass.amazon_jp_url) {
       parts.push(
         '<div class="cpass-asin">' +
@@ -1347,11 +1386,11 @@ const App = {
         '</div>'
       );
     }
- 
+
     if (parts.length === 0) return '';
     return '<div class="order-cpass-info">' + parts.join('') + '</div>';
   },
- 
+
   /**
    * v3.15: CPaSS バナーを表示/更新
    * - Inbox に取込待ちあり → 青いバナー + [取込実行] ボタン
@@ -1365,36 +1404,36 @@ const App = {
     const inboxCountEl = document.getElementById('cpass-inbox-count');
     const unimportedCountEl = document.getElementById('cpass-unimported-count');
     if (!banner || !inboxAlert || !unimportedAlert) return;
- 
+
     const status = this.state.cpassStatus;
     const inboxCount = status && status.inbox_pending_count ? status.inbox_pending_count : 0;
     const unimportedCount = status && status.unimported_count ? status.unimported_count : 0;
- 
+
     if (inboxCount > 0) {
       if (inboxCountEl) inboxCountEl.textContent = inboxCount;
       inboxAlert.classList.remove('hidden');
     } else {
       inboxAlert.classList.add('hidden');
     }
- 
+
     if (unimportedCount > 0) {
       if (unimportedCountEl) unimportedCountEl.textContent = unimportedCount;
       unimportedAlert.classList.remove('hidden');
     } else {
       unimportedAlert.classList.add('hidden');
     }
- 
+
     if (inboxCount > 0 || unimportedCount > 0) {
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
     }
   },
- 
+
   // ============================================================
   // v3.16: 印刷機能
   // ============================================================
- 
+
   /**
    * ヘッダーの印刷ボタンのバッジを更新 (バルク印刷対象数)
    */
@@ -1416,7 +1455,7 @@ const App = {
       console.error('updateBulkPrintBadge error:', e);
     }
   },
- 
+
   /**
    * 一括印刷を開始: 対象注文の印刷データを取得して印刷プレビュー画面へ
    */
@@ -1440,7 +1479,7 @@ const App = {
       showToast('印刷データ取得失敗: ' + e.message);
     }
   },
- 
+
   /**
    * 個別印刷: 指定注文1件のみ
    */
@@ -1462,7 +1501,7 @@ const App = {
       showToast('印刷データ取得失敗: ' + e.message);
     }
   },
- 
+
   /**
    * v3.17: 印刷プレビューを描画 (A4 1枚に 2商品・上下分割)
    * 奇数末尾の最終ペアは上カードのみ・下半分は空白
@@ -1472,30 +1511,30 @@ const App = {
     const countLabel = document.getElementById('print-count-label');
     const titleEl = document.getElementById('print-title');
     if (!area) return;
- 
+
     // v3.18.11: ★同梱表示が印刷で効かない問題の修正★
     //  getPrintData(Apps Script) は doukonGroupId/doukonRole しか返さず、
     //  doukonGroupLabel/Size/LeadId が欠落していたため _buildPrintDoukonElements が常に empty を返し、
     //  サブにも計測欄(defaultMeasure)が描画されていた。
     //  一覧用 this.state.orders は annotateDoukonLabels_ 済みなので、グループID単位で補完する。
     orders = this._enrichPrintDoukonLabels(orders);
- 
+
     // v3.18: 同梱グループは「代表→サブ」の順で連続配置。同梱なしの単独商品は元の順序維持。
     orders = this._reorderForDoukon(orders);
- 
+
     const total = orders.length;
     const pageCount = Math.ceil(total / 2);
     if (countLabel) countLabel.textContent = total + ' 件 / ' + pageCount + ' 枚 (1ページ2商品)';
     if (titleEl) titleEl.textContent = '📦 ピックアップシート印刷 (' + total + '件 / ' + pageCount + '枚)';
- 
+
     const dateStr = this._formatPrintDate(new Date());
- 
+
     // 2件ずつペアにグループ化
     const pairs = [];
     for (let i = 0; i < total; i += 2) {
       pairs.push([orders[i], orders[i + 1] || null]);
     }
- 
+
     // v3.18.6: ★iOS Safari 印刷崩れ修正★
     //  .print-pair ラッパーを廃止し、.print-page をフラットな兄弟として並べる。
     //  iOS Safari はラッパー div 内にネストされた要素の page-break-before を無視するため、
@@ -1512,12 +1551,12 @@ const App = {
     }).join('');
     area.innerHTML = html;
   },
- 
+
   _formatPrintDate(d) {
     const pad = n => (n < 10 ? '0' + n : '' + n);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   },
- 
+
   /**
    * v3.18.11: 印刷データに同梱ラベル情報(label/size/leadId)を補完する
    *  - getPrintData は doukonGroupId/doukonRole のみ返す。
@@ -1528,7 +1567,7 @@ const App = {
   _enrichPrintDoukonLabels(orders) {
     try {
       if (!Array.isArray(orders) || orders.length === 0) return orders;
- 
+
       // 1) 一覧(this.state.orders)から groupId -> 正準ラベルのマップ(あれば優先)
       const stateMap = {};
       if (Array.isArray(this.state.orders)) {
@@ -1542,7 +1581,7 @@ const App = {
           }
         });
       }
- 
+
       // 2) ★フォールバック★ groupId 未タグでも「同一OrderID複数明細(パターン1)」を自動検出
       //    getPrintData が AC列を返さない/シート未タグでも、同じ OrderID が複数行あれば
       //    同梱グループ扱い(代表=先頭明細, 以降=サブ)。ユーザー例 21-14641-67588(2 ASIN) を確実に拾う。
@@ -1563,7 +1602,7 @@ const App = {
           else { o.doukonRole = o.doukonRole || 'sub'; }
         }
       });
- 
+
       // 3) 印刷データ自身を groupId 単位に集計(出現順を保持)
       const groupOrder = [];
       const members = {};
@@ -1573,7 +1612,7 @@ const App = {
         if (!members[gid]) { members[gid] = []; groupOrder.push(gid); }
         members[gid].push(o);
       });
- 
+
       // 代表(lead)の特定 + role 未設定グループの補完(先頭=lead, 以降=sub)
       const leadOf = {};
       groupOrder.forEach(gid => {
@@ -1587,7 +1626,7 @@ const App = {
         const lead = arr.find(x => String(x.doukonRole || '') === 'lead') || arr[0];
         leadOf[gid] = lead ? String(lead.orderId || '') : '';
       });
- 
+
       // 4) ラベル(A,B,C…)を出現順で割当(state にあればそれを優先し一覧と一致させる)
       const LB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       let li = 0;
@@ -1596,7 +1635,7 @@ const App = {
         if (stateMap[gid] && stateMap[gid].label) labelOf[gid] = stateMap[gid].label;
         else { labelOf[gid] = LB.charAt(li % LB.length); li += 1; }
       });
- 
+
       // 5) 各注文へ反映(単独商品は groupId 無しなので一切変更しない)
       orders.forEach(o => {
         const gid = (o && o.doukonGroupId) ? String(o.doukonGroupId) : '';
@@ -1606,7 +1645,7 @@ const App = {
         o.doukonGroupLeadId = (stateMap[gid] && stateMap[gid].leadId) || leadOf[gid] || '';
         if (!o.buyerUsername && stateMap[gid] && stateMap[gid].buyer) o.buyerUsername = stateMap[gid].buyer;
       });
- 
+
       // 6) 内訳ブロック用にメンバーマップを保持(state.orders 非依存化)
       this.state.printGroupMembers = members;
       return orders;
@@ -1615,7 +1654,7 @@ const App = {
       return orders;
     }
   },
- 
+
   /**
    * v3.18: 印刷用に注文配列を並べ替える
    *  - 同梱グループは「代表→サブ」順で連続配置
@@ -1660,7 +1699,7 @@ const App = {
       return orders;
     }
   },
- 
+
   /**
    * v3.18: 印刷シート用の同梱要素を組み立て
    *  - bannerHtml: 上部の同梱バナー
@@ -1682,7 +1721,7 @@ const App = {
       const colors = this._doukonColors[label] || this._doukonColors.A;
       const isPattern2 = String(o.doukonGroupId).indexOf('P2-') === 0;
       const leadOrderId = String(o.doukonGroupLeadId || '');
- 
+
       // バナー
       const bannerText = isLead
         ? '📦 同梱グループ' + label + ' ・代表 ・' + groupSize + '点まとめて計測'
@@ -1691,16 +1730,16 @@ const App = {
         ? 'background:' + colors.bg + ';color:' + colors.fg + ';border:0.5px solid ' + colors.border + ';'
         : 'background:#ECECEC;color:#5A5A5A;border:0.5px solid #B4B2A9;';
       const bannerHtml = '<div class="pp-doukon-banner-wrap"><span class="pp-doukon-banner" style="' + bannerStyle + '">' + escapeHtml(bannerText) + '</span></div>';
- 
+
       // パターン2 サブの赤警告バー
       const warningHtml = (isSub && isPattern2)
         ? '<div class="pp-doukon-warning">⚠️ このOrderIDはスキャン対象外です（代表シートをご使用ください） ・代表 <strong>' + escapeHtml(leadOrderId) + '</strong></div>'
         : '';
- 
+
       // ORDER ID 枠の装飾切替
       const frameClass = isSub ? ' doukon-sub' : '';
       const idLabel = isSub ? '🚫 PICKUP REF (撮影不可)' : '📷 ORDER ID';
- 
+
       // 内訳ブロック
       // v3.18.11: メンバーは印刷側マップ(_enrichPrintDoukonLabels が構築)を優先。
       //   state.orders がフィルタで欠けていても内訳が出るようにする。
@@ -1743,18 +1782,18 @@ const App = {
             + '</div>';
         }
       }
- 
+
       const measureHtml = isSub
         ? '<div class="pp-measure doukon-sub-note"><div class="pp-measure-label">⚖ 計測欄なし</div>※ 重量・寸法は代表シート <strong>' + escapeHtml(leadOrderId) + '</strong> に一括入力</div>'
         : '';
- 
+
       return { bannerHtml: bannerHtml, warningHtml: warningHtml, frameClass: frameClass, idLabel: idLabel, breakdownHtml: breakdownHtml, measureHtml: measureHtml };
     } catch (e) {
       try { console.warn('_buildPrintDoukonElements failed:', e); } catch (_) {}
       return empty;
     }
   },
- 
+
   _renderPrintPage(o, orderIdx, total, dateStr, positionClass) {
     const orderId = escapeHtml(o.orderId || '');
     const account = escapeHtml(o.account || '');
@@ -1770,7 +1809,7 @@ const App = {
     const imageHtml = (o.imageUrl && String(o.imageUrl).indexOf('http') === 0)
       ? '<img src="' + escapeAttr(o.imageUrl) + '" alt="" onerror="this.outerHTML=&#39;\u{1F4E6}&#39;">'
       : '\u{1F4E6}';
- 
+
     const dm = this.computeDeadlineMeta(o.shipByDate);
     let deadlineLabel;
     // v3.18.8: 超過は daysLeft<0 でのみ「(超過)」表記。red は当日/残り1-2日も含むため区別する
@@ -1780,7 +1819,7 @@ const App = {
     else if (dm.level === 'orange')                   deadlineLabel = '⚠ 発送期日 ' + dm.label;
     else                                              deadlineLabel = '発送期日 ' + dm.label;
     const deadlineHtml = '<div class="pp-deadline urgent-' + dm.level + '">' + escapeHtml(deadlineLabel) + '</div>';
- 
+
     const addrLine1 = escapeHtml(o.addrLine1 || '');
     const addrLine2 = escapeHtml(o.addrLine2 || '');
     const city = escapeHtml(o.city || '');
@@ -1795,17 +1834,17 @@ const App = {
       cityStateZip ? '<div>' + cityStateZip + '</div>' : '',
       countryFull ? '<div>' + countryFull + '</div>' : ''
     ].filter(Boolean).join('');
- 
+
     const cpassBlock = cpassPackage
       ? '<div class="pp-cpass"><div class="pp-cpass-label">CPASS PACKAGE</div><div class="pp-cpass-value">#' + cpassPackage + '</div></div>'
       : '<div class="pp-cpass warning"><div class="pp-cpass-label">CPASS</div><div class="pp-cpass-value">⚠ 未取込</div></div>';
- 
+
     const amazonBlock = amazonTitle
       ? '<div class="pp-amazon-text">' + amazonTitle + '</div><div class="pp-amazon-asin">\u{1F6D2} ' + asin + '</div>'
       : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込') + ')</div>';
- 
+
     const posCls = positionClass ? (' ' + positionClass) : '';
- 
+
     const dp = this._buildPrintDoukonElements(o);
     const defaultMeasure =
       '<div class="pp-measure">' +
@@ -1813,7 +1852,7 @@ const App = {
         '重量: <span class="pp-write-box"></span> g 　' +
         '寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm' +
       '</div>';
- 
+
     return '' +
       '<div class="print-page' + posCls + '">' +
         '<div class="pp-header">' +
@@ -1849,7 +1888,7 @@ const App = {
         '</div>' +
       '</div>';
   },
- 
+
   // ===== v3.18 復元: 印刷/同期/CPaSS/カードメニュー系メソッド =====
   async sync() {
     showToast('eBayから注文を取得中...');
@@ -1861,7 +1900,7 @@ const App = {
       showToast('同期失敗: ' + err.message);
     }
   },
- 
+
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -1888,7 +1927,7 @@ const App = {
     showToast('Sheetsへ書込み中... ホームへ戻ります');
     this.state.pendingWrites++;
     this.goHome();
- 
+
     API.writeShipment(data)
       .then(res => {
         this.state.pendingWrites--;
@@ -1903,14 +1942,14 @@ const App = {
         showToast('書込み失敗: ' + err.message);
       });
   },
- 
+
   async runCpassImport() {
     const btn = document.getElementById('btn-cpass-import');
     if (!btn) return;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>取込中...';
- 
+
     try {
       const result = await API.runCpassImport();
       if (result && typeof result.files_processed === 'number') {
@@ -1927,16 +1966,16 @@ const App = {
       btn.innerHTML = originalText;
     }
   },
- 
+
   showCardActionMenu(orderId) {
     this.state.longPressOrderId = orderId;
     const overlay = document.getElementById('card-action-overlay');
     const target = document.getElementById('card-action-target');
     const unmarkBtn = document.getElementById('card-action-unmark');
     if (!overlay || !target) return;
- 
+
     target.textContent = orderId;
- 
+
     // 印刷済か否かでメニュー表示制御
     const order = this.state.orders.find(o => o.orderId === orderId);
     if (unmarkBtn) {
@@ -1946,7 +1985,7 @@ const App = {
         unmarkBtn.style.display = 'none';
       }
     }
- 
+
     // ★ Phase B: 発送済にする / 解除 の表示制御
     //   - 発送済にする: まだ発送済でない (追跡なし AND FULFILLEDでない)
     //   - 発送済を解除 : 手動/API で FULFILLED かつ 追跡番号なし (=手動マーク相当)
@@ -1956,27 +1995,27 @@ const App = {
     const isFulfilled = !!(order && order.fulfillmentStatus === 'FULFILLED');
     if (shipBtn) shipBtn.style.display = (!hasTracking && !isFulfilled) ? '' : 'none';
     if (unshipBtn) unshipBtn.style.display = (!hasTracking && isFulfilled) ? '' : 'none';
- 
+
     // ★ 手動キャンセル: 未キャンセルなら「キャンセル済にする」、キャンセル済なら「解除」
     const cancelMarkBtn = document.getElementById('card-action-cancelmark');
     const uncancelBtn = document.getElementById('card-action-uncancelmark');
     const isCancelled = !!(order && order.cancelledAt);
     if (cancelMarkBtn) cancelMarkBtn.style.display = isCancelled ? 'none' : '';
     if (uncancelBtn) uncancelBtn.style.display = isCancelled ? '' : 'none';
- 
+
     overlay.classList.remove('hidden');
     // オーバーレイ外タップで閉じる
     overlay.onclick = (e) => {
       if (e.target === overlay) this.closeCardActionMenu();
     };
   },
- 
+
   closeCardActionMenu() {
     const overlay = document.getElementById('card-action-overlay');
     if (overlay) overlay.classList.add('hidden');
     this.state.longPressOrderId = null;
   },
- 
+
   // ★ Phase B: 手動「発送済にする / 解除」(表示フラグのみ・eBay非送信)
   async markShippedAndReload(orderId, shipped) {
     this.closeCardActionMenu();
@@ -1997,7 +2036,7 @@ const App = {
       showToast('エラー: ' + (e.message || e));
     }
   },
- 
+
   // ★ 手動「キャンセル済にする / 解除」(表示フラグのみ・eBay非送信)
   async markCancelledAndReload(orderId, cancelled) {
     this.closeCardActionMenu();
@@ -2018,11 +2057,11 @@ const App = {
       showToast('エラー: ' + (e.message || e));
     }
   },
- 
+
   doBrowserPrint() {
     window.print();
   },
- 
+
   async markPrintedAndReturn() {
     const orders = this.state.printPreviewOrders || [];
     if (orders.length === 0) {
@@ -2041,7 +2080,7 @@ const App = {
       showToast('印刷済マーク失敗: ' + e.message);
     }
   },
- 
+
   async unmarkPrintedAndReload(orderId) {
     this.closeCardActionMenu();
     if (!orderId) return;
@@ -2058,9 +2097,9 @@ const App = {
       showToast('印刷済解除失敗: ' + e.message);
     }
   },
- 
+
 };
- 
+
 function showToast(message) {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -2070,21 +2109,20 @@ function showToast(message) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
 }
- 
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 function escapeAttr(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
- 
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
- 
+
 // PWA 初期化エントリ (v3.18.11)
 document.addEventListener('DOMContentLoaded', () => App.init());
- 

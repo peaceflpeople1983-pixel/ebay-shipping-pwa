@@ -828,6 +828,21 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 }
 .deadline-banner.urgent-green .deadline-banner-main,
 .deadline-banner.urgent-green .deadline-banner-sub { color: #2F5A1A; }
+
+/* v3.18.16: 発送ポリシー不明バナー (青系 / CPaSS黄・締切赤と区別) */
+.policy-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #E7F0FB;
+  border-left: 4px solid #1D5FAB;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.policy-banner-icon { font-size: 20px; flex-shrink: 0; }
+.policy-banner-body { flex: 1; min-width: 0; }
+.policy-banner-main { font-size: 13px; font-weight: 500; color: #1D5FAB; }
+.policy-banner-sub { font-size: 11px; margin-top: 2px; color: #2F6DB5; }
 .cpass-banner-btn .spinner {
   display: inline-block;
   width: 12px;
