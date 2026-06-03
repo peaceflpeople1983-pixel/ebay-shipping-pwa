@@ -585,12 +585,12 @@ const App = {
       // v3.13: 発送済情報の組み立て
       const isShipped = !!(o.trackingNumber || o.fulfillmentStatus === 'FULFILLED');
       const shippedBadge = isShipped ? '<span class="badge shipped">✓ 発送済</span>' : '';
-      // v3.15: CPaSS 未取込警告バッジ (発送済かつ未取込のみ)
-      const cpassUnimportedBadge = o.cpass_unimported ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
+      // v3.15: CPaSS 未取込警告バッジ (発送済かつ未取込のみ)。v3.18.16: キャンセル済は非表示
+      const cpassUnimportedBadge = (o.cpass_unimported && !o.cancelledAt) ? '<span class="badge cpass-unimported">⚠ CPaSS未取込</span>' : '';
       // v3.16: 印刷済バッジ
       const printedBadge = o.printedAt ? '<span class="badge printed">🖨 印刷済</span>' : '';
-      // v3.17: 発送期日バッジ (緊急度4段階 + 期限不明)。発送済はバッジ非表示
-      const deadlineBadge = (!isShipped) ? this._buildDeadlineBadge(o.shipByDate) : '';
+      // v3.17: 発送期日バッジ (緊急度4段階 + 期限不明)。発送済はバッジ非表示。v3.18.16: キャンセル済も非表示
+      const deadlineBadge = (!isShipped && !o.cancelledAt) ? this._buildDeadlineBadge(o.shipByDate) : '';
       const shippingInfoHtml = isShipped ? `
           <div class="order-shipping-info">
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
@@ -1271,6 +1271,7 @@ const App = {
       for (var i = 0; i < orders.length; i++) {
         var o = orders[i];
         if (!o || o.trackingNumber || o.fulfillmentStatus === 'FULFILLED') continue;  // 発送済は対象外
+        if (o.cancelledAt) continue;                       // ★ v3.18.16: キャンセル済は対象外
         var oid = String(o.orderId || '');
         if (!oid || seen[oid]) continue;                  // orderId 単位でユニーク
         var meta;
@@ -1407,7 +1408,21 @@ const App = {
 
     const status = this.state.cpassStatus;
     const inboxCount = status && status.inbox_pending_count ? status.inbox_pending_count : 0;
-    const unimportedCount = status && status.unimported_count ? status.unimported_count : 0;
+    // ★ v3.18.16: 未取込件数はバックエンドの status.unimported_count ではなく、
+    //    取得済 orders から orderId 単位でユニーク集計(キャンセル済はバックエンドで cpass_unimported 解除済 → 自動除外)。
+    var unimportedCount = 0;
+    try {
+      var orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+      var seenU = {};
+      for (var i = 0; i < orders.length; i++) {
+        var o = orders[i];
+        if (!o || !o.cpass_unimported || o.cancelledAt) continue;
+        var uid = String(o.orderId || '');
+        if (!uid || seenU[uid]) continue;
+        seenU[uid] = true;
+        unimportedCount++;
+      }
+    } catch (e) { unimportedCount = 0; }
 
     if (inboxCount > 0) {
       if (inboxCountEl) inboxCountEl.textContent = inboxCount;
