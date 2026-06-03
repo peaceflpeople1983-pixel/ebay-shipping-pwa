@@ -126,9 +126,10 @@ const App = {
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-shipped', 'onchange', () => this.renderOrders());
-      // v3.17: 発送期日フィルタ
-      this._bind('filter-overdue-only', 'onchange', () => this.renderOrders());
-      this._bind('filter-urgent-only', 'onchange', () => this.renderOrders());
+      // ★ Zonos未送信フィルタ
+      this._bind('filter-zonos-pending', 'onchange', () => this.renderOrders());
+      // ★ 追跡スキャン待ちフィルタ
+      this._bind('filter-tracking-pending', 'onchange', () => this.renderOrders());
       // ★ v1.0 キャンセル通知: キャンセル済隠すフィルタ
       this._bind('filter-hide-cancel', 'onchange', () => this.renderOrders());
 
@@ -172,6 +173,33 @@ const App = {
       this._bind('card-action-cancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, true));
       this._bind('card-action-uncancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, false));
       this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
+
+      // ★ Zonos: 送信画面の戻る / Declaration ID 解除
+      this._bind('btn-back-zonos', 'onclick', () => this.goHome());
+      this._bind('card-action-zonos-clear', 'onclick', () => this.zonosClearDeclaration(this.state.longPressOrderId));
+      // ★ 追跡番号スキャン: 画面遷移・撮影・確認・手動入力 のイベント
+      this._bind('btn-back-tracking', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.close();
+        this.goHome();
+      });
+      this._bind('btn-tracking-capture', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.capture();
+      });
+      this._bind('btn-tracking-manual', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.showManualInput();
+      });
+      this._bind('btn-tracking-rescan', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.rescan();
+      });
+      this._bind('btn-tracking-confirm', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.confirmUpload();
+      });
+      this._bind('btn-tracking-manual-cancel', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.hideManualInput();
+      });
+      this._bind('btn-tracking-manual-submit', 'onclick', () => {
+        if (window.TrackingScan) window.TrackingScan.submitManualInput();
+      });
 
       this._bind('btn-batch-scan', 'onclick', () => this.startBatchScan());
       this._bind('btn-today-clear', 'onclick', () => {
@@ -512,11 +540,6 @@ const App = {
     // v3.13: 発送済（追跡番号あり）を隠すトグル。要素が無い古い HTML には防御的に対応
     const hideShippedEl = document.getElementById('filter-hide-shipped');
     const hideShipped = hideShippedEl ? hideShippedEl.checked : false;
-    // v3.17: 発送期日フィルタ
-    const overdueOnlyEl = document.getElementById('filter-overdue-only');
-    const overdueOnly = overdueOnlyEl ? overdueOnlyEl.checked : false;
-    const urgentOnlyEl = document.getElementById('filter-urgent-only');
-    const urgentOnly = urgentOnlyEl ? urgentOnlyEl.checked : false;
     const list = document.getElementById('order-list');
 
     let orders = this.state.orders;
@@ -529,23 +552,24 @@ const App = {
     if (hideCancelHistory) {
       orders = orders.filter(o => !(o.cancelledAt && !o.printedAt));
     }
-    // v3.17: 期限フィルタ (computeDeadlineMeta は完全防御化済み)
-    if (overdueOnly) {
-      const self = this;
+    // ★ Zonos未送信 / 追跡スキャン待ち の OR フィルタ
+    const zonosPendingEl = document.getElementById('filter-zonos-pending');
+    const zonosPendingOnly = zonosPendingEl ? zonosPendingEl.checked : false;
+    const trackingPendingEl = document.getElementById('filter-tracking-pending');
+    const trackingPendingOnly = trackingPendingEl ? trackingPendingEl.checked : false;
+    if (zonosPendingOnly || trackingPendingOnly) {
       orders = orders.filter(function(o) {
-        try {
-          const m = self.computeDeadlineMeta(o.shipByDate);
-          return m && m.level === 'red';
-        } catch (e) { return false; }
-      });
-    }
-    if (urgentOnly) {
-      const self = this;
-      orders = orders.filter(function(o) {
-        try {
-          const m = self.computeDeadlineMeta(o.shipByDate);
-          return m && (m.level === 'red' || m.level === 'orange');
-        } catch (e) { return false; }
+        // Zonos未送信判定 (Zonos対象 + DDP未取得 + 未発送 + 代表/単独)
+        if (zonosPendingOnly && window.Zonos && window.Zonos.isZonosTargetOrder(o)
+            && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub') {
+          return true;
+        }
+        // 追跡スキャン待ち判定
+        if (trackingPendingOnly && window.TrackingScan
+            && window.TrackingScan.isTrackingTargetOrder(o)) {
+          return true;
+        }
+        return false;
       });
     }
 
@@ -563,6 +587,9 @@ const App = {
 
     // v3.18.16: 発送ポリシー不明バナーを更新 (H列空の未発送があれば Seller Hub CSV取込を促す)
     this._updatePolicyBanner();
+
+    // ★ Zonos: 期限切迫バナー更新
+    this._updateZonosExpireBanner();
 
     if (orders.length === 0) {
       list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近60日／入力済を隠す／発送済を隠す）</span></div>';
@@ -637,17 +664,48 @@ const App = {
             ${dk.badgeHtml}
             ${dk.subTagHtml}
             ${deadlineBadge}
+            ${(window.Zonos && window.Zonos.buildZonosBadge) ? window.Zonos.buildZonosBadge(o) : ''}
           </div>
           ${dk.warningBarHtml}
           ${orderIdHtml}
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
           ${shippingInfoHtml}
+          ${(window.Zonos && window.Zonos.isZonosTargetOrder(o) && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub')
+            ? `<button class="zonos-card-btn" data-zonos-order-id="${escapeAttr(o.orderId)}">📦 Zonosへ送信${(o.doukonRole === 'lead' && o.doukonCount > 1) ? ' (' + o.doukonCount + '点まとめて)' : ''}</button>`
+            : ''}
+          ${(window.Zonos && !window.Zonos.isZonosTargetOrder(o) && o.country && o.shippingPolicy) ? window.Zonos.buildZonosScopeNote(o) : ''}
+          ${(window.TrackingScan && window.TrackingScan.isTrackingTargetOrder) ? window.TrackingScan.buildTrackingButton(o) : ''}
           ${this.renderCpassInfo(o.cpass)}
           ${dk.breakdownHtml}
         </div>
       </div>`;
     }).join('');
+
+    // ★ Zonos: 送信ボタンのクリックハンドラ (イベント委譲)
+    list.querySelectorAll('[data-zonos-order-id]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const zid = btn.getAttribute('data-zonos-order-id');
+        if (window.Zonos && window.Zonos.Screen) {
+          window.Zonos.Screen.open(zid);
+        }
+      });
+    });
+
+    // ★ 追跡番号スキャン: ボタンのクリックハンドラ (イベント委譲)
+    list.querySelectorAll('[data-tracking-order-id]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-tracking-order-id');
+        if (window.TrackingScan && window.TrackingScan.openForTracking) {
+          const orderData = (this.state.orders || []).find(x => x.orderId === tid);
+          window.TrackingScan.openForTracking(tid, orderData);
+        }
+      });
+    });
 
     // v3.16: 長押し対応 + 通常クリック
     list.querySelectorAll('.order-item').forEach(el => {
@@ -1345,6 +1403,41 @@ const App = {
     }
   },
 
+  // ★ Zonos: 期限切迫バナー更新
+  _updateZonosExpireBanner() {
+    if (!window.Zonos || !window.Zonos.buildZonosExpireBanner) return;
+    try {
+      const html = window.Zonos.buildZonosExpireBanner(this.state.orders);
+      const container = document.getElementById('zonos-expire-banner-container');
+      if (container) container.innerHTML = html || '';
+    } catch (e) {
+      try { console.warn('_updateZonosExpireBanner error:', e); } catch (_) {}
+    }
+  },
+
+  // ★ Zonos: Declaration ID 解除
+  async zonosClearDeclaration(orderId) {
+    if (!orderId) return;
+    if (!confirm('Declaration ID を解除しますか？\n同梱の場合は同じグループ全件が解除されます。')) {
+      this.closeCardActionMenu();
+      return;
+    }
+    try {
+      const url = API.config.url + '?action=zonosClearDeclaration&orderId=' + encodeURIComponent(orderId);
+      const res = await fetch(url, { method: 'GET' });
+      const result = await res.json();
+      if (result.success) {
+        showToast('Declaration ID を解除しました' + (result.rowsCleared > 1 ? ' (' + result.rowsCleared + '件)' : ''));
+        this.closeCardActionMenu();
+        await this.loadAll();
+      } else {
+        showToast('解除失敗: ' + (result.error || '不明なエラー'));
+      }
+    } catch (e) {
+      showToast('解除エラー: ' + e.message);
+    }
+  },
+
   shortenCarrier(carrier) {
     if (carrier.indexOf('ePacket') !== -1) return 'ePacketライト';
     if (carrier.indexOf('Ship via DHL') !== -1) return 'Ship via DHL';
@@ -2017,6 +2110,16 @@ const App = {
     const isCancelled = !!(order && order.cancelledAt);
     if (cancelMarkBtn) cancelMarkBtn.style.display = isCancelled ? 'none' : '';
     if (uncancelBtn) uncancelBtn.style.display = isCancelled ? '' : 'none';
+
+    // ★ Zonos: Declaration ID 解除ボタンの表示制御 (取得済のみ表示)
+    const zonosClearBtn = document.getElementById('card-action-zonos-clear');
+    if (zonosClearBtn) {
+      if (order && order.declarationId) {
+        zonosClearBtn.classList.remove('hidden');
+      } else {
+        zonosClearBtn.classList.add('hidden');
+      }
+    }
 
     overlay.classList.remove('hidden');
     // オーバーレイ外タップで閉じる
