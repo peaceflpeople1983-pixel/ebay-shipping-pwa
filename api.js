@@ -162,6 +162,36 @@ const API = {
     });
   },
 
+  /**
+   * RECOVERY v1.2: 未取得 order 候補 + API 3分類 + メールプレビュー
+   *   戻り値: { candidates:[{orderId,account,status,email}], counts, generatedAt }
+   */
+  async recoveryGetMissing() {
+    return this._get('?action=recoveryGetMissing');
+  },
+
+  /**
+   * RECOVERY v1.2: 1件 API フル取込 (AR='api')
+   */
+  async recoveryFetchOne(orderId) {
+    return this._post({
+      action: 'recoveryFetchOne',
+      secret: this.config.secret,
+      orderId: orderId
+    });
+  },
+
+  /**
+   * RECOVERY v1.2: 1件 メール情報で追加 (仮 AR='email')
+   */
+  async recoveryAddFromEmail(orderId) {
+    return this._post({
+      action: 'recoveryAddFromEmail',
+      secret: this.config.secret,
+      orderId: orderId
+    });
+  },
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);

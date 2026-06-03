@@ -403,6 +403,10 @@ const App = {
       step = 'state assignment';
       this.state.orders = data.orders || [];
       this.state.cpassStatus = data.cpass_status || null;  // v3.15
+      // ★ RECOVERY: 未取得 order 件数バッジ更新
+      if (window.Recovery && typeof Recovery.setCount === 'function') {
+        Recovery.setCount(data.recovery_missing_count || 0);
+      }
       step = 'pruneTodayGroup';
       this.pruneTodayGroup();
       step = 'populateCountrySelect';
@@ -552,7 +556,7 @@ const App = {
     this._updateDeadlineBanner();
 
     if (orders.length === 0) {
-      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近15日／入力済を隠す／発送済を隠す）</span></div>';
+      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近60日／入力済を隠す／発送済を隠す）</span></div>';
       return;
     }
 
@@ -599,9 +603,16 @@ const App = {
       const cancelBadge = (window.CancelNotice && CancelNotice.buildBadge)
         ? CancelNotice.buildBadge(o)
         : '';
+      // ★ RECOVERY: メール由来(仮) バッジ + class
+      const recoveryClass = (window.Recovery && Recovery.buildItemClass)
+        ? Recovery.buildItemClass(o)
+        : '';
+      const recoveryBadge = (window.Recovery && Recovery.buildBadge)
+        ? Recovery.buildBadge(o)
+        : '';
 
       return `
-      <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}${dk.itemClass}${cancelClass}" data-id="${escapeAttr(o.orderId)}" data-line-item-id="${escapeAttr(o.lineItemId || '')}">
+      <div class="order-item${inToday ? ' in-today' : ''}${isShipped ? ' shipped' : ''}${dk.itemClass}${cancelClass}${recoveryClass}" data-id="${escapeAttr(o.orderId)}" data-line-item-id="${escapeAttr(o.lineItemId || '')}">
         ${dk.bannerHtml}
         ${thumbHtml}
         <div class="order-body">
@@ -613,6 +624,7 @@ const App = {
             ${cpassUnimportedBadge}
             ${printedBadge}
             ${cancelBadge}
+            ${recoveryBadge}
             ${dk.badgeHtml}
             ${dk.subTagHtml}
             ${deadlineBadge}
