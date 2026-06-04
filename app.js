@@ -49,7 +49,10 @@ const App = {
     printPreviewOrders: [],
     longPressOrderId: null,
     _longPressTimer: null,
-    _longPressTriggered: false
+    _longPressTriggered: false,
+    // ★ v3.18.18: 並び替えトグル ('' | 'cpass' | 'orderId' | 'deadline')
+    sortKey: '',
+    sortDir: 'asc'
   },
 
   async init() {
@@ -132,6 +135,11 @@ const App = {
       this._bind('filter-tracking-pending', 'onchange', () => this.renderOrders());
       // ★ v1.0 キャンセル通知: キャンセル済隠すフィルタ
       this._bind('filter-hide-cancel', 'onchange', () => this.renderOrders());
+      // ★ v3.18.18: 並び替えトグル (無効→▲→▼→無効 / 同時有効は1つ)
+      this._bind('sort-cpass', 'onclick', () => this._cycleSort('cpass'));
+      this._bind('sort-orderid', 'onclick', () => this._cycleSort('orderId'));
+      this._bind('sort-deadline', 'onclick', () => this._cycleSort('deadline'));
+      this._restoreSortPref();
 
       this._bind('btn-back-list', 'onclick', () => this.goHome());
       this._bind('btn-back-input', 'onclick', () => this.show('screen-input'));
@@ -597,13 +605,22 @@ const App = {
     }
 
     const todaySet = new Set(TodayGroup.load().ids);
-    const sortedOrders = orders.slice().sort((a, b) => {
-      const ta = todaySet.has(a.orderId) ? 0 : 1;
-      const tb = todaySet.has(b.orderId) ? 0 : 1;
-      return ta - tb;
-    });
+    // ★ v3.18.18: 並び替えトグル有効時はキー順で描画 (本日沈め・新着反転は一時停止)。
+    //   無効時は従来通り (本日グループ先頭ソート → 全体反転 = 新着上・本日下)。
+    let renderArr;
+    const toggled = this._applySortToggle(orders);
+    if (toggled) {
+      renderArr = toggled;
+    } else {
+      const sortedOrders = orders.slice().sort((a, b) => {
+        const ta = todaySet.has(a.orderId) ? 0 : 1;
+        const tb = todaySet.has(b.orderId) ? 0 : 1;
+        return ta - tb;
+      });
+      renderArr = sortedOrders.slice().reverse();
+    }
 
-    list.innerHTML = sortedOrders.slice().reverse().map(o => {
+    list.innerHTML = renderArr.map(o => {
       const inToday = todaySet.has(o.orderId);
       const hasUrl = o.imageUrl && String(o.imageUrl).indexOf('http') === 0;
       const thumbHtml = hasUrl
@@ -1437,6 +1454,98 @@ const App = {
     } catch (e) {
       showToast('解除エラー: ' + e.message);
     }
+  },
+
+  // ============================================================
+  // ★ v3.18.18: 並び替えトグル (CPaSS# / OrderID / 期日)
+  // ============================================================
+
+  /** タップで 無効→▲昇順→▼降順→無効 をサイクル。同時有効は1つだけ。 */
+  _cycleSort(key) {
+    if (this.state.sortKey !== key) {
+      this.state.sortKey = key;
+      this.state.sortDir = 'asc';
+    } else if (this.state.sortDir === 'asc') {
+      this.state.sortDir = 'desc';
+    } else {
+      this.state.sortKey = '';
+      this.state.sortDir = 'asc';
+    }
+    try {
+      localStorage.setItem('sort_pref_v1', JSON.stringify({ key: this.state.sortKey, dir: this.state.sortDir }));
+    } catch (_) {}
+    this._updateSortChips();
+    this.renderOrders();
+  },
+
+  /** localStorage から前回の並び替え設定を復元 */
+  _restoreSortPref() {
+    try {
+      const raw = localStorage.getItem('sort_pref_v1');
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && (p.key === 'cpass' || p.key === 'orderId' || p.key === 'deadline')) {
+          this.state.sortKey = p.key;
+          this.state.sortDir = (p.dir === 'desc') ? 'desc' : 'asc';
+        }
+      }
+    } catch (_) {}
+    this._updateSortChips();
+  },
+
+  /** チップの見た目 (ON色 + ▲/▼) を state に同期 */
+  _updateSortChips() {
+    const map = { cpass: 'sort-cpass', orderId: 'sort-orderid', deadline: 'sort-deadline' };
+    for (const k in map) {
+      const el = document.getElementById(map[k]);
+      if (!el) continue;
+      const dirEl = el.querySelector('.sort-dir');
+      if (this.state.sortKey === k) {
+        el.classList.add('on');
+        if (dirEl) dirEl.textContent = (this.state.sortDir === 'asc') ? '▲' : '▼';
+      } else {
+        el.classList.remove('on');
+        if (dirEl) dirEl.textContent = '';
+      }
+    }
+  },
+
+  /**
+   * 並び替えトグルが有効ならソート済み配列を返す。無効なら null (=従来の並び)。
+   * キー無し注文 (CPaSS無し / 期限不明) は昇降に関わらず常に末尾。安定ソート。
+   */
+  _applySortToggle(orders) {
+    const key = this.state.sortKey;
+    if (!key) return null;
+    const dir = (this.state.sortDir === 'desc') ? -1 : 1;
+    const getVal = (o) => {
+      if (!o) return null;
+      if (key === 'cpass') {
+        const raw = (o.cpass && o.cpass.package_no != null) ? String(o.cpass.package_no).trim() : '';
+        if (raw === '') return null;
+        const n = parseFloat(raw);
+        return isNaN(n) ? null : n;
+      }
+      if (key === 'orderId') {
+        const s = String(o.orderId || '');
+        return s === '' ? null : s;
+      }
+      if (key === 'deadline') {
+        if (!o.shipByDate) return null;
+        const t = new Date(o.shipByDate).getTime();
+        return isNaN(t) ? null : t;
+      }
+      return null;
+    };
+    return orders.slice().sort((a, b) => {
+      const va = getVal(a), vb = getVal(b);
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;   // キー無しは常に末尾
+      if (vb === null) return -1;
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
   },
 
   shortenCarrier(carrier) {

@@ -829,6 +829,34 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .deadline-banner.urgent-green .deadline-banner-main,
 .deadline-banner.urgent-green .deadline-banner-sub { color: #2F5A1A; }
 
+/* ★ v3.18.18: 並び替えトグル (フィルタバー直下) */
+.sort-row {
+  padding: 0 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #fff;
+}
+.sort-row-label { font-size: 12px; color: #6b7280; font-weight: 600; flex-shrink: 0; }
+.sort-chip {
+  border: 1px dashed #d7dbe0;
+  border-radius: 18px;
+  padding: 8px 13px;
+  font-size: 13px;
+  color: #6b7280;
+  background: #fff;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sort-chip.on {
+  background: var(--primary);
+  color: #fff;
+  border: 1px solid var(--primary);
+}
+.sort-chip .sort-dir { font-weight: 800; margin-left: 4px; }
+
 /* v3.18.16: 発送ポリシー不明バナー (青系 / CPaSS黄・締切赤と区別) */
 .policy-banner {
   display: flex;

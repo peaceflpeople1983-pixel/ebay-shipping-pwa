@@ -132,6 +132,13 @@
       </label>
       <button class="secondary" id="btn-new">+ 手動入力</button>
     </div>
+    <!-- ★ v3.18.18: 並び替えトグル (タップで 無効→▲昇順→▼降順→無効 / 同時有効は1つ) -->
+    <div class="sort-row">
+      <span class="sort-row-label">並び替え:</span>
+      <button class="sort-chip" id="sort-cpass">📦 CPaSS#<span class="sort-dir"></span></button>
+      <button class="sort-chip" id="sort-orderid"># OrderID<span class="sort-dir"></span></button>
+      <button class="sort-chip" id="sort-deadline">⏰ 期日<span class="sort-dir"></span></button>
+    </div>
     <div id="order-list" class="content"></div>
     <div class="loader hidden" id="list-loader">読み込み中...</div>
   </section>
