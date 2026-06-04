@@ -1383,6 +1383,7 @@ const App = {
       for (var i = 0; i < orders.length; i++) {
         var o = orders[i];
         if (!o || o.trackingNumber || o.fulfillmentStatus === 'FULFILLED') continue; // 発送済は対象外
+        if (o.cancelledAt) continue;                       // ★ v3.18.17: キャンセル済は対象外
         var oid = String(o.orderId || '');
         if (!oid || seen[oid]) continue;                  // orderId 単位でユニーク
         var policy = String(o.shippingPolicy || '').trim();

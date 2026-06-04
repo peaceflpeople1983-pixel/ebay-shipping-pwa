@@ -422,10 +422,52 @@
           // ★ needsManual (eBay側でorderが認識されない稀ケース) を最優先で表示
           const needsManualResults = (result.results || []).filter(r => r.needsManual);
           if (needsManualResults.length > 0) {
-            this._showUploadToast(
-              '⚠ eBay側で更新不可。Seller Hubで手動アップロードしてください',
-              'error'
+            // ★ v3.18.17: 破損注文向け — シートにのみ記録して「発送済」にする選択肢を提示。
+            //   (eBay への登録は Seller Hub で手動実施する運用)
+            const recordOnly = confirm(
+              '⚠ eBay側でこの注文を認識できません(API破損注文)。\n\n' +
+              'Seller Hub で手動アップロードする前提で、追跡番号をシートにのみ記録して「発送済」にしますか？\n' +
+              '(記録すると一覧・追跡スキャン待ちから消えます)'
             );
+            if (!recordOnly) {
+              this._showUploadToast('⚠ eBay側で更新不可。Seller Hubで手動アップロードしてください', 'error');
+              return;
+            }
+            try {
+              const body2 = {
+                action: 'uploadTracking',
+                secret: API.config.secret || '',
+                orderId: orderId,
+                trackingNumber: tracking,
+                options: { sheetOnly: true }
+              };
+              const res2 = await fetch(API.config.url, {
+                method: 'POST',
+                body: JSON.stringify(body2),
+                headers: { 'Content-Type': 'text/plain' }
+              });
+              const result2 = await res2.json();
+              if (result2 && result2.success) {
+                this._showUploadToast('📋 シートに記録しました (発送済扱い)', 'success');
+                if (navigator.vibrate) navigator.vibrate(100);
+                if (typeof App !== 'undefined' && App.loadAll) {
+                  try { await App.loadAll(); } catch (_) {}
+                }
+                setTimeout(() => {
+                  this._hideUploadToast();
+                  this.close();
+                  if (typeof showScreenGlobal === 'function') {
+                    showScreenGlobal('screen-list');
+                  } else {
+                    showScreen('screen-list');
+                  }
+                }, RETURN_DELAY_MS);
+              } else {
+                this._showUploadToast('記録失敗: ' + ((result2 && result2.error) || 'unknown'), 'error');
+              }
+            } catch (e2) {
+              this._showUploadToast('記録エラー: ' + e2.message, 'error');
+            }
             return;
           }
 
