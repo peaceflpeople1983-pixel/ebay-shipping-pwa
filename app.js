@@ -1493,23 +1493,19 @@ const App = {
     this._updateSortChips();
   },
 
-  /** チップの見た目を state に同期。幅が変わらないよう、先頭アイコンを ▲/▼ に置換して方向を示す */
+  /** チップの見た目 (ON色 + ▲/▼) を state に同期 */
   _updateSortChips() {
-    const defs = {
-      cpass:    { id: 'sort-cpass',    icon: '📦' },
-      orderId:  { id: 'sort-orderid',  icon: '#' },
-      deadline: { id: 'sort-deadline', icon: '⏰' }
-    };
-    for (const k in defs) {
-      const el = document.getElementById(defs[k].id);
+    const map = { cpass: 'sort-cpass', orderId: 'sort-orderid', deadline: 'sort-deadline' };
+    for (const k in map) {
+      const el = document.getElementById(map[k]);
       if (!el) continue;
-      const ic = el.querySelector('.sort-icon');
+      const dirEl = el.querySelector('.sort-dir');
       if (this.state.sortKey === k) {
         el.classList.add('on');
-        if (ic) ic.textContent = (this.state.sortDir === 'asc') ? '▲' : '▼';
+        if (dirEl) dirEl.textContent = (this.state.sortDir === 'asc') ? '▲' : '▼';
       } else {
         el.classList.remove('on');
-        if (ic) ic.textContent = defs[k].icon;
+        if (dirEl) dirEl.textContent = '';
       }
     }
   },
