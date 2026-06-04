@@ -829,15 +829,18 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .deadline-banner.urgent-green .deadline-banner-main,
 .deadline-banner.urgent-green .deadline-banner-sub { color: #2F5A1A; }
 
-/* ★ v3.18.18: 並び替えトグル (フィルタバー直下) */
+/* ★ v3.18.18: 並び替えトグル (フィルタバー直下 / 1行固定・折返しなし) */
 .sort-row {
   padding: 0 16px 10px;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: #fff;
 }
+.sort-row::-webkit-scrollbar { display: none; }
 .sort-row-label { font-size: 12px; color: #6b7280; font-weight: 600; flex-shrink: 0; }
 .sort-chip {
   border: 1px dashed #d7dbe0;
@@ -849,13 +852,16 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .sort-chip.on {
   background: var(--primary);
   color: #fff;
   border: 1px solid var(--primary);
 }
-.sort-chip .sort-dir { font-weight: 800; margin-left: 4px; }
+/* 先頭アイコン枠: ▲/▼ に置換しても幅が変わらないよう固定幅 */
+.sort-chip .sort-icon { display: inline-block; min-width: 16px; text-align: center; }
 
 /* v3.18.16: 発送ポリシー不明バナー (青系 / CPaSS黄・締切赤と区別) */
 .policy-banner {
