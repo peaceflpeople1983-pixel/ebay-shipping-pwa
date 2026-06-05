@@ -293,6 +293,7 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .badge.due-orange { background: #FFE4CC; color: #8A4310; border: 0.5px solid #EF9F27; }
 .badge.due-yellow { background: #FDF3D1; color: #7D5D10; border: 0.5px solid #FAC775; }
 .badge.due-green  { background: #DFF1D8; color: #2F5A1A; border: 0.5px solid #97C459; }
+.badge.due-white  { background: #FFFFFF; color: #5A5A5A; border: 0.5px solid #D0D0D0; } /* v3.18.19: 8日以上先 */
 .badge.due-gray   { background: #ECECEC; color: #5A5A5A; border: 0.5px solid #B4B2A9; }
 
 /* v3.13: 発送済カードの強調と発送情報行 */

@@ -1111,9 +1111,10 @@ const App = {
         return Math.floor((dateObj.getTime() + 9 * 3600 * 1000) / (24 * 3600 * 1000));
       };
       var daysLeft = jstDay(d) - jstDay(now);
-      // 仕様: ≥8日=無色(none) / 7日=green / 6-5=yellow / 4-3=orange / 2-1=red / 当日(0)=red / 超過=red
+      // 仕様: ≥8日=white(白チップ) / 7日=green / 6-5=yellow / 4-3=orange / 2-1=red / 当日(0)=red / 超過=red
+      //   v3.18.19: ≥8日も非表示にせず白チップで表示 (全注文に期日チップ)
       var level;
-      if (daysLeft >= 8) level = 'none';
+      if (daysLeft >= 8) level = 'white';
       else if (daysLeft === 7) level = 'green';
       else if (daysLeft >= 5) level = 'yellow';   // 6,5
       else if (daysLeft >= 3) level = 'orange';   // 4,3
@@ -1307,8 +1308,7 @@ const App = {
     try {
       var meta = this.computeDeadlineMeta(shipByDate);
       if (!meta) return '';
-      // v3.18.8: 8日以上先(none)はバッジを出さない
-      if (meta.level === 'none') return '';
+      // v3.18.19: 8日以上先も白チップで表示 (旧 none の非表示分岐は廃止)
       var cls = 'badge due-' + (meta.level || 'gray');
       var icon = '';
       if (meta.level === 'red') icon = '⛔ ';
