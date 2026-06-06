@@ -96,3 +96,13 @@
   border-left: 4px solid #BA7517;
   background: #FFFDF7;
 }
+/* ★ v1.2: レポート由来(レポートCSVから新規追加) */
+.badge.recovery-report-badge {
+  background: #EAF1FB;
+  color: #1D5FAB;
+  border: 1px dashed #9CC0EC;
+}
+.order-item.recovery-report {
+  border-left: 4px solid #1D5FAB;
+  background: #FAFCFF;
+}

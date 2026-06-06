@@ -68,11 +68,16 @@
       if (o && o.dataSource === 'email') {
         return '<span class="badge recovery-email-badge">📧 メール由来(仮)</span>';
       }
+      if (o && o.dataSource === 'report') {
+        return '<span class="badge recovery-report-badge">📄 レポート由来</span>';
+      }
       return '';
     },
 
     buildItemClass(o) {
-      return (o && o.dataSource === 'email') ? ' recovery-provisional' : '';
+      if (o && o.dataSource === 'email') return ' recovery-provisional';
+      if (o && o.dataSource === 'report') return ' recovery-report';
+      return '';
     },
 
     // ============================================================
