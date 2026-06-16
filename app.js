@@ -596,6 +596,9 @@ const App = {
     // v3.18.16: 発送ポリシー不明バナーを更新 (H列空の未発送があれば Seller Hub CSV取込を促す)
     this._updatePolicyBanner();
 
+    // v3.2.1: 仕入値未取得バナーを更新 (Amazon仕入値が無く一括印刷から除外される件数)
+    this._updateNoCostPrintBanner();
+
     // ★ Zonos: 期限切迫バナー更新
     this._updateZonosExpireBanner();
 
@@ -1422,6 +1425,45 @@ const App = {
     }
   },
 
+  /**
+   * v3.2.1: Amazon仕入値が無いため一括印刷から除外される注文の件数バナー。
+   *  サーバ getBulkPrintTargets と同じ判定をクライアントで再現(情報表示・サーバが正)。
+   *  候補条件: 未発送 AND 未印刷 AND 未キャンセル AND CPaSS取込済。
+   *  同梱(doukonGroupId)は「1点でも仕入値なし」ならグループ全体を除外として数える。
+   */
+  _updateNoCostPrintBanner() {
+    try {
+      var banner = document.getElementById('nocost-print-banner');
+      if (!banner) return;
+      var orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+      var candidates = [];     // {oid, g, hasCost}
+      var groupMissing = {};   // groupId -> 1点でも仕入値なし
+      for (var i = 0; i < orders.length; i++) {
+        var o = orders[i];
+        if (!o) continue;
+        var unshipped = !o.trackingNumber && o.fulfillmentStatus !== 'FULFILLED';
+        var base = unshipped && !o.printedAt && !o.cancelledAt && !!o.cpass; // CPaSS取込済の代理
+        if (!base) continue;
+        var hasCost = (o.amazonCost != null && !isNaN(o.amazonCost) && Number(o.amazonCost) > 0);
+        var g = String(o.doukonGroupId || '').trim();
+        candidates.push({ oid: String(o.orderId || ''), g: g, hasCost: hasCost });
+        if (g && !hasCost) groupMissing[g] = true;
+      }
+      var excluded = {};
+      candidates.forEach(function (c) {
+        var ex = c.g ? !!groupMissing[c.g] : !c.hasCost;
+        if (ex && c.oid) excluded[c.oid] = true;
+      });
+      var n = Object.keys(excluded).length;
+      if (n === 0) { banner.classList.add('hidden'); return; }
+      var countEl = document.getElementById('nocost-print-banner-count');
+      if (countEl) countEl.textContent = n;
+      banner.classList.remove('hidden');
+    } catch (e) {
+      try { console.warn('_updateNoCostPrintBanner error:', e); } catch (_) {}
+    }
+  },
+
   // ★ Zonos: 期限切迫バナー更新
   _updateZonosExpireBanner() {
     if (!window.Zonos || !window.Zonos.buildZonosExpireBanner) return;
@@ -1699,7 +1741,7 @@ const App = {
    */
   async openBulkPrint() {
     if (this.state.bulkPrintCount === 0) {
-      showToast('印刷対象がありません (未発送+CPaSS取込済+未印刷の注文がない)');
+      showToast('印刷対象がありません (未発送+CPaSS取込済+仕入値あり+未印刷の注文がない)');
       return;
     }
     showToast('印刷データを取得中... (' + this.state.bulkPrintCount + '件)');

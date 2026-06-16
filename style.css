@@ -890,6 +890,11 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .policy-banner-body { flex: 1; min-width: 0; }
 .policy-banner-main { font-size: 13px; font-weight: 500; color: #1D5FAB; }
 .policy-banner-sub { font-size: 11px; margin-top: 2px; color: #2F6DB5; }
+
+/* v3.2.1: 仕入値未取得バナー(policy-banner を踏襲しつつ色を区別) */
+.policy-banner.nocost-banner { background: #FBF3E2; border-left-color: #B7791F; }
+.policy-banner.nocost-banner .policy-banner-main { color: #8A5A0B; }
+.policy-banner.nocost-banner .policy-banner-sub { color: #A86E1A; }
 .cpass-banner-btn .spinner {
   display: inline-block;
   width: 12px;

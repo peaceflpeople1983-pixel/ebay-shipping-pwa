@@ -1,10 +1,11 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-2-1: ★ 仕入値未取得の注文を一括印刷から除外(個別印刷は可)+ 仕入値未取得バナー
  * v3-18-15-z21: ★ 手動「キャンセル済にする/解除」長押しアクション (app.js 更新)
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-18-26';
+const CACHE_NAME = 'ebay-ship-v3-2-1';
 
 const STATIC_FILES = [
   './',
