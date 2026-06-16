@@ -691,6 +691,18 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #1e2a4a;
 }
 
+/* ★ Amazon仕入値(カード) */
+.order-amazon-cost {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e2a4a;
+}
+.order-amazon-cost .cost-icon { font-size: 14px; }
+
 .cpass-package .pkg-icon {
   font-size: 14px;
 }
@@ -1187,6 +1199,15 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-family: monospace;
   margin-top: 2px;
 }
+
+/* ★ Amazon仕入値(印刷) */
+.pp-amazon-cost {
+  font-size: 11px;
+  font-weight: 800;
+  color: #000;
+  margin-top: 2px;
+}
+.pp-amazon-cost.none { font-weight: 600; color: #888; }
 
 .pp-cpass {
   background: white;

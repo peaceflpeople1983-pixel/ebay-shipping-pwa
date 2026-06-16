@@ -694,6 +694,7 @@ const App = {
           ${(window.Zonos && !window.Zonos.isZonosTargetOrder(o) && o.country && o.shippingPolicy) ? window.Zonos.buildZonosScopeNote(o) : ''}
           ${(window.TrackingScan && window.TrackingScan.isTrackingTargetOrder) ? window.TrackingScan.buildTrackingButton(o) : ''}
           ${this.renderCpassInfo(o.cpass)}
+          ${this.renderAmazonCost(o)}
           ${dk.breakdownHtml}
         </div>
       </div>`;
@@ -1600,6 +1601,21 @@ const App = {
   },
 
   /**
+   * ★ Amazon仕入値(JPY/1個あたり)をカードに表示。
+   *   getOrders が o.amazonCost を付与 (ASIN→ASIN_仕入シート)。
+   *   未記録(null/0)のときは何も表示しない(カードを汚さない)。
+   */
+  renderAmazonCost(o) {
+    const c = (o && o.amazonCost != null && !isNaN(o.amazonCost) && Number(o.amazonCost) > 0)
+      ? Number(o.amazonCost) : null;
+    if (!c) return '';
+    return '<div class="order-amazon-cost">' +
+      '<span class="cost-icon">💴</span>' +
+      '<span>仕入 ¥' + c.toLocaleString('ja-JP') + '</span>' +
+      '</div>';
+  },
+
+  /**
    * v3.15: CPaSS バナーを表示/更新
    * - Inbox に取込待ちあり → 青いバナー + [取込実行] ボタン
    * - CPaSS 未取込あり → 黄色いバナー (情報のみ)
@@ -2061,9 +2077,16 @@ const App = {
       ? '<div class="pp-cpass"><div class="pp-cpass-label">CPASS PACKAGE</div><div class="pp-cpass-value">#' + cpassPackage + '</div></div>'
       : '<div class="pp-cpass warning"><div class="pp-cpass-label">CPASS</div><div class="pp-cpass-value">⚠ 未取込</div></div>';
 
-    const amazonBlock = amazonTitle
+    // ★ Amazon仕入値(JPY/1個あたり)。未記録は控えめに表示。
+    const amazonCostNum = (o.amazonCost != null && !isNaN(o.amazonCost) && Number(o.amazonCost) > 0) ? Number(o.amazonCost) : null;
+    const costHtml = amazonCostNum
+      ? '<div class="pp-amazon-cost">\u{1F4B4} 仕入 ¥' + amazonCostNum.toLocaleString('ja-JP') + '</div>'
+      : '<div class="pp-amazon-cost none">\u{1F4B4} 仕入 未記録</div>';
+
+    const amazonBlock = (amazonTitle
       ? '<div class="pp-amazon-text">' + amazonTitle + '</div><div class="pp-amazon-asin">\u{1F6D2} ' + asin + '</div>'
-      : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込') + ')</div>';
+      : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込') + ')</div>')
+      + costHtml;
 
     const posCls = positionClass ? (' ' + positionClass) : '';
 
