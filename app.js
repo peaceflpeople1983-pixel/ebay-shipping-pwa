@@ -554,11 +554,15 @@ const App = {
     if (filterAcc) orders = orders.filter(o => o.account === filterAcc);
     if (hideDone) orders = orders.filter(o => !o.selectedCarrier);
     if (hideShipped) orders = orders.filter(o => !(o.trackingNumber || o.fulfillmentStatus === 'FULFILLED'));
-    // ★ v1.0 キャンセル通知: キャンセル済 (未印刷 + AP列マーク済) を隠す
+    // ★ v1.0 キャンセル通知: キャンセル済を隠す。
+    //   v3.2.2: 「印刷済→キャンセル」は紙の抜き取りが必要なので原則残すが、
+    //   キャンセル通知を印刷済(AQ=cancelNoticePrintedAt あり=抜き取り対応完了)なら隠す。
+    //   → 隠す条件: cancelledAt あり AND (未印刷 OR 通知印刷済)。
+    //     残すのは「印刷済 かつ 通知未印刷」(=まだ抜き取り対応していないキャンセルのみ)。
     const hideCancelHistoryEl = document.getElementById('filter-hide-cancel');
     const hideCancelHistory = hideCancelHistoryEl ? hideCancelHistoryEl.checked : false;
     if (hideCancelHistory) {
-      orders = orders.filter(o => !(o.cancelledAt && !o.printedAt));
+      orders = orders.filter(o => !(o.cancelledAt && (!o.printedAt || o.cancelNoticePrintedAt)));
     }
     // ★ Zonos未送信 / 追跡スキャン待ち の OR フィルタ
     const zonosPendingEl = document.getElementById('filter-zonos-pending');
