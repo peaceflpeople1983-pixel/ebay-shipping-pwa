@@ -124,7 +124,7 @@ const App = {
   bindAll() {
     try {
       this._bind('btn-sync', 'onclick', () => this.sync());
-      this._bind('btn-settings', 'onclick', () => this.show('screen-setup'));
+      this._bind('btn-settings', 'onclick', () => { this.show('screen-setup'); this.refreshAmazonCostMeta(); });
       this._bind('btn-new', 'onclick', () => this.openInput(null));
       this._bind('filter-account', 'onchange', () => this.renderOrders());
       this._bind('filter-hide-done', 'onchange', () => this.renderOrders());
@@ -164,6 +164,8 @@ const App = {
 
       // v3.15: CPaSS 取込実行ボタン
       this._bind('btn-cpass-import', 'onclick', () => this.runCpassImport());
+      // v3.2.5: Amazon仕入値 手動取得(設定画面)
+      this._bind('btn-amazon-cost-import', 'onclick', () => this.runAmazonCostImport());
 
       // v3.16: 印刷機能
       this._bind('btn-bulk-print', 'onclick', () => this.openBulkPrint());
@@ -2255,6 +2257,48 @@ const App = {
     } finally {
       btn.disabled = false;
       btn.innerHTML = originalText;
+    }
+  },
+
+  // v3.2.5: Amazon仕入値 手動取得(設定画面ボタン)
+  async runAmazonCostImport() {
+    const btn = document.getElementById('btn-amazon-cost-import');
+    let originalText = '';
+    if (btn) { originalText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 取得中...'; }
+    try {
+      const r = await API.runAmazonCostImport();
+      if (r && r.ok) {
+        showToast('仕入値取得: ' + (r.files || 0) + 'ファイル / 追加' + (r.added || 0) + ' 更新' + (r.updated || 0));
+        await this.loadAll();              // カード/バナーを最新化
+      } else if (r && r.reason === 'busy') {
+        showToast('別の取込が実行中です。少し待って再試行してください');
+      } else if (r && r.reason === 'no_inbox') {
+        showToast('Inbox未設定です(AMAZON_COST_INBOX_ID)');
+      } else {
+        showToast('仕入値取得: 対象なし');
+      }
+    } catch (err) {
+      showToast('仕入値取得 失敗: ' + (err.message || err));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+      this.refreshAmazonCostMeta();        // メタ(最終取得/ASIN件数)を更新
+    }
+  },
+
+  // v3.2.5: 設定画面の仕入値メタ(最終取得時刻・登録ASIN件数)を更新。未設定/失敗時は '—'。
+  async refreshAmazonCostMeta() {
+    const lastEl = document.getElementById('amazon-cost-lastrun');
+    const cntEl = document.getElementById('amazon-cost-count');
+    if (!lastEl && !cntEl) return;
+    if (!API.config || !API.config.url) return;  // 初回(URL未設定)はAPIを叩かない
+    try {
+      const s = await API.getAmazonCostStatus();
+      if (s && s.ok) {
+        if (lastEl) lastEl.textContent = s.lastImportAt || '—';
+        if (cntEl) cntEl.textContent = (s.asinCount != null) ? Number(s.asinCount).toLocaleString('ja-JP') + '件' : '—';
+      }
+    } catch (e) {
+      try { console.warn('refreshAmazonCostMeta error:', e); } catch (_) {}
     }
   },
 

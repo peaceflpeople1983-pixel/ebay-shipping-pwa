@@ -895,6 +895,15 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .policy-banner.nocost-banner { background: #FBF3E2; border-left-color: #B7791F; }
 .policy-banner.nocost-banner .policy-banner-main { color: #8A5A0B; }
 .policy-banner.nocost-banner .policy-banner-sub { color: #A86E1A; }
+
+/* v3.2.5: 設定画面の Amazon仕入値 取得セクション */
+.cost-sec { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 18px; }
+.cost-sec-title { font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.cost-sec-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px; }
+.cost-btn { width: 100%; background: #FBF3E2; color: #8A5A0B; border: 1px solid #E4C685; border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 700; }
+.cost-btn:disabled { opacity: 0.7; }
+.cost-auto-chip { display: inline-flex; align-items: center; gap: 5px; background: #EEF3FB; color: #1D5FAB; border: 1px solid #C7DBF3; border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; margin-top: 10px; }
+.cost-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-tertiary); margin-top: 10px; }
 .cpass-banner-btn .spinner {
   display: inline-block;
   width: 12px;

@@ -30,6 +30,18 @@
       <input type="text" id="cfg-secret" placeholder="setupSharedSecretで生成したUUID">
       <button class="primary" id="btn-save-config">保存して開始</button>
       <button class="secondary" id="btn-clear-cache" style="margin-top: 12px; width: 100%;">マスタキャッシュをクリア（強制再取得）</button>
+
+      <!-- v3.2.5: Amazon仕入値 取得セクション -->
+      <div class="cost-sec" id="amazon-cost-sec">
+        <div class="cost-sec-title">💴 Amazon仕入値</div>
+        <div class="cost-sec-desc">Driveの同期フォルダにある新しいAmazon購入CSVを取り込み、原価(仕入値)を最新化します(新規分のみの軽い取込)。</div>
+        <button class="cost-btn" id="btn-amazon-cost-import">💴 Amazon仕入値を今すぐ取得</button>
+        <div class="cost-auto-chip">⏰ 自動取得: 毎日 7:00 / 19:00</div>
+        <div class="cost-meta">
+          <span>最終取得: <b id="amazon-cost-lastrun">—</b></span>
+          <span>登録ASIN: <b id="amazon-cost-count">—</b></span>
+        </div>
+      </div>
     </div>
   </section>
 

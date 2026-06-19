@@ -86,6 +86,22 @@ const API = {
   },
 
   /**
+   * v3.2.5: Amazon仕入値 手動取得(設定画面ボタン)。増分取込(新規CSVのみ)。
+   * 戻り値: { ok, files, rows, added, updated, skipped, note } | { ok:false, reason }
+   */
+  async runAmazonCostImport() {
+    return this._get('?action=amazonCostImport');
+  },
+
+  /**
+   * v3.2.5: Amazon仕入値メタ状態 (設定画面メタ表示用)
+   * 戻り値: { ok, asinCount, lastImportAt }
+   */
+  async getAmazonCostStatus() {
+    return this._get('?action=amazonCostStatus');
+  },
+
+  /**
    * v3.16: 印刷機能
    */
   async getPrintTargets() {
