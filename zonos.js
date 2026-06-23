@@ -338,8 +338,9 @@
           html += this._renderField('value_' + idx, 'VALUE (Amazon仕入値/JPY)', String(it.value),
             false, '', '¥' + Number(it.value).toLocaleString());
         }
-        // NON-DANGEROUS GOODS REASON = (CPaSS番号) no battery, no glue / 日本語
+        // NON-DANGEROUS GOODS REASON = (CPaSS番号) no battery, no glue(英数字のみ・最大64字)
         html += this._renderField('ndg_' + idx, 'NON-DANGEROUS GOODS REASON', it.nonDangerousReason);
+        html += '<div class="zonos-madein-warn">Zonosで「Others (input detail below)」を選択 → この値を貼付(英数字のみ・最大64字。日本語は不可)</div>';
         // MADE IN(Zonos既定はChina → Japanへ)
         html += this._renderField('madein_' + idx, 'MADE IN', it.madeIn || 'Japan');
         html += '<div class="zonos-madein-warn">⚠ Zonos既定は <b>China</b>。欄に「Japan」を貼付/入力し候補から選択</div>';
