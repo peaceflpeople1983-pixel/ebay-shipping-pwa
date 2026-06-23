@@ -389,3 +389,58 @@
   gap: 6px;
 }
 .zonos-card-btn:active { background: #2d4a8a; }
+
+/* ===== ★ v3.3 PC受け渡し用 追加スタイル ===== */
+
+/* DESCRIPTION 30字メーター */
+.zonos-charmeter {
+  font-size: 10.5px;
+  padding: 2px 12px 8px;
+  margin-top: -2px;
+}
+.zonos-charmeter.ok  { color: #0F6E56; }
+.zonos-charmeter.bad { color: #B42318; font-weight: 600; }
+
+/* 日本語サブラベル(表示のみ・コピー不可) */
+.zonos-sublabel {
+  font-size: 12px;
+  color: #374151;
+  padding: 0 12px 8px;
+}
+.zonos-sublabel .zonos-sublabel-note {
+  font-size: 10px;
+  color: #9AA3B2;
+}
+
+/* 仕入値 未取得の警告 */
+.zonos-cost-missing {
+  margin: 4px 12px 8px;
+  padding: 7px 10px;
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FACC15;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* Made in 注意(既定China → Japanへ) */
+.zonos-madein-warn {
+  font-size: 10.5px;
+  color: #8A4310;
+  background: #FFF1E6;
+  border-left: 3px solid #BA7517;
+  padding: 5px 10px;
+  margin: 0 12px 8px;
+  border-radius: 4px;
+  line-height: 1.5;
+}
+.zonos-madein-warn b { color: #8A1A1A; }
+
+/* 副ボタン(Zonosアプリ=スマホ) */
+#screen-zonos .primary-btn.zonos-secondary-btn {
+  background: #fff;
+  color: #1F3864;
+  border: 1px solid #1F3864;
+  margin-top: 8px;
+}

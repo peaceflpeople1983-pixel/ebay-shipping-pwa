@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-3-0: ★ Zonos PC受け渡し: web版を開く / 申告価格=Amazon仕入値(JPY) / Non-Dangerous Goods Reason(CPaSS番号+注記+日本語) / Made in=Japan / Description 30字メーター / 画像DL
  * v3-2-5: ★ Amazon仕入値: 設定画面に手動取得ボタン+メタ表示 / 自動19:00追加(7:00+19:00)
  * v3-2-2: ★ 「キャンセル済を隠す」で通知印刷済(対応完了)のキャンセルも隠す
  * v3-2-1: ★ 仕入値未取得の注文を一括印刷から除外(個別印刷は可)+ 仕入値未取得バナー
@@ -7,7 +8,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-2-5';
+const CACHE_NAME = 'ebay-ship-v3-3-0';
 
 const STATIC_FILES = [
   './',

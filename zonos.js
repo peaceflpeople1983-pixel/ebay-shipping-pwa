@@ -288,7 +288,9 @@
       // 1 ITEM あたりのフィールド数: description / value / countryOfOrigin / quantity
       //   + weightG が有効なら weight も加算 (同梱は全 ITEM 同じ weightG なので 0/N の二択)
       const hasWeight = d.items.some(it => it.weightG && it.weightG > 0);
-      const fieldsPerItem = 4 + (hasWeight ? 1 : 0);
+      const hasHs = d.items.some(it => it.hsCode);
+      // 1 ITEM あたりコピー欄: description / value / ndg / madein / quantity (+weight +hs)
+      const fieldsPerItem = 5 + (hasWeight ? 1 : 0) + (hasHs ? 1 : 0);
       const totalFields = fields.filter(f => !f.skipIfEmpty || f.value).length +
                            d.items.length * fieldsPerItem;
       const copiedCount = Object.keys(this.state.copiedFields).length;
@@ -314,19 +316,40 @@
       });
       html += '</div>';
 
-      // ITEMS カード (同梱なら1/N, 2/N...)
+      // ITEMS カード (同梱なら1/N, 2/N...) — ★v3.3 PC受け渡し用に再構成
       d.items.forEach((it, idx) => {
         const label = isDoukon ? ('ITEM ' + (idx + 1) + '/' + d.items.length) : 'ITEM';
         html += '<div class="zonos-card">' +
           '<div class="zonos-card-head">▍ ' + label + ' — ' + escapeHtmlZ_(truncate_(it.itemTitle, 40)) + '</div>';
-        html += this._renderField('description_' + idx, 'DESCRIPTION', it.description, true);
-        html += this._renderField('value_' + idx, 'VALUE', it.value.toFixed(2) + ' USD');
-        html += this._renderField('origin_' + idx, 'COUNTRY OF ORIGIN', it.countryOfOrigin);
+        // DESCRIPTION(英語名)+ 30字メーター(税関説明上限)
+        html += this._renderField('description_' + idx, 'DESCRIPTION (英語)', it.description, true);
+        html += this._renderCharMeter(it.description, 30);
+        // 日本語サブラベル(表示のみ・コピー不可)
+        if (it.itemTitle) {
+          html += '<div class="zonos-sublabel">🇯🇵 ' + escapeHtmlZ_(it.itemTitle) +
+            ' <span class="zonos-sublabel-note">(表示のみ・Zonosには貼らない)</span></div>';
+        }
+        // VALUE: Amazon仕入値 (JPY)。未取得は警告し、誤って¥0申告を防ぐ
+        if (it.costMissing) {
+          html += '<div class="zonos-cost-missing">⚠ 仕入値 未取得 — 申告価格を手動で確認してください</div>';
+        } else {
+          html += this._renderField('value_' + idx, 'VALUE (Amazon仕入値/JPY)', String(it.value),
+            false, '', '¥' + Number(it.value).toLocaleString());
+        }
+        // NON-DANGEROUS GOODS REASON = (CPaSS番号) no battery, no glue / 日本語
+        html += this._renderField('ndg_' + idx, 'NON-DANGEROUS GOODS REASON', it.nonDangerousReason);
+        // MADE IN(Zonos既定はChina → Japanへ)
+        html += this._renderField('madein_' + idx, 'MADE IN', it.madeIn || 'Japan');
+        html += '<div class="zonos-madein-warn">⚠ Zonos既定は <b>China</b>。欄に「Japan」を貼付/入力し候補から選択</div>';
+        // QUANTITY
         html += this._renderField('quantity_' + idx, 'QUANTITY', String(it.quantity));
-        // WEIGHT: 表示 "850 g" / コピー "850" (g単位、同梱の全ITEMに同じ値が入る)
-        // 重量未入力 (weightG=0/undefined) は行ごと非表示
+        // HARMONIZED CODE(任意)
+        if (it.hsCode) {
+          html += this._renderField('hs_' + idx, 'HARMONIZED CODE (任意)', it.hsCode);
+        }
+        // UNIT WEIGHT: 表示 "850 g" / コピー "850"(g単位、同梱の全ITEMに同じ値)。未入力は非表示
         if (it.weightG && it.weightG > 0) {
-          html += this._renderField('weight_' + idx, 'WEIGHT', String(it.weightG), false, ' g');
+          html += this._renderField('weight_' + idx, 'UNIT WEIGHT', String(it.weightG), false, ' g');
         }
         html += '</div>';
       });
@@ -334,7 +357,7 @@
       // 商品画像 (タップで写真ライブラリへ保存)
       if (d.items.length > 0 && d.items.some(it => it.imageUrl)) {
         html += '<div class="zonos-card">' +
-          '<div class="zonos-card-head">▍ 商品画像 (タップで写真に保存)</div>' +
+          '<div class="zonos-card-head">▍ 商品画像 (クリックでDL → Zonosに添付)</div>' +
           '<div class="product-images">';
         d.items.forEach((it, idx) => {
           if (it.imageUrl) {
@@ -353,7 +376,7 @@
         });
         html += '</div>' +
           '<div style="font-size:10.5px; color:var(--text-secondary); padding:8px 12px 10px; line-height:1.5;">' +
-            '💡 タップで写真ライブラリへ保存 → Zonosアプリで「写真を選択」から取り込めます' +
+            '💡 PC: クリックで画像をダウンロード → Zonos web版の「Browse / ドラッグ」で添付(Snipping Tool不要)。スマホ: タップで写真保存。' +
           '</div>' +
         '</div>';
       }
@@ -387,8 +410,9 @@
       }
       html += '</div>';
 
-      // Zonosアプリを開くボタン
-      html += '<button class="primary-btn" id="zonos-open-app-btn">📲 Zonosアプリを開く</button>';
+      // Zonos web版を開く(PC・主) + アプリ(スマホ・副)
+      html += '<button class="primary-btn" id="zonos-open-web-btn">🌐 Zonos Prepay web版を開く</button>';
+      html += '<button class="primary-btn zonos-secondary-btn" id="zonos-open-app-btn">📲 Zonosアプリを開く(スマホ)</button>';
       html += '<div style="height: 24px;"></div>';
 
       root.innerHTML = html;
@@ -404,28 +428,42 @@
      * @param {boolean} [isAiTranslated]
      * @param {string} [displaySuffix] - 表示にのみ付加する単位等 (例: ' g')。コピーには含まれない
      */
-    _renderField(key, label, value, isAiTranslated, displaySuffix) {
+    _renderField(key, label, value, isAiTranslated, displaySuffix, displayValue) {
       if (!value && value !== 0) return '';
       const isCopied = !!this.state.copiedFields[key];
       const cls = isCopied ? 'done' : '';
       const btnText = isCopied ? '✓ 済' : '📋';
       const btnCls = isCopied ? 'done' : '';
-      const escapedValue = escapeHtmlZ_(String(value));
+      // 表示値(displayValue があればそれを表示。コピー値は常に value)
+      const shownRaw = (displayValue != null && displayValue !== '') ? String(displayValue) : String(value);
+      const shownHtml = escapeHtmlZ_(shownRaw);
       const suffixHtml = displaySuffix
         ? '<span class="copy-field-unit">' + escapeHtmlZ_(displaySuffix) + '</span>'
         : '';
       const aiTag = isAiTranslated ? '<span class="ai-tag">AI英訳</span>' : '';
-      const warnTag = containsNonAscii_(String(value))
+      // 「要確認」は英訳DESCRIPTIONに日本語が残っている場合のみ(日本語が正規の欄では出さない)
+      const warnTag = (isAiTranslated && containsNonAscii_(String(value)))
         ? '<span class="warn-tag">⚠ 要確認</span>'
         : '';
       return '<div class="copy-field ' + cls + '" data-field-key="' + escapeAttrZ_(key) + '">' +
         '<div class="copy-field-info">' +
           '<div class="copy-field-key">' + escapeHtmlZ_(label) + '</div>' +
-          '<div class="copy-field-value">' + escapedValue + suffixHtml + aiTag + warnTag + '</div>' +
+          '<div class="copy-field-value">' + shownHtml + suffixHtml + aiTag + warnTag + '</div>' +
         '</div>' +
         '<button class="copy-btn ' + btnCls + '" data-copy-value="' + escapeAttrZ_(String(value)) + '" ' +
           'data-copy-key="' + escapeAttrZ_(key) + '">' + btnText + '</button>' +
       '</div>';
+    },
+
+    /** DESCRIPTION の30字メーター(税関説明の既定上限) */
+    _renderCharMeter(text, limit) {
+      const n = String(text || '').length;
+      const ok = n <= limit;
+      const cls = ok ? 'ok' : 'bad';
+      const msg = ok
+        ? (n + ' / ' + limit + ' 字 ✓ 税関説明に収まる')
+        : (n + ' / ' + limit + ' 字 ⚠ 超過 — 名前を短縮推奨(税関側で切詰めの恐れ)');
+      return '<div class="zonos-charmeter ' + cls + '">' + escapeHtmlZ_(msg) + '</div>';
     },
 
     _bindEvents() {
@@ -457,11 +495,22 @@
         saveBtn.addEventListener('click', () => this._saveDeclaration());
       }
 
-      // Zonosアプリを開く
+      // Zonos web版を開く(PC)
+      const openWebBtn = document.getElementById('zonos-open-web-btn');
+      if (openWebBtn) {
+        openWebBtn.addEventListener('click', () => this._openZonosWeb());
+      }
+
+      // Zonosアプリを開く(スマホ)
       const openBtn = document.getElementById('zonos-open-app-btn');
       if (openBtn) {
         openBtn.addEventListener('click', () => this._openZonosApp());
       }
+    },
+
+    /** Zonos Prepay web版 (PC) を新規タブで開く */
+    _openZonosWeb() {
+      window.open('https://dashboard.zonosprepay.com/', '_blank', 'noopener');
     },
 
     /**
@@ -566,9 +615,10 @@
     _updateProgress() {
       const d = this.state.data;
       if (!d) return;
-      // 1 ITEM あたり: description / value / countryOfOrigin / quantity (+weight if present)
+      // 1 ITEM あたり: description / value / ndg / madein / quantity (+weight +hs)
       const hasWeight = d.items.some(it => it.weightG && it.weightG > 0);
-      const fieldsPerItem = 4 + (hasWeight ? 1 : 0);
+      const hasHs = d.items.some(it => it.hsCode);
+      const fieldsPerItem = 5 + (hasWeight ? 1 : 0) + (hasHs ? 1 : 0);
       const totalFields = 8 + d.items.length * fieldsPerItem;
       const copiedCount = Object.keys(this.state.copiedFields).length;
       const progressPct = totalFields > 0 ? Math.round(copiedCount / totalFields * 100) : 0;
