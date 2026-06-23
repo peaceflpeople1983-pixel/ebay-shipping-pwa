@@ -324,10 +324,12 @@
         // DESCRIPTION(英語名)+ 30字メーター(税関説明上限)
         html += this._renderField('description_' + idx, 'DESCRIPTION (英語)', it.description, true);
         html += this._renderCharMeter(it.description, 30);
-        // 日本語サブラベル(表示のみ・コピー不可)
-        if (it.itemTitle) {
-          html += '<div class="zonos-sublabel">🇯🇵 ' + escapeHtmlZ_(it.itemTitle) +
-            ' <span class="zonos-sublabel-note">(表示のみ・Zonosには貼らない)</span></div>';
+        // 日本語サブラベル(表示のみ・コピー不可)= Amazon日本語商品名。無ければeBay名にフォールバック
+        var jaLabel = it.amazonTitleJa || it.itemTitle;
+        if (jaLabel) {
+          const jaSrc = it.amazonTitleJa ? 'Amazon商品名' : 'eBay名(Amazon名なし)';
+          html += '<div class="zonos-sublabel">🇯🇵 ' + escapeHtmlZ_(jaLabel) +
+            ' <span class="zonos-sublabel-note">(' + jaSrc + '・表示のみ)</span></div>';
         }
         // VALUE: Amazon仕入値 (JPY)。未取得は警告し、誤って¥0申告を防ぐ
         if (it.costMissing) {
@@ -542,8 +544,12 @@
           // File オブジェクトを作成
           const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
 
-          // Tier 1: Web Share API (iOS 15+ で「写真に保存」が選べる)
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          // Tier 1: Web Share API はモバイルのみ。
+          //   ★v3.3 fix: PC(Windows等)では共有シートが出てファイル保存/添付できないため使わず、
+          //   Tier 2(ファイルDL)へ直行する。
+          const isMobileLike = (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) ||
+            (navigator.maxTouchPoints > 1 && !/Windows NT/i.test(navigator.userAgent || ''));
+          if (isMobileLike && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
               await navigator.share({ files: [file], title: filename });
               if (typeof showToast === 'function') showToast('共有シートを開きました');
