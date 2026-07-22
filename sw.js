@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-4-1: ★ 同期エラーバナー: アカウント別の注文同期失敗(eBay認証切れ等)をPWAに警告表示(沈黙させない)
  * v3-3-2: ★ Non-Dangerous欄はASCIIのみ(Zonosが日本語を除去)→ NDGは「(CPaSS番号) no battery, no glue」。日本語はPWA表示専用。「Others」選択ヒント追加
  * v3-3-1: ★ Zonos修正: PCで画像をDL(Web Share回避) / 日本語訳はAmazon商品名から取得
  * v3-3-0: ★ Zonos PC受け渡し: web版を開く / 申告価格=Amazon仕入値(JPY) / Non-Dangerous Goods Reason(CPaSS番号+注記+日本語) / Made in=Japan / Description 30字メーター / 画像DL
@@ -10,7 +11,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-3-2';
+const CACHE_NAME = 'ebay-ship-v3-4-1';
 
 const STATIC_FILES = [
   './',

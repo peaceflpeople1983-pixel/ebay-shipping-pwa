@@ -82,6 +82,15 @@
       <button class="today-bar-btn secondary" id="btn-today-clear" title="本日グループをクリア">クリア</button>
     </div>
 
+    <!-- ★ v3.4.1: 同期エラーバナー (アカウント別の注文同期失敗を表示。eBay認証切れは再認可手順を案内) -->
+    <div class="sync-error-banner hidden" id="sync-error-banner">
+      <span class="sync-error-icon">🔒</span>
+      <div class="sync-error-body">
+        <div class="sync-error-main" id="sync-error-main"></div>
+        <div class="sync-error-sub" id="sync-error-sub"></div>
+      </div>
+    </div>
+
     <div class="cpass-banner hidden" id="cpass-banner">
       <div class="cpass-inbox-alert hidden" id="cpass-inbox-alert">
         <span class="cpass-banner-icon">📂</span>

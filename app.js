@@ -43,6 +43,7 @@ const App = {
     pendingWrites: 0,
     batchScanActive: false,
     cpassStatus: null,  // v3.15: { inbox_pending_count, unimported_count, unimported_orders }
+    syncStatus: null,   // ★ v3.4.1: { at, daysBack, accounts: { acc: {ok, fetched, inserted, error} } }
     // v3.16: 印刷関連
     bulkPrintCount: 0,
     bulkPrintTargets: [],
@@ -447,6 +448,7 @@ const App = {
       step = 'state assignment';
       this.state.orders = data.orders || [];
       this.state.cpassStatus = data.cpass_status || null;  // v3.15
+      this.state.syncStatus = data.sync_status || null;    // ★ v3.4.1: 同期エラーバナー用
       // ★ RECOVERY: 未取得 order 件数バッジ更新
       if (window.Recovery && typeof Recovery.setCount === 'function') {
         Recovery.setCount(data.recovery_missing_count || 0);
@@ -459,6 +461,8 @@ const App = {
       this.renderOrders();
       step = 'updateCpassBanner';
       this.updateCpassBanner();  // v3.15
+      step = 'updateSyncErrorBanner';
+      this.updateSyncErrorBanner();  // ★ v3.4.1
       step = 'updateBulkPrintBadge';
       this.updateBulkPrintBadge();  // v3.16
       // ★ キャンセル通知 v1.0: バナー + バッジ更新
@@ -1669,6 +1673,56 @@ const App = {
    * - CPaSS 未取込あり → 黄色いバナー (情報のみ)
    * - 両方なし → バナー全体非表示
    */
+  /**
+   * ★ v3.4.1: 同期エラーバナーの表示内容を組み立てる純関数(オフライン検証対象)。
+   *  - accounts のうち ok:false のものを列挙
+   *  - error 文字列から「eBay認証切れ(invalid_grant 等)」を判定し、再認可手順を案内
+   * @param {object|null} syncStatus getOrders 応答の sync_status
+   * @return {{show:boolean, main:string, sub:string}}
+   */
+  buildSyncErrorInfo(syncStatus) {
+    const AUTH_FN = { good_market39: 'authorizeGoodMarket39', gifts_fromnippon: 'authorizeGiftsFromNippon' };
+    const failed = [];
+    if (syncStatus && syncStatus.accounts) {
+      Object.keys(syncStatus.accounts).forEach(acc => {
+        const a = syncStatus.accounts[acc];
+        if (a && a.ok === false) failed.push({ account: acc, error: String(a.error || '') });
+      });
+    }
+    if (!failed.length) return { show: false, main: '', sub: '' };
+    const isAuthErr = e => /invalid_grant|refresh_token|Token refresh failed|Run authorize/i.test(e);
+    const authFailed = failed.filter(f => isAuthErr(f.error));
+    const main = failed.map(f => f.account).join(' / ') + ' の注文同期が失敗しています';
+    let sub;
+    if (authFailed.length > 0) {
+      const fns = authFailed.map(f => AUTH_FN[f.account] || ('authorize(' + f.account + ')')).join(' と ');
+      sub = 'eBay認証が切れています(パスワード変更等)。Apps Scriptで ' + fns + ' を実行して再認可してください';
+    } else {
+      sub = (failed[0].error || '').substring(0, 120) || '原因不明。Apps Scriptの実行ログを確認してください';
+    }
+    if (syncStatus.at) {
+      const d = new Date(syncStatus.at);
+      if (!isNaN(d.getTime())) {
+        sub += ' (最終同期試行: ' + (d.getMonth() + 1) + '/' + d.getDate()
+             + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ')';
+      }
+    }
+    return { show: true, main: main, sub: sub };
+  },
+
+  /** ★ v3.4.1: 同期エラーバナーのDOM反映(表示は buildSyncErrorInfo に委譲) */
+  updateSyncErrorBanner() {
+    const banner = document.getElementById('sync-error-banner');
+    if (!banner) return;
+    const info = this.buildSyncErrorInfo(this.state.syncStatus);
+    if (!info.show) { banner.classList.add('hidden'); return; }
+    const mainEl = document.getElementById('sync-error-main');
+    const subEl = document.getElementById('sync-error-sub');
+    if (mainEl) mainEl.textContent = info.main;
+    if (subEl) subEl.textContent = info.sub;
+    banner.classList.remove('hidden');
+  },
+
   updateCpassBanner() {
     const banner = document.getElementById('cpass-banner');
     const inboxAlert = document.getElementById('cpass-inbox-alert');

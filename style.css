@@ -763,6 +763,30 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 /* ============ v3.15: CPaSS 未取込通知 (注文一覧バナー + カードバッジ + 入力画面警告) ============ */
 
 /* 上部バナー (Inbox 取込待機 / 未取込警告) */
+/* ★ v3.4.1: 同期エラーバナー (アカウント別の注文同期失敗。CPaSSバナーと同系のレイアウト) */
+.sync-error-banner {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FDECEA;
+  border-left: 4px solid #C62828;
+  border-bottom: 1px solid #F5B8B2;
+}
+.sync-error-icon { font-size: 20px; flex-shrink: 0; }
+.sync-error-body { flex: 1; min-width: 0; }
+.sync-error-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8E1B12;
+}
+.sync-error-sub {
+  font-size: 11px;
+  margin-top: 2px;
+  color: #8E1B12;
+  word-break: break-word;
+}
+
 .cpass-banner { display: flex; flex-direction: column; }
 .cpass-inbox-alert,
 .cpass-unimported-alert {
