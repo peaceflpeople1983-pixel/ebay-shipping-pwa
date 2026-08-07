@@ -7,7 +7,12 @@
  */
 const Calculator = {
   master: null,
-  setMaster(m) { this.master = m; },
+  setMaster(m) { this.master = m; this._ecoEuCache = null; },
+
+  // ★ EU対応 (2026-08, 料金ガイド2026-07-30発効):
+  //   SpeedPAK Economy の発送先が DE単独 → EU27カ国 に拡大。
+  //   DE以外の26カ国はマスタ「料金_Eco_EU」(master.rates.ecoEU) の国別列から料金を引く。
+  EU_ECO_CODES: ['AT','BE','BG','CY','CZ','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'],
 
   // 為替レート（USD→JPY、概算）。実運用で必要があればAI設定で外出し可
   exchangeRate: 150,
@@ -97,9 +102,12 @@ const Calculator = {
   _eco(input, country, dims, vol8000, tariffJPY) {
     if (!this._ecoSizeOk(input, country, dims)) return null;
     const billableKg = Math.max(input.weightG / 1000, vol8000);
-    if (billableKg > 25) return null;
-    if (country.code === 'GB' && input.weightG / 1000 > 15) return null;
-    if (country.code === 'AU' && input.weightG / 1000 > 22) return null;
+    const actualKg = input.weightG / 1000;
+    // 実重量の上限 (2026-07-30改定: UK≤15 / AU≤22)
+    if (country.code === 'GB' && actualKg > 15) return null;
+    if (country.code === 'AU' && actualKg > 22) return null;
+    // 請求重量の上限 (US/UK/DE=25, AU=22.5, EU=30, SE=20)
+    if (billableKg > this._ecoBillableCap(country.code)) return null;
 
     const table = this._ecoTable(country.code);
     if (!table) return null;
@@ -135,10 +143,27 @@ const Calculator = {
       usFees,
       totalCost,
       billableG: Math.ceil(billableKg * 1000),
-      estimatedDays: '6〜12営業日',
+      estimatedDays: this._ecoDays(country.code),
       tracking: true,
       insurance: true
     };
+  },
+
+  // 国別の請求重量上限 (2026-07-30改定)
+  _ecoBillableCap(code) {
+    if (code === 'AU') return 22.5;
+    if (code === 'SE') return 20;
+    if (this.EU_ECO_CODES.includes(code)) return 30; // DE以外のEU(DEは25)
+    return 25; // US / GB / DE
+  },
+
+  // 国別の推定配送日数 (2026-07-30版ガイド)
+  _ecoDays(code) {
+    if (code === 'US') return '8〜12営業日';
+    if (code === 'GB') return '7〜10営業日';
+    if (code === 'AU') return '6〜12営業日';
+    if (code === 'DE' || this.EU_ECO_CODES.includes(code)) return '6〜16営業日';
+    return '6〜16営業日';
   },
 
   _ecoTable(code) {
@@ -146,15 +171,39 @@ const Calculator = {
     if (code === 'GB') return this.master.rates.ecoUK;
     if (code === 'DE') return this.master.rates.ecoDE;
     if (code === 'AU') return this.master.rates.ecoAU;
+    if (this.EU_ECO_CODES.includes(code)) return this._ecoEuTable(code);
     return null;
+  },
+
+  // 料金_Eco_EU (master.rates.ecoEU = {header:[国コード27], rows:[[kg, ...27値]]}) から
+  // 国別の [ [kg, JPY], ... ] を組み立てる。空欄(DE>25kg/SE>20kg)は行ごと除外。
+  _ecoEuTable(code) {
+    const eu = this.master.rates.ecoEU;
+    if (!eu || !eu.header || !eu.rows) return null; // マスタ未対応(旧GAS)なら候補に出さない
+    if (!this._ecoEuCache) this._ecoEuCache = {};
+    if (this._ecoEuCache[code]) return this._ecoEuCache[code];
+    const ci = eu.header.indexOf(code);
+    if (ci < 0) return null;
+    const table = [];
+    for (let i = 0; i < eu.rows.length; i++) {
+      const r = eu.rows[i];
+      const v = r[ci + 1]; // r[0]=重量, r[1]〜=header順の料金
+      if (v != null && v !== '' && v > 0) table.push([r[0], v]);
+    }
+    if (table.length === 0) return null;
+    this._ecoEuCache[code] = table;
+    return table;
   },
 
   _ecoSizeOk(input, country, dims) {
     const c = country.code;
     if (c === 'US') return dims[0] <= 66 && (dims[0] + 2 * (dims[1] + dims[2])) <= 274;
     if (c === 'GB') return dims[0] <= 120 && (dims[0] + 2 * (dims[1] + dims[2])) <= 225;
-    if (c === 'DE') return dims[0] <= 110 && dims[1] <= 50 && dims[2] <= 50;
-    if (c === 'AU') return dims[0] <= 105 && (input.lengthCm * input.widthCm * input.heightCm) <= 250000;
+    // 2026-07-30改定: DE=120/60/60、AU体積250,000→180,000、EU(DE以外)=120/40/40。EU/AUは総容積≤180,000cm³
+    const volume = input.lengthCm * input.widthCm * input.heightCm;
+    if (c === 'DE') return dims[0] <= 120 && dims[1] <= 60 && dims[2] <= 60 && volume <= 180000;
+    if (c === 'AU') return dims[0] <= 105 && volume <= 180000;
+    if (this.EU_ECO_CODES.includes(c)) return dims[0] <= 120 && dims[1] <= 40 && dims[2] <= 40 && volume <= 180000;
     return false;
   },
 
