@@ -175,7 +175,7 @@ const Calculator = {
   _ecoTable(code) {
     if (code === 'US') return this.master.rates.ecoUSA48;
     if (code === 'GB') return this.master.rates.ecoUK;
-    if (code === 'DE') return this.master.rates.ecoDE;
+    if (code === 'DE') return this._ecoEuTable('DE') || this.master.rates.ecoDE; // DE二重管理解消: EU表に一本化(旧マスタはDE表へフォールバック)
     if (code === 'AU') return this.master.rates.ecoAU;
     if (this.EU_ECO_CODES.includes(code)) return this._ecoEuTable(code);
     return null;
