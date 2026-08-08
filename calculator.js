@@ -14,8 +14,14 @@ const Calculator = {
   //   DE以外の26カ国はマスタ「料金_Eco_EU」(master.rates.ecoEU) の国別列から料金を引く。
   EU_ECO_CODES: ['AT','BE','BG','CY','CZ','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'],
 
-  // 為替レート（USD→JPY、概算）。実運用で必要があればAI設定で外出し可
+  // 為替レート（USD→JPY）。マスタ「アプリ設定」シートの usd_jpy_rate を優先し、
+  // 未設定・旧マスタの場合は 150 にフォールバック(後方互換)
   exchangeRate: 150,
+  _rate() {
+    const c = this.master && this.master.config;
+    const r = c ? parseFloat(c.usd_jpy_rate) : NaN;
+    return (isFinite(r) && r > 0) ? r : this.exchangeRate;
+  },
 
   calculate(input) {
     if (!this.master) throw new Error('Master data not loaded');
@@ -28,7 +34,7 @@ const Calculator = {
 
     // 米国向けの関税概算（円）
     const tariffJPY = (country.code === 'US' && input.itemPriceUSD && input.tariffRate)
-      ? Math.round(input.itemPriceUSD * input.tariffRate / 100 * this.exchangeRate)
+      ? Math.round(input.itemPriceUSD * input.tariffRate / 100 * this._rate())
       : 0;
 
     const candidates = [];
