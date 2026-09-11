@@ -14,7 +14,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-5-2';
+const CACHE_NAME = 'ebay-ship-v3-6-0'; // v3.6.0: EU関税DDP対応(2026-10-01〜)
 
 const STATIC_FILES = [
   './',

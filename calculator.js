@@ -14,6 +14,33 @@ const Calculator = {
   //   DE以外の26カ国はマスタ「料金_Eco_EU」(master.rates.ecoEU) の国別列から料金を引く。
   EU_ECO_CODES: ['AT','BE','BG','CY','CZ','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK'],
 
+  // ★ EU関税DDP対応 (2026-10-01義務化・取引日基準):
+  //   EU27宛て・150€以下はDDPラベル必須 → 日本郵便(ePacketライト)は候補から除外し、
+  //   OC経由(SpeedPAK Eco/DHL/FedEx)はDDP自動適用のためEU関税+手数料(概算)をセラー負担で加算。
+  //   150€超はDDU可なのでePacketは残す(閾値は概算USD換算)。
+  //   金額・閾値・開始日は「アプリ設定」シートで上書き可能(キーが無ければ既定値)。
+  EU_DDP_DEFAULTS: { start: '2026-10-01', tariffJPY: 567, thresholdUSD: 175 },
+  _euDdpConf() {
+    const c = (this.master && this.master.config) || {};
+    const d = this.EU_DDP_DEFAULTS;
+    const t = parseFloat(c.eu_tariff_jpy);
+    const th = parseFloat(c.eu_ddp_threshold_usd);
+    return {
+      start: String(c.eu_ddp_start || d.start),
+      tariffJPY: (isFinite(t) && t >= 0) ? Math.round(t) : d.tariffJPY,
+      thresholdUSD: (isFinite(th) && th > 0) ? th : d.thresholdUSD
+    };
+  },
+  _isEuCountry(code) { return code === 'DE' || this.EU_ECO_CODES.includes(code); },
+  _todayYmd(input) {
+    if (input && input.dateOverride) return String(input.dateOverride); // テスト用
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+  },
+  _euDdpActive(code, input) {
+    return this._isEuCountry(code) && this._todayYmd(input) >= this._euDdpConf().start;
+  },
+
   // 為替レート（USD→JPY）。マスタ「アプリ設定」シートの usd_jpy_rate を優先し、
   // 未設定・旧マスタの場合は 150 にフォールバック(後方互換)
   exchangeRate: 150,
@@ -67,7 +94,8 @@ const Calculator = {
         vol5000G: Math.ceil(vol5000 * 1000),
         country: country.name,
         tariffJPY: tariffJPY,
-        tariffRate: input.tariffRate || 0
+        tariffRate: input.tariffRate || 0,
+        euDdp: this._euDdpActive(country.code, input) // ★EU関税DDP適用中か(UI推奨表示用)
       }
     };
   },
@@ -76,6 +104,17 @@ const Calculator = {
     // v3.11: 除外時に理由を画面表示できるよう { _excluded:true, name, reason } を返す
     const NAME = 'ePacketライト';
     const ex = (reason) => ({ _excluded: true, name: NAME, reason });
+
+    // ★EU関税DDP(10/1〜): 150€以下(価格不明含む)はDDPラベル必須のため日本郵便は使えない
+    if (this._euDdpActive(country.code, input)) {
+      const conf = this._euDdpConf();
+      const p = input.itemPriceUSD;
+      if (!(p > conf.thresholdUSD)) {
+        return ex(p > 0
+          ? `EU関税DDP義務化(10/1〜): 150€(≈$${conf.thresholdUSD})以下はDDPラベル必須 → CPaSSでSpeedPAKを使う`
+          : `EU関税DDP義務化(10/1〜): 商品価格が未取得のため150€以下とみなし除外(150€超はDDU可・手動入力なら価格確認)`);
+      }
+    }
 
     if (!country.epacketZone) return ex(`国マスタに ePacket 地帯が未設定（${country.code}）`);
     if (input.weightG > 2000) return ex(`重量 ${input.weightG}g が 2000g 超`);
@@ -135,6 +174,10 @@ const Calculator = {
       usFees = 245 + Math.round(tariffJPY * 0.021); // 米国輸入通関手数料 + 関税処理手数料2.1%
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
       if (usFees > 0) surchargeReasons.push('米国通関手数料');
+    } else if (this._euDdpActive(country.code, input)) {
+      // ★EU関税DDP(10/1〜): SpeedPAKはDDP自動適用 → 3€+手数料2.1%の概算をセラー負担で加算
+      tariffSeller = this._euDdpConf().tariffJPY;
+      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
     }
 
     const totalCost = row[1] + surcharge + tariffSeller + usFees;
@@ -242,6 +285,10 @@ const Calculator = {
       tariffSeller = tariffJPY;
       usFees = Math.round(tariffJPY * 0.021); // 関税処理手数料2.1%（DHLは通関手数料は別途）
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
+    } else if (this._euDdpActive(country.code, input)) {
+      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → 概算をセラー負担で加算
+      tariffSeller = this._euDdpConf().tariffJPY;
+      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
     }
 
     const totalCost = cost + surcharge + tariffSeller + usFees;
@@ -306,6 +353,10 @@ const Calculator = {
       // 関税処理手数料 2.1% のみ加算（FICPは他の通関手数料が無料）
       usFees = Math.round(tariffJPY * (sc.usDutyProcessRate || 0.021));
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
+    } else if (this._euDdpActive(country.code, input)) {
+      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → 概算をセラー負担で加算
+      tariffSeller = this._euDdpConf().tariffJPY;
+      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
     }
 
     const totalCost = cost + surcharge + tariffSeller + usFees;

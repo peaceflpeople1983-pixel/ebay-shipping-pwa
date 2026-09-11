@@ -952,7 +952,12 @@ const App = {
     // v3.10: shipping policy に応じた推奨ハイライトの算出
     const order = this.state.currentOrder;
     const shippingPolicy = order ? order.shippingPolicy : '';
-    const recommendedTypes = this.getRecommendedCarrierTypes(shippingPolicy);
+    let recommendedTypes = this.getRecommendedCarrierTypes(shippingPolicy);
+    // ★EU関税DDP(10/1〜): EU宛てEconomy帯はePacket除外 → 推奨をSpeedPAK Ecoに差し替える
+    if (result.context && result.context.euDdp && recommendedTypes.indexOf('epacket') !== -1) {
+      recommendedTypes = recommendedTypes.filter(t => t !== 'epacket');
+      if (recommendedTypes.indexOf('speedpak') === -1) recommendedTypes.push('speedpak');
+    }
     const hintHtml = (recommendedTypes.length > 0)
       ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
       : '';
