@@ -50,6 +50,45 @@ const Calculator = {
     return (isFinite(r) && r > 0) ? r : this.exchangeRate;
   },
 
+  // ★v3.6.1 アプリ設定(master.config)の数値/日付キー。未設定・旧マスタは既定値
+  _cfgNum(key, dflt) {
+    const c = (this.master && this.master.config) || {};
+    const v = parseFloat(c[key]);
+    return isFinite(v) ? v : dflt;
+  },
+  _cfgYmd(key, dflt) {
+    const c = (this.master && this.master.config) || {};
+    const v = c[key];
+    if (!v) return dflt;
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v.trim())) return v.trim().slice(0, 10);
+    const d = new Date(v); // Sheetsの日付セルはDate/ISO文字列で届く
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    return dflt;
+  },
+  // ★v3.6.1 燃料サーチャージ(週次キャッシュ・master.fuel)。旧マスタ(未同梱)は null=加算しない
+  _fuelConf(carrier) {
+    const f = this.master && this.master.fuel && this.master.fuel[carrier];
+    if (!f) return null;
+    const eff = parseFloat(f.eff);
+    if (!isFinite(eff) || eff <= 0 || eff >= 90) return null;
+    return { eff, stale: !!f.stale };
+  },
+  _fuelReason(conf) {
+    return '燃料割増金 ' + conf.eff.toFixed(2) + '%' + (conf.stale ? '(⚠旧率・更新待ち)' : '');
+  },
+  // ★v3.6.1 FedEx混雑時割増金の国別単価(円/kg)。2026-09-21改定を日付で切替。旧マスタは null
+  _fedexDemandPerKg(code, input) {
+    const d = this.master && this.master.fedexDemand;
+    if (!d || !d.after) return null;
+    const useAfter = this._todayYmd(input) >= (d.changeDate || '2026-09-21');
+    let v = useAfter ? d.after[code] : (d.before || {})[code];
+    if (!useAfter && (v == null || v === '')) v = d.after[code]; // 改定前単価が未実測の国はフォールバック
+    const n = parseFloat(v);
+    return isFinite(n) ? n : null;
+  },
+
   calculate(input) {
     if (!this.master) throw new Error('Master data not loaded');
     const country = this.master.countries.find(c => c.code === input.country);
@@ -164,6 +203,17 @@ const Calculator = {
     if (dims[0] > 55.88 || (input.lengthCm * input.widthCm * input.heightCm) > 55000) {
       surcharge += this.master.surcharges.eco.oversizeFlat;
       surchargeReasons.push('規定外寸法');
+    }
+
+    // ★v3.6.1: Eco混雑時割増金(EU27・ピークシーズン11/1〜12/31・アプリ設定 eco_demand_jpy。
+    //   ガイド2026-09版&マスタ「サーチャージ_Eco」準拠。燃料はEcoの料金表に込みのため加算しない)
+    const ecoDemandJPY = this._cfgNum('eco_demand_jpy', 0);
+    if (ecoDemandJPY > 0 && this._isEuCountry(country.code)) {
+      const md = this._todayYmd(input).slice(5); // 'MM-DD'
+      if (md >= '11-01' && md <= '12-31') {
+        surcharge += ecoDemandJPY;
+        surchargeReasons.push('混雑時割増金(ピークシーズン)');
+      }
     }
 
     // 米国向け関税＋通関手数料（Orange Connex経由はセラー負担）
@@ -291,10 +341,21 @@ const Calculator = {
       if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
     }
 
+    // ★v3.6.1: 燃料割増金 = 実効率(公表×0.75=SpeedPAK 25%OFF) × (運賃+対象サーチャージ)。
+    //   OC実請求の逆算で検証済み(IE: 2265×0.75×42.50%=722円一致)。旧マスタは加算なし
+    let fuelJPY = 0;
+    const dhlFuel = this._fuelConf('dhl');
+    if (dhlFuel) {
+      fuelJPY = Math.round((cost + surcharge) * dhlFuel.eff / 100);
+      surcharge += fuelJPY;
+      surchargeReasons.push(this._fuelReason(dhlFuel));
+    }
+
     const totalCost = cost + surcharge + tariffSeller + usFees;
 
     return {
       carrier: 'eBay SpeedPAK Ship via DHL',
+      fuelJPY,
       detail: 'Zone ' + country.dhlZone,
       basicCost: cost,
       surcharge,
@@ -318,8 +379,14 @@ const Calculator = {
     const girth = 2 * (dims[1] + dims[2]);
     if (dims[0] + girth > 330) return null;
     // 重量制限：68kg
-    const billableKg = Math.max(input.weightG / 1000, vol5000);
+    let billableKg = Math.max(input.weightG / 1000, vol5000);
     if (billableKg > 68) return null;
+
+    // ★v3.6.1: 非標準判定を運賃検索より先に行う(特別取扱-寸法は最低請求重量18kgが運賃ティアに波及)
+    const isOversize = dims[0] > 243; // (長さ+胴回り>330は上でnull済み)
+    const isAhsDim = !isOversize && (dims[0] > 121 || dims[1] > 76 || (dims[0] + girth) > 266);
+    const isAhsWeight = input.weightG / 1000 > 25;
+    if (isAhsDim && billableKg < 18) billableKg = 18; // ガイド2026-09: 特別取扱(寸法)は最低請求重量18kg
 
     // 料金検索：重量を切り上げて該当行を取得
     const fedexRates = this.master.rates.fedex || [];
@@ -328,22 +395,46 @@ const Calculator = {
     const cost = tier.zones[fedexZone];
     if (!cost) return null;
 
-    let surcharge = 0;
     const surchargeReasons = [];
     const sc = this.master.surcharges.fedex || {};
-    // オーバーサイズ：長さ243cm超 or 長さ+胴回り330cm超
-    if (dims[0] > 243 || (dims[0] + girth) > 330) {
-      surcharge += sc.oversizeFlat || 8800;
+
+    // 非標準手数料 ★v3.6.1: 複数該当時は最高額1つのみ(ガイド2026-09。旧版は寸法+重量を重複加算していた)
+    let nonStdJPY = 0;
+    if (isOversize) {
+      nonStdJPY = sc.oversizeFlat || 8800;
       surchargeReasons.push('オーバーサイズ');
-    } else if (dims[0] > 121 || dims[1] > 76 || (dims[0] + girth) > 266) {
-      // 特別取扱料金（寸法）：長さ121cm超 or 二番目76cm超 or 長さ+胴回り266cm超
-      surcharge += sc.specialHandlingDimFlat || 3390;
-      surchargeReasons.push('特別取扱料金(寸法)');
+    } else if (isAhsDim || isAhsWeight) {
+      nonStdJPY = Math.max(sc.specialHandlingDimFlat || 3390, sc.specialHandlingWeightFlat || 3390);
+      surchargeReasons.push(isAhsDim ? '特別取扱料金(寸法)' : '特別取扱料金(重量)');
+      if (isAhsDim && isAhsWeight) surchargeReasons.push('※寸法+重量該当も課金は高い方1つ');
     }
-    if (input.weightG / 1000 > 25) {
-      surcharge += sc.specialHandlingWeightFlat || 3390;
-      surchargeReasons.push('特別取扱料金(重量)');
+
+    // ★v3.6.1: 混雑時割増金(国別円/kg×請求重量・最低37円/件。2026-09-21改定を日付切替。旧マスタは非加算)
+    let demandJPY = 0;
+    const demandPerKg = this._fedexDemandPerKg(country.code, input);
+    if (demandPerKg != null && demandPerKg > 0) {
+      demandJPY = Math.max(this._cfgNum('fedex_demand_min_jpy', 37), Math.round(demandPerKg * billableKg));
+      surchargeReasons.push('混雑時割増金(' + demandPerKg + '円/kg)');
     }
+
+    // ★v3.6.1: 非標準貨物混雑時割増金 NSSDS(2026-09-21新設・非標準該当時+770円・燃料対象)
+    let nssdsJPY = 0;
+    if (this.master.fedexDemand && (isOversize || isAhsDim || isAhsWeight)
+        && this._todayYmd(input) >= this._cfgYmd('nssds_start', '2026-09-21')) {
+      nssdsJPY = this._cfgNum('nssds_jpy', 770);
+      surchargeReasons.push('非標準貨物混雑時割増金');
+    }
+
+    // ★v3.6.1: 燃料割増金 = 公表週率(割引なし) × (運賃+非標準+混雑時+NSSDS)。
+    //   OC実請求の逆算で検証済み(基礎に混雑時割増金を含む)。旧マスタは非加算
+    let fuelJPY = 0;
+    const fedexFuel = this._fuelConf('fedex');
+    if (fedexFuel) {
+      fuelJPY = Math.round((cost + nonStdJPY + demandJPY + nssdsJPY) * fedexFuel.eff / 100);
+      surchargeReasons.push(this._fuelReason(fedexFuel));
+    }
+
+    const surcharge = nonStdJPY + demandJPY + nssdsJPY + fuelJPY;
 
     // 米国向け関税：FICPは米国輸入手続き手数料が無料、関税転送も無料
     let tariffSeller = 0;
@@ -352,6 +443,12 @@ const Calculator = {
       tariffSeller = tariffJPY;
       // 関税処理手数料 2.1% のみ加算（FICPは他の通関手数料が無料）
       usFees = Math.round(tariffJPY * (sc.usDutyProcessRate || 0.021));
+      // ★v3.6.1: MPF簡易通関(2.69USD/件・アプリ設定 fedex_mpf_usd。旧マスタはキー無し=0)
+      const mpfUSD = this._cfgNum('fedex_mpf_usd', 0);
+      if (mpfUSD > 0) {
+        usFees += Math.round(mpfUSD * this._rate());
+        surchargeReasons.push('米国MPF(簡易通関)');
+      }
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
     } else if (this._euDdpActive(country.code, input)) {
       // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → 概算をセラー負担で加算
@@ -367,6 +464,9 @@ const Calculator = {
       basicCost: cost,
       surcharge,
       surchargeReasons,
+      demandJPY,   // ★v3.6.1 内訳(UI/検証用)
+      nssdsJPY,
+      fuelJPY,
       tariffSeller,
       usFees,
       totalCost,
