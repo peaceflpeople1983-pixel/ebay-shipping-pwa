@@ -1,5 +1,8 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-8-0: ★ Zonos APIラベル発行: Zonos送信画面に「⚡APIでラベル発行」— 関税計算→Declaration ID→
+ *           ラベルPDF(署名+発送日印字)→シート書込みまで自動 (zonos_api.js 新規 + GAS zonos_api.gs)。
+ *           差出票はラベル発行済み(追跡あり・未FULFILLED)も対象に (sashidashi.js v1.2)
  * v3-7-0: ★ 料金後納郵便物差出票の出力: 確定済ePacketライトを重量帯×料金で集計し正式様式をA4印刷 (sashidashi.js 新規)
  * v3-6-1: ★ FedEx混雑時割増金(2026-09-21改定・国別kg単価×請求重量・最低37円) + NSSDS(非標準+770円) +
  *           燃料割増金の自動加算(FedEx=公表週率/DHL=公表×0.75・週次キャッシュ) + 米国MPF(2.69USD) +
@@ -18,7 +21,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-7-0'; // v3.7.0: 料金後納郵便物差出票の出力 (sashidashi.js)
+const CACHE_NAME = 'ebay-ship-v3-8-0'; // v3.8.0: Zonos APIラベル発行 (zonos_api.js) + 差出票v1.2
 
 const STATIC_FILES = [
   './',
@@ -33,6 +36,7 @@ const STATIC_FILES = [
   './calculator.js',
   './ocr.js',
   './zonos.js',
+  './zonos_api.js',
   './tracking_scan.js',
   './cancel_notice.js',
   './recovery.js',

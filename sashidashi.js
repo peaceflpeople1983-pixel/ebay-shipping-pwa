@@ -85,15 +85,16 @@
 
   /**
    * 差出票の候補注文を返す。
-   * 条件: 発送方法確定済み(ePacketライト) / 未発送 / キャンセルでない / 同梱の子でない
+   * 条件: 発送方法確定済み(ePacketライト) / 未FULFILLED / キャンセルでない / 同梱の子でない
    * (同梱は lead 1件 = 物理1個として数える。lead の重量・料金が小包全体の値)
+   * v1.2: 「追跡番号なし」条件を撤廃 — Zonos APIラベル発行では差出し前に追跡番号が付くため。
+   *       eBayへ追跡登録(FULFILLED)された時点で差出済みとみなして除外する
    */
   function collectCandidates() {
     const orders = (window.App && Array.isArray(App.state.orders)) ? App.state.orders : [];
     return orders.filter(o =>
       o &&
       o.selectedCarrier === TARGET_CARRIER &&
-      !o.trackingNumber &&
       o.fulfillmentStatus !== 'FULFILLED' &&
       !o.cancelledAt &&
       o.doukonRole !== 'sub'
