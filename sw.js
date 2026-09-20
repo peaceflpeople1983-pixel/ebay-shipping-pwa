@@ -23,7 +23,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-9'; // v3.8.9: 差出票: チェックボックス表示修正+差出日を候補の発送日へ自動切替
+const CACHE_NAME = 'ebay-ship-v3-8-10'; // v3.8.10: 差出票様式へのアプリCSS漏れ込み対策(白地黒字に強制)
 
 const STATIC_FILES = [
   './',

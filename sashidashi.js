@@ -473,6 +473,10 @@
     R + '.toolbar .hint { color: #cdd6ea; font-size: 12px; font-family: sans-serif; }',
     R + '.sheet { width: 210mm; min-height: 296mm; margin: 8px auto; background: #fff; padding: 14mm 12mm; page-break-after: always; }',
     R + '.sheet:last-child { page-break-after: auto; }',
+    // アプリ本体style.cssの漏れ込み対策 (.head等の汎用クラスが紺背景・白文字になる):
+    // 様式内は白地・黒字に強制 (画面表示・印刷とも)
+    R + '.sheet, ' + R + '.sheet * { background: transparent !important; color: #000 !important; box-shadow: none !important; text-shadow: none !important; }',
+    R + '.sheet { background: #fff !important; }',
     R + '.title { text-align: center; font-size: 22px; letter-spacing: 6px; margin-bottom: 6mm; }',
     R + '.head { display: flex; align-items: flex-start; gap: 6mm; margin-bottom: 3mm; }',
     R + '.stamp { width: 34mm; height: 22mm; border: 1.2px solid #000; position: relative; }',
