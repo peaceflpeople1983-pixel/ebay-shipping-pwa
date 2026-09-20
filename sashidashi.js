@@ -266,6 +266,15 @@
     const dateEl = document.getElementById('sashidashi-date');
     if (dateEl) dateEl.onchange = applyDateSelection;
     applyDateSelection();
+    // 今日で自動選択が0件なら、候補(未印刷)の発送日のうち最も近い日へ自動切替 (前夜の翌日分印刷を1タップに)
+    if (dateEl && !wrap.querySelector('.sashidashi-list input[type=checkbox]:checked')) {
+      const dates = cands.filter(c => c.ok && !c.printed && c.shipDate).map(c => c.shipDate).sort();
+      const next = dates.find(d => d >= todayStr) || dates[dates.length - 1];
+      if (next && next !== dateEl.value) {
+        dateEl.value = next;
+        applyDateSelection();
+      }
+    }
 
     document.getElementById('sashidashi-cancel').onclick = closeModal;
     document.getElementById('sashidashi-print').onclick = () => {
@@ -526,6 +535,7 @@
       '.sashidashi-list { overflow-y: auto; flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px; min-height: 60px; }',
       '.sashidashi-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; }',
       '.sashidashi-row.ng { opacity: 0.55; }',
+      '.sashidashi-row input[type=checkbox] { width: 20px !important; height: 20px !important; flex: none; margin: 0; padding: 0; appearance: auto; -webkit-appearance: checkbox; }',
       '.sashidashi-oid { font-weight: 600; font-family: monospace; }',
       '.sashidashi-meta { color: #555; }',
       '.sashidashi-doukon { background: #1F3864; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
