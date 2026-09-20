@@ -268,6 +268,7 @@
           '</div>') : '') +
         '<div class="zapi-actions">' +
           '<button class="zapi-sec" id="zapi-up-cancel">閉じる</button>' +
+          (targets.length ? '<button class="zapi-sec" id="zapi-up-skip" title="既にeBay登録済み等の過去分をリストから外す">送らず除外</button>' : '') +
           (targets.length ? '<button class="zapi-btn" id="zapi-up-exec">eBayへ登録</button>' : '') +
         '</div>' +
         '<div id="zapi-up-result"></div>' +
@@ -275,6 +276,34 @@
     document.body.appendChild(wrap);
     document.getElementById('zapi-up-cancel').onclick = closeUploadModal;
     wrap.onclick = (e) => { if (e.target === wrap) closeUploadModal(); };
+
+    // 「送らず除外」: eBayへPOSTせずAO列に除外マークを付けてリストから外す (過去分クリーンアップ)
+    const skipBtn = document.getElementById('zapi-up-skip');
+    if (skipBtn) skipBtn.onclick = async () => {
+      const checked = [];
+      wrap.querySelectorAll('.zapi-up-list input[type=checkbox]:checked')
+        .forEach(cb => checked.push(targets[parseInt(cb.dataset.idx, 10)]));
+      const resultEl = document.getElementById('zapi-up-result');
+      if (checked.length === 0) { resultEl.innerHTML = '<div class="zapi-error">小包が選択されていません</div>'; return; }
+      if (!window.confirm('選択した ' + checked.length + ' 件を「eBayへ送らず除外」しますか？\n\n' +
+        '※ eBayには何も送信しません。既にSeller Hub等で追跡登録済みの過去分を\n' +
+        'このリストから外すための操作です。')) return;
+      skipBtn.disabled = true;
+      try {
+        const r = await API._post({
+          action: 'zonosMarkUploadedManual',
+          secret: API.config.secret,
+          orderIds: checked.map(t => t.orderId)
+        });
+        if (r.error) throw new Error(r.error);
+        resultEl.innerHTML = '<div class="zapi-success">✅ ' + checked.length + '件を除外しました</div>';
+        if (window.App && typeof App.loadAll === 'function') App.loadAll();
+        setTimeout(closeUploadModal, 1500);
+      } catch (e) {
+        resultEl.innerHTML = '<div class="zapi-error">❌ ' + escapeHtml(e.message || String(e)) + '</div>';
+        skipBtn.disabled = false;
+      }
+    };
 
     const execBtn = document.getElementById('zapi-up-exec');
     if (execBtn) execBtn.onclick = async () => {

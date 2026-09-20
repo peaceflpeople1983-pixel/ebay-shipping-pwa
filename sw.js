@@ -23,7 +23,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-3'; // v3.8.3: eBay登録モーダルのチェックボックス表示修正+過去分は既定未チェック
+const CACHE_NAME = 'ebay-ship-v3-8-4'; // v3.8.4: eBay登録: 逆アカウント自動リトライ+送らず除外ボタン
 
 const STATIC_FILES = [
   './',
