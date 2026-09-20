@@ -169,7 +169,7 @@
       };
       if (typeof showToast === 'function') showToast('✓ ラベル発行: ' + r.trackingNumber);
       // 一覧・差出票へ反映
-      if (window.App && typeof App.loadAll === 'function') App.loadAll();
+      if (typeof App !== 'undefined' && typeof App.loadAll === 'function') App.loadAll();
     } catch (e) {
       resultEl.innerHTML = '<div class="zapi-error">❌ ' + escapeHtml(e.message || String(e)) + '</div>';
       btn.disabled = false;
@@ -297,7 +297,7 @@
         });
         if (r.error) throw new Error(r.error);
         resultEl.innerHTML = '<div class="zapi-success">✅ ' + checked.length + '件を除外しました</div>';
-        if (window.App && typeof App.loadAll === 'function') App.loadAll();
+        if (typeof App !== 'undefined' && typeof App.loadAll === 'function') App.loadAll();
         setTimeout(closeUploadModal, 1500);
       } catch (e) {
         resultEl.innerHTML = '<div class="zapi-error">❌ ' + escapeHtml(e.message || String(e)) + '</div>';
@@ -340,7 +340,7 @@
         }
         resultEl.innerHTML = html;
         if (typeof showToast === 'function') showToast('eBay登録: ' + r.uploaded + '件完了');
-        if (window.App && typeof App.loadAll === 'function') App.loadAll();
+        if (typeof App !== 'undefined' && typeof App.loadAll === 'function') App.loadAll();
         if (!(r.failed && r.failed.length)) setTimeout(closeUploadModal, 2500);
       } catch (e) {
         resultEl.innerHTML = '<div class="zapi-error">❌ ' + escapeHtml(e.message || String(e)) + '</div>';

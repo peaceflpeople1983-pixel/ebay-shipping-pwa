@@ -73,7 +73,7 @@
   /** 国コード → ePacket地帯番号 (マスタ国データから)。不明は null */
   function zoneOf(countryCode) {
     try {
-      const list = (window.App && App.state.masterData && App.state.masterData.countries) || [];
+      const list = (typeof App !== 'undefined' && App.state.masterData && App.state.masterData.countries) || [];
       const c = list.find(x => x.code === countryCode);
       return (c && c.epacketZone) ? c.epacketZone : null;
     } catch (e) { return null; }
@@ -91,7 +91,7 @@
    *       eBayへ追跡登録(FULFILLED)された時点で差出済みとみなして除外する
    */
   function collectCandidates() {
-    const orders = (window.App && Array.isArray(App.state.orders)) ? App.state.orders : [];
+    const orders = (typeof App !== 'undefined' && Array.isArray(App.state.orders)) ? App.state.orders : [];
     return orders.filter(o =>
       o &&
       o.selectedCarrier === TARGET_CARRIER &&
@@ -279,7 +279,7 @@
         const ids = getCheckedItems(cands).map(it => it.orderId);
         if (ids.length && window.API && API._post) {
           API._post({ action: 'zonosMarkSashidashiPrinted', secret: API.config.secret, orderIds: ids })
-            .then(r => { if (r && r.success && window.App && App.loadAll) App.loadAll(); })
+            .then(r => { if (r && r.success && typeof App !== 'undefined' && App.loadAll) App.loadAll(); })
             .catch(e => console.warn('差出票印刷済みマーク失敗:', e));
         }
       } catch (e) { console.warn('差出票印刷済みマーク失敗:', e); }
