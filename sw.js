@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-7-0: ★ 料金後納郵便物差出票の出力: 確定済ePacketライトを重量帯×料金で集計し正式様式をA4印刷 (sashidashi.js 新規)
  * v3-6-1: ★ FedEx混雑時割増金(2026-09-21改定・国別kg単価×請求重量・最低37円) + NSSDS(非標準+770円) +
  *           燃料割増金の自動加算(FedEx=公表週率/DHL=公表×0.75・週次キャッシュ) + 米国MPF(2.69USD) +
  *           特別取扱料金の重複加算修正(寸法+重量→高い方1つ) + 特別取扱(寸法)の最低請求重量18kg (calculator.js)
@@ -17,7 +18,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-6-1'; // v3.6.1: FedEx混雑時割増金(9/21改定)+NSSDS+燃料割増金(FedEx/DHL週次)+MPF+特別取扱重複加算修正
+const CACHE_NAME = 'ebay-ship-v3-7-0'; // v3.7.0: 料金後納郵便物差出票の出力 (sashidashi.js)
 
 const STATIC_FILES = [
   './',
@@ -35,6 +36,7 @@ const STATIC_FILES = [
   './tracking_scan.js',
   './cancel_notice.js',
   './recovery.js',
+  './sashidashi.js',
   './manifest.webmanifest'
 ];
 
