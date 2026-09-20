@@ -16,10 +16,11 @@
 (function () {
   'use strict';
 
-  // 発送日印字の位置 (pt)。ラベルA4=595x842pt・署名欄左横 (検証済み座標: x=172, top基準y=376)
-  // pdf-lib は左下原点のため y = 842 - 376 = 466
+  // 発送日印字の位置 (pt)。ラベルA4=595x842pt・署名欄の「見出しと署名の間」左寄せ
+  // (v1.0の署名左横 y=466 は署名が左寄り配置の個体で重なった → 上段へ移動・2026-09-21検証済み)
+  // pdf-lib は左下原点のため y = 842 - 357.5 ≈ 484
   const DATE_X = 172;
-  const DATE_Y_FROM_BOTTOM = 466;
+  const DATE_Y_FROM_BOTTOM = 484;
   const DATE_FONT_SIZE = 8;
 
   const PDF_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
