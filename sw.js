@@ -1,5 +1,6 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-8-2: ★ eBay追跡番号の一括登録: 差出後に「📤eBay登録」→受領証枚数と照合して一括POST (zonos_api.js + GAS)
  * v3-8-1: ★ ラベル発送日の印字位置修正: 署名左横→欄見出しと署名の間(上段)へ。署名左寄り個体での重なり解消 (zonos_api.js)
  * v3-8-0: ★ Zonos APIラベル発行: Zonos送信画面に「⚡APIでラベル発行」— 関税計算→Declaration ID→
  *           ラベルPDF(署名+発送日印字)→シート書込みまで自動 (zonos_api.js 新規 + GAS zonos_api.gs)。
@@ -22,7 +23,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-1'; // v3.8.1: ラベル発送日の印字位置を署名上段へ (zonos_api.js)
+const CACHE_NAME = 'ebay-ship-v3-8-2'; // v3.8.2: eBay追跡一括登録(受領枚数照合) + 発送日印字位置修正
 
 const STATIC_FILES = [
   './',

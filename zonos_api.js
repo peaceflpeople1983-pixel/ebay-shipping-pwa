@@ -197,9 +197,132 @@
       '.zapi-btn:disabled { background: #9aa5bd; }',
       '.zapi-note { font-size: 11px; color: #555; }',
       '.zapi-success { background: #e8f5e9; border-radius: 8px; padding: 10px; font-size: 13px; margin-top: 8px; line-height: 1.7; }',
-      '.zapi-error { background: #fbe9e7; color: #c62828; border-radius: 8px; padding: 10px; font-size: 13px; margin-top: 8px; }'
+      '.zapi-error { background: #fbe9e7; color: #c62828; border-radius: 8px; padding: 10px; font-size: 13px; margin-top: 8px; }',
+      '.zapi-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }',
+      '.zapi-panel { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 16px; }',
+      '.zapi-up-list { border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px; margin: 10px 0; max-height: 40vh; overflow-y: auto; }',
+      '.zapi-up-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; }',
+      '.zapi-up-oid { font-weight: 600; font-family: monospace; }',
+      '.zapi-up-meta { color: #555; font-size: 12px; }',
+      '.zapi-up-doukon { background: #1F3864; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
+      '.zapi-up-empty { padding: 24px 12px; text-align: center; color: #666; font-size: 13px; }',
+      '.zapi-up-verify { background: #fff8e1; border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 13px; }',
+      '.zapi-up-verify input { width: 70px; font-size: 15px; padding: 6px; border: 1px solid #ccc; border-radius: 6px; margin-left: 6px; }',
+      '.zapi-actions { display: flex; gap: 10px; justify-content: flex-end; }',
+      '.zapi-sec { background: #e8e8e8; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; cursor: pointer; }'
     ].join('\n');
     document.head.appendChild(st);
+  }
+
+  // ============================================================
+  // eBay追跡番号 一括登録 (差出後・C方式)
+  //   「📤 eBay登録」→ API発行済み・eBay未登録の小包一覧 →
+  //   窓口で受け取った受領証枚数を入力 → 件数照合 → 一括登録
+  // ============================================================
+
+  const UPLOAD_MODAL_ID = 'zapi-upload-modal';
+
+  async function openUploadModal() {
+    closeUploadModal();
+    injectStyles();
+    let targets;
+    try {
+      if (typeof showToast === 'function') showToast('対象を取得中...');
+      const r = await API._get('?action=zonosGetUploadTargets');
+      if (r.error) throw new Error(r.error);
+      targets = r.targets || [];
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('取得失敗: ' + (e.message || e));
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.id = UPLOAD_MODAL_ID;
+    wrap.className = 'zapi-overlay';
+    let rows = '';
+    if (targets.length === 0) {
+      rows = '<div class="zapi-up-empty">対象がありません<br>' +
+        '<span class="zapi-note">条件: APIでラベル発行済み・eBay未登録の小包</span></div>';
+    } else {
+      rows = targets.map((t, i) =>
+        '<label class="zapi-up-row">' +
+          '<input type="checkbox" data-idx="' + i + '" checked>' +
+          '<span class="zapi-up-oid">' + escapeHtml(t.orderId) + '</span>' +
+          (t.doukonCount > 1 ? '<span class="zapi-up-doukon">' + t.doukonCount + '点同梱</span>' : '') +
+          '<span class="zapi-up-meta">' + escapeHtml(t.tracking) +
+            (t.shipDate ? ' / 発送日 ' + escapeHtml(t.shipDate) : '') + '</span>' +
+        '</label>'
+      ).join('');
+    }
+    wrap.innerHTML =
+      '<div class="zapi-panel">' +
+        '<div class="zapi-title">📤 eBayへ追跡番号を一括登録</div>' +
+        '<div class="zapi-note">窓口で差し出した小包にチェック（同梱はグループ内の全注文へ登録されます）</div>' +
+        '<div class="zapi-up-list">' + rows + '</div>' +
+        (targets.length ? (
+          '<div class="zapi-up-verify">' +
+            '<label>窓口で受け取った受領証（ご依頼主様控）の枚数: ' +
+            '<input type="number" id="zapi-receipt-count" min="0" placeholder="枚数"></label>' +
+            '<div class="zapi-note">選択した小包数と一致しないと登録できません（取り違え・出し忘れの検知）</div>' +
+          '</div>') : '') +
+        '<div class="zapi-actions">' +
+          '<button class="zapi-sec" id="zapi-up-cancel">閉じる</button>' +
+          (targets.length ? '<button class="zapi-btn" id="zapi-up-exec">eBayへ登録</button>' : '') +
+        '</div>' +
+        '<div id="zapi-up-result"></div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    document.getElementById('zapi-up-cancel').onclick = closeUploadModal;
+    wrap.onclick = (e) => { if (e.target === wrap) closeUploadModal(); };
+
+    const execBtn = document.getElementById('zapi-up-exec');
+    if (execBtn) execBtn.onclick = async () => {
+      const checked = [];
+      wrap.querySelectorAll('.zapi-up-list input[type=checkbox]:checked')
+        .forEach(cb => checked.push(targets[parseInt(cb.dataset.idx, 10)]));
+      const resultEl = document.getElementById('zapi-up-result');
+      if (checked.length === 0) { resultEl.innerHTML = '<div class="zapi-error">小包が選択されていません</div>'; return; }
+      const receiptCount = parseInt((document.getElementById('zapi-receipt-count') || {}).value, 10);
+      if (!(receiptCount >= 0)) {
+        resultEl.innerHTML = '<div class="zapi-error">受領証の枚数を入力してください</div>';
+        return;
+      }
+      if (receiptCount !== checked.length) {
+        resultEl.innerHTML = '<div class="zapi-error">⚠ 枚数不一致: 受領証 ' + receiptCount +
+          '枚 / 選択 ' + checked.length + '個<br>差し出した小包と選択が合っているか確認してください' +
+          '（出し忘れ・チェック漏れの可能性）</div>';
+        return;
+      }
+      execBtn.disabled = true;
+      execBtn.textContent = '登録中...';
+      try {
+        const r = await API._post({
+          action: 'zonosUploadShipped',
+          secret: API.config.secret,
+          orderIds: checked.map(t => t.orderId)
+        });
+        if (r.error) throw new Error(r.error);
+        let html = '<div class="zapi-success">✅ 登録完了: ' + r.uploaded + '件' +
+          (r.skipped ? ' (既登録スキップ ' + r.skipped + ')' : '') + '</div>';
+        if (r.failed && r.failed.length) {
+          html += '<div class="zapi-error">❌ 失敗 ' + r.failed.length + '件:<br>' +
+            r.failed.map(f => escapeHtml(f.orderId) + ': ' + escapeHtml(f.error)).join('<br>') + '</div>';
+        }
+        resultEl.innerHTML = html;
+        if (typeof showToast === 'function') showToast('eBay登録: ' + r.uploaded + '件完了');
+        if (window.App && typeof App.loadAll === 'function') App.loadAll();
+        if (!(r.failed && r.failed.length)) setTimeout(closeUploadModal, 2500);
+      } catch (e) {
+        resultEl.innerHTML = '<div class="zapi-error">❌ ' + escapeHtml(e.message || String(e)) + '</div>';
+        execBtn.disabled = false;
+        execBtn.textContent = 'eBayへ登録';
+      }
+    };
+  }
+
+  function closeUploadModal() {
+    const el = document.getElementById(UPLOAD_MODAL_ID);
+    if (el) el.remove();
   }
 
   // ============================================================
@@ -207,6 +330,8 @@
   // ============================================================
 
   function init() {
+    const btn = document.getElementById('btn-ebay-upload');
+    if (btn) btn.onclick = openUploadModal;
     if (!(window.Zonos && Zonos.Screen && typeof Zonos.Screen._render === 'function')) {
       console.warn('ZonosApi: Zonos.Screen が見つかりません (zonos.js より後に読み込むこと)');
       return;
