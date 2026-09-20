@@ -202,6 +202,7 @@
       '.zapi-panel { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 16px; }',
       '.zapi-up-list { border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px; margin: 10px 0; max-height: 40vh; overflow-y: auto; }',
       '.zapi-up-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; }',
+      '.zapi-up-row input[type=checkbox] { width: 20px !important; height: 20px !important; flex: none; margin: 0; padding: 0; appearance: auto; -webkit-appearance: checkbox; }',
       '.zapi-up-oid { font-weight: 600; font-family: monospace; }',
       '.zapi-up-meta { color: #555; font-size: 12px; }',
       '.zapi-up-doukon { background: #1F3864; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
@@ -246,7 +247,7 @@
     } else {
       rows = targets.map((t, i) =>
         '<label class="zapi-up-row">' +
-          '<input type="checkbox" data-idx="' + i + '" checked>' +
+          '<input type="checkbox" data-idx="' + i + '"' + (t.shipDate ? ' checked' : '') + '>' +
           '<span class="zapi-up-oid">' + escapeHtml(t.orderId) + '</span>' +
           (t.doukonCount > 1 ? '<span class="zapi-up-doukon">' + t.doukonCount + '点同梱</span>' : '') +
           '<span class="zapi-up-meta">' + escapeHtml(t.tracking) +
