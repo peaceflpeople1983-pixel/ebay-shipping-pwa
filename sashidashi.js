@@ -114,6 +114,8 @@
       w100: g ? w100Of(g) : null,
       zone: zoneOf(o.country),
       cost: (cost && cost > 0) ? cost : null,
+      shipDate: String(o.zonosShipDate || ''),  // API発行時の発送日 (日付指定フィルタ用 v1.3)
+      printed: !!o.sashidashiPrintedAt,         // 差出票印刷済み (追加分のみ発行用 v1.4)
       ok: !!(g && cost && cost > 0)
     };
   }
@@ -154,12 +156,14 @@
         const warn = it.ok ? '' :
           '<span class="sashidashi-warn">⚠ ' + (!it.weightG ? '重量未入力' : '料金なし') + '（出力対象外）</span>';
         const doukon = it.doukonCount > 1 ? ' <span class="sashidashi-doukon">' + it.doukonCount + '点同梱</span>' : '';
+        const printedBadge = it.printed ? ' <span class="sashidashi-printed">票印刷済</span>' : '';
         return '<label class="sashidashi-row' + (it.ok ? '' : ' ng') + '">' +
-          '<input type="checkbox" data-idx="' + i + '"' + (it.ok ? ' checked' : ' disabled') + '>' +
-          '<span class="sashidashi-oid">' + esc(it.orderId) + '</span>' + doukon +
+          '<input type="checkbox" data-idx="' + i + '" data-shipdate="' + esc(it.shipDate) + '" data-printed="' + (it.printed ? '1' : '') + '"' + (it.ok ? '' : ' disabled') + '>' +
+          '<span class="sashidashi-oid">' + esc(it.orderId) + '</span>' + doukon + printedBadge +
           '<span class="sashidashi-meta">' + esc(it.country) + ' / ' +
             (it.weightG ? it.weightG + 'g → ' + it.w100 + 'gまで' : '重量?') + ' / ' +
-            (it.cost ? '¥' + yen(it.cost) : '¥?') + '</span>' +
+            (it.cost ? '¥' + yen(it.cost) : '¥?') +
+            (it.shipDate ? ' / 発送日 ' + esc(it.shipDate) : '') + '</span>' +
           warn +
         '</label>';
       }).join('');
@@ -168,10 +172,15 @@
     const kindOptions = Object.keys(KINDS)
       .map(k => '<option value="' + k + '">' + KINDS[k].label + '</option>').join('');
 
+    const todayStr = (() => { const d = new Date(); const p2 = n => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); })();
+
     wrap.innerHTML =
       '<div class="sashidashi-panel">' +
         '<div class="sashidashi-title">📮 料金後納郵便物差出票の出力</div>' +
-        '<div class="sashidashi-sub">本日窓口へ差し出す小包にチェック（同梱グループは1個として数えます）</div>' +
+        '<div class="sashidashi-date-row">差出日: <input type="date" id="sashidashi-date" value="' + todayStr + '">' +
+          '<span class="sashidashi-sub">発送日が一致する小包を自動選択（発送日なしは差出日=今日のとき選択）</span></div>' +
+        '<div class="sashidashi-sub">窓口へ差し出す小包にチェック（同梱グループは1個として数えます）</div>' +
         '<div class="sashidashi-list">' + rows + '</div>' +
         '<div class="sashidashi-manual-title">その他の郵便物（Hirogete分など・後納でまとめて差し出すもの）</div>' +
         '<div id="sashidashi-manual-list"></div>' +
@@ -242,8 +251,21 @@
         rows2.length === 0 ? '' :
         '合計 ' + totalCount + '個 / ' + rows2.length + '行 / ¥' + yen(totalYen);
     };
+    // 差出日に応じてチェックを付け直す (発送日一致 or 発送日なし×今日)
+    const applyDateSelection = () => {
+      const sel = (document.getElementById('sashidashi-date') || {}).value || todayStr;
+      wrap.querySelectorAll('.sashidashi-list input[type=checkbox]').forEach(cb => {
+        if (cb.disabled) return;
+        const sd = cb.dataset.shipdate || '';
+        const dateMatch = sd ? (sd === sel) : (sel === todayStr);
+        cb.checked = dateMatch && !cb.dataset.printed; // 印刷済みは追加分から除外(手動で再チェック可)
+      });
+      updateSummary();
+    };
     wrap.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = updateSummary);
-    updateSummary();
+    const dateEl = document.getElementById('sashidashi-date');
+    if (dateEl) dateEl.onchange = applyDateSelection;
+    applyDateSelection();
 
     document.getElementById('sashidashi-cancel').onclick = closeModal;
     document.getElementById('sashidashi-print').onclick = () => {
@@ -252,6 +274,15 @@
         if (typeof showToast === 'function') showToast('出力対象がありません（チェックまたは行の追加をしてください）');
         return;
       }
+      // 差出票印刷済みマークを記録 (v1.4: 追加分のみ発行のため。失敗しても出力は続行)
+      try {
+        const ids = getCheckedItems(cands).map(it => it.orderId);
+        if (ids.length && window.API && API._post) {
+          API._post({ action: 'zonosMarkSashidashiPrinted', secret: API.config.secret, orderIds: ids })
+            .then(r => { if (r && r.success && window.App && App.loadAll) App.loadAll(); })
+            .catch(e => console.warn('差出票印刷済みマーク失敗:', e));
+        }
+      } catch (e) { console.warn('差出票印刷済みマーク失敗:', e); }
       openPrintWindow(rows2);
     };
     wrap.onclick = (e) => { if (e.target === wrap) closeModal(); };
@@ -490,12 +521,15 @@
       '.sashidashi-panel { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; padding: 16px; }',
       '.sashidashi-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }',
       '.sashidashi-sub { font-size: 12px; color: #666; margin-bottom: 10px; }',
+      '.sashidashi-date-row { display: flex; align-items: center; gap: 8px; margin: 6px 0 8px; font-size: 13px; flex-wrap: wrap; }',
+      '.sashidashi-date-row input[type=date] { font-size: 14px; padding: 6px; border: 1px solid #ccc; border-radius: 6px; width: auto !important; }',
       '.sashidashi-list { overflow-y: auto; flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px; min-height: 60px; }',
       '.sashidashi-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; }',
       '.sashidashi-row.ng { opacity: 0.55; }',
       '.sashidashi-oid { font-weight: 600; font-family: monospace; }',
       '.sashidashi-meta { color: #555; }',
       '.sashidashi-doukon { background: #1F3864; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
+      '.sashidashi-printed { background: #757575; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
       '.sashidashi-warn { color: #c62828; font-size: 11px; width: 100%; padding-left: 26px; }',
       '.sashidashi-empty { padding: 24px 12px; text-align: center; color: #666; font-size: 13px; }',
       '.sashidashi-manual-title { font-size: 12px; font-weight: 600; color: #444; margin: 12px 0 6px; }',
