@@ -1,5 +1,10 @@
 /**
- * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.0)
+ * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.6)
+ *
+ * v1.6: 「その他の郵便物」に ＋注文から引用 を追加 — Hirogete分等をシートの注文データ
+ *       (国・重量・運賃・同梱)からプリフィルして手入力の手間を削減。
+ *       種別は追跡番号で自動判定 (RN…=国際郵便(印刷物・小形包装物) / それ以外=エアパケット)。
+ *       引用した注文は自動選択リストから外れ(二重計上防止)、出力時にAX印刷済みマークも付く
  *
  * 背景:
  *   料金後納の承認取得(2026-09-16)に伴い、後納で差し出す際は
@@ -79,6 +84,22 @@
     } catch (e) { return null; }
   }
 
+  // ── v1.6: 通常郵便物(印刷物・小形包装物)の地帯 (エアパケット地帯とは別区分) ──
+  // 第1地帯=東アジア・東南アジア等 / 第3地帯=中南米・アフリカ / それ以外(US・CA・豪・欧・中近東)=第2地帯
+  const AIRMAIL_ZONE1 = ['CN', 'KR', 'TW', 'HK', 'MO', 'PH', 'VN', 'TH', 'SG', 'MY', 'ID', 'IN', 'KH', 'LA', 'MM', 'BD', 'LK', 'NP', 'MN', 'BN', 'PK', 'GU'];
+  const AIRMAIL_ZONE3 = ['BR', 'AR', 'CL', 'PE', 'CO', 'VE', 'BO', 'EC', 'PY', 'UY', 'ZA', 'EG', 'NG', 'KE', 'MA', 'GH', 'TZ'];
+  function airmailZoneLabel(cc) {
+    if (!cc) return '';
+    if (AIRMAIL_ZONE1.indexOf(cc) !== -1) return '第1地帯';
+    if (AIRMAIL_ZONE3.indexOf(cc) !== -1) return '第3地帯';
+    return '第2地帯';
+  }
+
+  /** v1.6: 引用時の種別自動判定 — 追跡番号 R始まり(RN等の書留/通常郵便)=国際郵便(印刷物・小形包装物)、それ以外はエアパケット */
+  function kindOfItem(it) {
+    return /^R/i.test(it.tracking || '') ? 'kokusai_air' : 'airpacket';
+  }
+
   // ============================================================
   // 対象注文の収集
   // ============================================================
@@ -116,6 +137,8 @@
       cost: (cost && cost > 0) ? cost : null,
       shipDate: String(o.zonosShipDate || ''),  // API発行時の発送日 (日付指定フィルタ用 v1.3)
       printed: !!o.sashidashiPrintedAt,         // 差出票印刷済み (追加分のみ発行用 v1.4)
+      tracking: String(o.trackingNumber || ''), // v1.6: 引用時の種別自動判定 (RN…=印刷物/小形包装物)
+      hasDecl: !!o.declarationId,               // v1.6: Zonos分の目印 (無し=Hirogete等の手動発行分)
       ok: !!(g && cost && cost > 0)
     };
   }
@@ -158,7 +181,7 @@
         const doukon = it.doukonCount > 1 ? ' <span class="sashidashi-doukon">' + it.doukonCount + '点同梱</span>' : '';
         const printedBadge = it.printed ? ' <span class="sashidashi-printed">票印刷済</span>' : '';
         return '<label class="sashidashi-row' + (it.ok ? '' : ' ng') + '">' +
-          '<input type="checkbox" data-idx="' + i + '" data-shipdate="' + esc(it.shipDate) + '" data-printed="' + (it.printed ? '1' : '') + '"' + (it.ok ? '' : ' disabled') + '>' +
+          '<input type="checkbox" data-idx="' + i + '" data-oid="' + esc(it.orderId) + '" data-shipdate="' + esc(it.shipDate) + '" data-printed="' + (it.printed ? '1' : '') + '"' + (it.ok ? '' : ' disabled') + '>' +
           '<span class="sashidashi-oid">' + esc(it.orderId) + '</span>' + doukon + printedBadge +
           '<span class="sashidashi-meta">' + esc(it.country) + ' / ' +
             (it.weightG ? it.weightG + 'g → ' + it.w100 + 'gまで' : '重量?') + ' / ' +
@@ -184,7 +207,11 @@
         '<div class="sashidashi-list">' + rows + '</div>' +
         '<div class="sashidashi-manual-title">その他の郵便物（Hirogete分など・後納でまとめて差し出すもの）</div>' +
         '<div id="sashidashi-manual-list"></div>' +
-        '<button class="sashidashi-manual-add" id="sashidashi-manual-add">＋ 行を追加</button>' +
+        '<div class="sashidashi-manual-btns">' +
+          '<button class="sashidashi-manual-add" id="sashidashi-quote-btn">＋ 注文から引用</button>' +
+          '<button class="sashidashi-manual-add" id="sashidashi-manual-add">＋ 行を追加（自由入力）</button>' +
+        '</div>' +
+        '<select id="sashidashi-quote-select" style="display:none"></select>' +
         '<div class="sashidashi-summary" id="sashidashi-summary"></div>' +
         '<div class="sashidashi-actions">' +
           '<button class="secondary" id="sashidashi-cancel">閉じる</button>' +
@@ -195,12 +222,41 @@
     document.body.appendChild(wrap);
     injectStyles();
 
-    // ── その他の郵便物 (手入力行) ──
+    // ── その他の郵便物 (手入力行 + v1.6 注文から引用) ──
     const manualList = document.getElementById('sashidashi-manual-list');
-    const addManualRow = () => {
+
+    // v1.6: 引用時に自動選択リスト側のチェックを外して二重計上を防ぐ
+    const cbOf = (oid) => wrap.querySelector('.sashidashi-list input[data-oid="' + oid + '"]');
+    const markQuoted = (oid) => {
+      const cb = cbOf(oid);
+      if (!cb) return;
+      cb.checked = false;
+      cb.disabled = true;
+      const label = cb.closest('label');
+      if (label && !label.querySelector('.sashidashi-quoted')) {
+        const b = document.createElement('span');
+        b.className = 'sashidashi-quoted';
+        b.textContent = '引用済';
+        label.insertBefore(b, label.querySelector('.sashidashi-meta'));
+      }
+    };
+    const restoreQuoted = (oid) => {
+      const cb = cbOf(oid);
+      if (!cb) return;
+      const it = cands[parseInt(cb.dataset.idx, 10)];
+      cb.disabled = !(it && it.ok);
+      const label = cb.closest('label');
+      const b = label && label.querySelector('.sashidashi-quoted');
+      if (b) b.remove();
+    };
+
+    /** 手入力行を1行追加。prefill があれば注文データからプリフィル (引用行・全項目編集可) */
+    const addManualRow = (prefill) => {
       const div = document.createElement('div');
       div.className = 'sashidashi-manual-row';
+      if (prefill) div.dataset.oid = prefill.orderId;
       div.innerHTML =
+        (prefill ? '<span class="m-oid" title="注文から引用">' + esc(prefill.orderId) + '　' + esc(prefill.country || '') + '</span>' : '') +
         '<select class="m-kind" title="郵便物の種類">' + kindOptions + '</select>' +
         '<input class="m-zone" placeholder="地帯(任意)" title="地帯 例: 第2地帯">' +
         '<input class="m-w" type="number" min="1" placeholder="量目g" title="量目(gまで)">' +
@@ -208,11 +264,67 @@
         '<input class="m-p" type="number" min="1" placeholder="料金/個" title="一個の料金(円)">' +
         '<select class="m-note" title="摘要"><option value="goods">物品</option><option value="docs">書類</option></select>' +
         '<button class="m-del" title="行を削除">✕</button>';
+      if (prefill) {
+        div.querySelector('.m-kind').value = prefill.kindKey || 'airpacket';
+        div.querySelector('.m-zone').value = prefill.zoneLabel || '';
+        if (prefill.wG) div.querySelector('.m-w').value = prefill.wG;
+        if (prefill.count) div.querySelector('.m-n').value = prefill.count;
+        if (prefill.cost) div.querySelector('.m-p').value = prefill.cost;
+      }
       manualList.appendChild(div);
-      div.querySelector('.m-del').onclick = () => { div.remove(); updateSummary(); };
+      div.querySelector('.m-del').onclick = () => {
+        div.remove();
+        if (prefill) restoreQuoted(prefill.orderId);
+        updateSummary();
+      };
       div.querySelectorAll('input,select').forEach(el => { el.onchange = updateSummary; el.oninput = updateSummary; });
     };
-    document.getElementById('sashidashi-manual-add').onclick = addManualRow;
+    document.getElementById('sashidashi-manual-add').onclick = () => addManualRow(null);
+
+    // v1.6: ＋注文から引用 — 候補(ePacketライト確定済み・未FULFILLED)から選んでプリフィル行を追加。
+    //       Hirogete分(declarationId無し)を上位に表示。種別は追跡番号から自動判定(変更可)
+    const quoteSelect = document.getElementById('sashidashi-quote-select');
+    const rebuildQuoteOptions = () => {
+      const used = new Set();
+      manualList.querySelectorAll('.sashidashi-manual-row[data-oid]').forEach(d => used.add(d.dataset.oid));
+      const avail = cands.map((it, i) => ({ it, i })).filter(x => !used.has(x.it.orderId));
+      avail.sort((a, b) => ((a.it.hasDecl ? 1 : 0) - (b.it.hasDecl ? 1 : 0)) || String(a.it.orderId).localeCompare(String(b.it.orderId)));
+      quoteSelect.innerHTML = '<option value="">— 引用する注文を選択してください —</option>' + avail.map(x =>
+        '<option value="' + x.i + '">' + esc(x.it.orderId) + ' / ' + esc(x.it.country) + ' / ' +
+        (x.it.weightG ? x.it.weightG + 'g' : '重量?') + ' / ' + (x.it.cost ? '¥' + yen(x.it.cost) : '¥?') +
+        (x.it.tracking ? ' / ' + esc(x.it.tracking) : '') + (x.it.hasDecl ? ' [Zonos]' : '') + (x.it.printed ? ' [票印刷済]' : '') +
+        '</option>').join('');
+    };
+    document.getElementById('sashidashi-quote-btn').onclick = () => {
+      if (quoteSelect.style.display === 'none') {
+        rebuildQuoteOptions();
+        quoteSelect.style.display = '';
+        quoteSelect.focus();
+      } else {
+        quoteSelect.style.display = 'none';
+      }
+    };
+    quoteSelect.onchange = () => {
+      const idx = parseInt(quoteSelect.value, 10);
+      quoteSelect.style.display = 'none';
+      quoteSelect.value = '';
+      if (isNaN(idx) || !cands[idx]) return;
+      const it = cands[idx];
+      const kindKey = kindOfItem(it);
+      addManualRow({
+        orderId: it.orderId,
+        country: it.country,
+        kindKey: kindKey,
+        // 地帯: エアパケットはePacket地帯、印刷物・小形包装物は通常郵便物の地帯 (別区分)
+        zoneLabel: kindKey === 'airpacket' ? (it.zone ? '第' + it.zone + '地帯' : '') : airmailZoneLabel(it.country),
+        // 量目: エアパケットは自動集計と同じ100g切上げ、その他は実重量のまま (料金バンドが異なるため・編集可)
+        wG: (kindKey === 'airpacket' ? it.w100 : it.weightG) || '',
+        count: 1,  // 同梱グループはlead 1件=物理1個
+        cost: it.cost || ''
+      });
+      markQuoted(it.orderId);
+      updateSummary();
+    };
 
     /** 手入力行 → 帳票行 (量目・個数・料金が揃った行のみ) */
     const readManualRows = () => {
@@ -284,8 +396,16 @@
         return;
       }
       // 差出票印刷済みマークを記録 (v1.4: 追加分のみ発行のため。失敗しても出力は続行)
+      // v1.6: 引用行(注文からプリフィル・値が揃った行)の注文IDにもマークを付ける
       try {
-        const ids = getCheckedItems(cands).map(it => it.orderId);
+        const quotedOk = [];
+        manualList.querySelectorAll('.sashidashi-manual-row[data-oid]').forEach(div => {
+          const wG = parseInt(div.querySelector('.m-w').value, 10);
+          const n = parseInt(div.querySelector('.m-n').value, 10);
+          const p = parseInt(div.querySelector('.m-p').value, 10);
+          if (wG > 0 && n > 0 && p > 0) quotedOk.push(div.dataset.oid);
+        });
+        const ids = getCheckedItems(cands).map(it => it.orderId).concat(quotedOk);
         if (ids.length && window.API && API._post) {
           API._post({ action: 'zonosMarkSashidashiPrinted', secret: API.config.secret, orderIds: ids })
             .then(r => { if (r && r.success && typeof App !== 'undefined' && App.loadAll) App.loadAll(); })
@@ -547,6 +667,10 @@
       '.sashidashi-warn { color: #c62828; font-size: 11px; width: 100%; padding-left: 26px; }',
       '.sashidashi-empty { padding: 24px 12px; text-align: center; color: #666; font-size: 13px; }',
       '.sashidashi-manual-title { font-size: 12px; font-weight: 600; color: #444; margin: 12px 0 6px; }',
+      '.sashidashi-manual-btns { display: flex; gap: 8px; flex-wrap: wrap; }',
+      '.sashidashi-quoted { background: #2e7d32; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 11px; }',
+      '.sashidashi-manual-row .m-oid { width: 100%; font-family: monospace; font-size: 11px; color: #2e7d32; font-weight: 600; }',
+      '#sashidashi-quote-select { display: block; width: 100% !important; margin: 6px 0; font-size: 13px; padding: 8px 6px; border: 1px solid #1F3864; border-radius: 6px; background: #fff; color: #222; appearance: auto; -webkit-appearance: menulist; }',
       '.sashidashi-manual-row { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }',
       '.sashidashi-manual-row select, .sashidashi-manual-row input { font-size: 12px; padding: 6px 4px; border: 1px solid #ccc; border-radius: 6px; }',
       '.sashidashi-manual-row .m-kind { flex: 2 1 130px; min-width: 0; }',
