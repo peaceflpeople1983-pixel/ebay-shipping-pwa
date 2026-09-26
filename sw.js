@@ -23,7 +23,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-12'; // v3.8.12: 「入力済を隠す」+「Zonos未送信」同時ON=梱包済・発送待ちのみ表示 (app.js)
+const CACHE_NAME = 'ebay-ship-v3-8-13'; // v3.8.13: 梱包済・発送待ちモードをePacketライト確定分のみに限定 (app.js)
 
 const STATIC_FILES = [
   './',

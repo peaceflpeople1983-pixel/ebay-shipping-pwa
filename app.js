@@ -557,7 +557,7 @@ const App = {
     const list = document.getElementById('order-list');
 
     // ★ v3.8.12: 「入力済を隠す」+「Zonos未送信」同時ON = 梱包済・発送待ちモード。
-    //   入力済(selectedCarrier あり=計量・発送会社確定済)を隠さず、逆に入力済のみを残す。
+    //   入力済を隠さず、逆にePacketライトで確定済(計量済)のZonos未送信のみを残す。
     const zonosPendingOnlyEarly = !!(document.getElementById('filter-zonos-pending') || {}).checked;
     const packedWaitMode = hideDone && zonosPendingOnlyEarly;
 
@@ -585,7 +585,7 @@ const App = {
         // Zonos未送信判定 (Zonos対象 + DDP未取得 + 未発送 + 代表/単独)
         if (zonosPendingOnly && window.Zonos && window.Zonos.isZonosTargetOrder(o)
             && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub'
-            && (!packedWaitMode || o.selectedCarrier)) {
+            && (!packedWaitMode || o.selectedCarrier === 'ePacketライト')) {
           return true;
         }
         // 追跡スキャン待ち判定
@@ -619,7 +619,7 @@ const App = {
     this._updateZonosExpireBanner();
 
     if (orders.length === 0) {
-      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近60日／入力済を隠す／発送済を隠す）' + (packedWaitMode ? '<br>※入力済を隠す+Zonos未送信 = 梱包済・発送待ちのみ表示中' : '') + '</span></div>';
+      list.innerHTML = '<div class="empty">表示できる注文がありません<br>右上の⟳で同期するか、+で手動入力してください<br><span class="muted">（既定: 直近60日／入力済を隠す／発送済を隠す）' + (packedWaitMode ? '<br>※入力済を隠す+Zonos未送信 = ePacketライト確定・発送待ちのみ表示中' : '') + '</span></div>';
       return;
     }
 
