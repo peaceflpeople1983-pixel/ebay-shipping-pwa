@@ -712,7 +712,7 @@ const App = {
             : ''}
           ${(window.Zonos && !window.Zonos.isZonosTargetOrder(o) && o.country && o.shippingPolicy) ? window.Zonos.buildZonosScopeNote(o) : ''}
           ${(window.TrackingScan && window.TrackingScan.isTrackingTargetOrder) ? window.TrackingScan.buildTrackingButton(o) : ''}
-          ${this.renderCpassInfo(o.cpass)}
+          ${this.renderCpassInfo(o.cpass, o)}
           ${this.renderAmazonCost(o)}
           ${dk.breakdownHtml}
         </div>
@@ -888,6 +888,22 @@ const App = {
     }
   },
 
+  // ★EU v2 (S1): 税関申告の行数 = 同梱グループ内の異なるASIN数(ASINが無ければ商品名/明細IDで区別)。
+  //   同梱でない・値が取れない場合は 1。表示は変えない(計算入力のみ)
+  _euDeclLines(order) {
+    try {
+      if (!order || !order.doukonGroupId || !Array.isArray(this.state.orders)) return 1;
+      const keys = {};
+      this.state.orders.forEach(x => {
+        if (x && x.doukonGroupId === order.doukonGroupId) {
+          keys[String(x.asin || x.itemTitle || x.lineItemId || x.orderId)] = 1;
+        }
+      });
+      const n = Object.keys(keys).length;
+      return n > 0 ? n : 1;
+    } catch (_) { return 1; }
+  },
+
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -932,7 +948,8 @@ const App = {
       widthCm: widthCm,
       heightCm: heightCm,
       itemPriceUSD: order ? order.itemPrice : 0,
-      tariffRate: order ? order.tariffRate : 0
+      tariffRate: order ? order.tariffRate : 0,
+      declLines: this._euDeclLines(order) // ★EU v2: 申告行数(同梱は異なるASIN数・取れなければ1)
     };
     this.state.currentInput = input;
     const result = Calculator.calculate(input);
@@ -1629,8 +1646,21 @@ const App = {
    * 引数: order.cpass オブジェクト (Apps Script の getOrders が JOIN して返す)
    * cpass が null/undefined の場合は空文字を返す (既存カードは壊さない)
    */
-  renderCpassInfo(cpass) {
-    if (!cpass) return '';
+  /**
+   * ★ v3.8.14: SKU（正規化済み・大文字 M + 数字8桁以上）がメルカリ商品IDなら商品ページURLを返す。それ以外は ''
+   */
+  mercariUrlForSku(sku) {
+    const s = String(sku || '').trim().toUpperCase();
+    if (!/^M\d{8,}$/.test(s)) return '';
+    return 'https://jp.mercari.com/item/' + s.toLowerCase();
+  },
+
+  renderCpassInfo(cpass, order) {
+    // ★ v3.8.14: メルカリ仕入（eBay SKU = メルカリ商品ID m…。AT列は大文字化済み）は Amazon リンクが無いので
+    //   「🛍 メルカリ: m…」リンクを出す（SellerPilot P26 mercariUrlForSku と同じ規則・URL は小文字ID）
+    const mercariUrl = (order && order.asin) ? this.mercariUrlForSku(order.asin) : '';
+    if (!cpass && !mercariUrl) return '';
+    cpass = cpass || {};
     const parts = [];
 
     if (cpass.package_no) {
@@ -1654,6 +1684,16 @@ const App = {
           '<span>Amazon.co.jp:</span>' +
           '<a href="' + escapeHtml(cpass.amazon_jp_url) + '" target="_blank" rel="noopener">' +
             escapeHtml(cpass.asin) +
+          '</a>' +
+        '</div>'
+      );
+    } else if (mercariUrl) {
+      parts.push(
+        '<div class="cpass-asin">' +
+          '<span class="asin-icon">🛍</span>' +
+          '<span>メルカリ:</span>' +
+          '<a href="' + escapeHtml(mercariUrl) + '" target="_blank" rel="noopener">' +
+            escapeHtml(String(order.asin).toLowerCase()) +
           '</a>' +
         '</div>'
       );
@@ -2196,9 +2236,12 @@ const App = {
       ? '<div class="pp-amazon-cost">\u{1F4B4} 仕入 ¥' + amazonCostNum.toLocaleString('ja-JP') + '</div>'
       : '<div class="pp-amazon-cost none">\u{1F4B4} 仕入 未記録</div>';
 
+    // ★ v3.8.14: 仕入元はAmazonに限らない（メルカリ m… / その他仕入）。ラベルは「仕入元商品名」、ID表記はキー種別で切替
+    const isMercariKey = /^M\d{8,}$/.test(String(o.asin || '').toUpperCase());
+    const keyLabel = isMercariKey ? 'メルカリ: ' + escapeHtml(String(o.asin).toLowerCase()) : 'ASIN: ' + asin;
     const amazonBlock = (amazonTitle
-      ? '<div class="pp-amazon-text">' + amazonTitle + '</div><div class="pp-amazon-asin">\u{1F6D2} ' + asin + '</div>'
-      : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? 'ASIN: ' + asin + ' / 未取得' : '未取込') + ')</div>')
+      ? '<div class="pp-amazon-text">' + amazonTitle + '</div><div class="pp-amazon-asin">\u{1F6D2} ' + (isMercariKey ? escapeHtml(String(o.asin).toLowerCase()) : asin) + '</div>'
+      : '<div class="pp-amazon-text" style="color:#666;">(' + (asin ? keyLabel + ' / 未取得' : '未取込') + ')</div>')
       + costHtml;
 
     const posCls = positionClass ? (' ' + positionClass) : '';
@@ -2233,7 +2276,7 @@ const App = {
             '</div>' +
             '<div class="pp-text-area">' +
               '<div class="pp-ebay"><div class="pp-ebay-label">eBay商品名</div><div class="pp-ebay-text">' + ebayTitle + '</div></div>' +
-              '<div class="pp-amazon"><div class="pp-amazon-label">AMAZON商品名 ⭐</div>' + amazonBlock + '</div>' +
+              '<div class="pp-amazon"><div class="pp-amazon-label">仕入元商品名 ⭐</div>' + amazonBlock + '</div>' +
             '</div>' +
           '</div>' +
           cpassBlock +

@@ -23,7 +23,7 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-13'; // v3.8.13: 梱包済・発送待ちモードをePacketライト確定分のみに限定 (app.js)
+const CACHE_NAME = 'ebay-ship-v3-8-14'; // v3.8.14: メルカリ仕入対応: カードに🛍メルカリリンク・印刷ラベル「仕入元商品名」・KPI→costUpsert プッシュ (app.js, cost_upsert.gs)
 
 const STATIC_FILES = [
   './',
