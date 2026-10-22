@@ -904,6 +904,29 @@ const App = {
     } catch (_) { return 1; }
   },
 
+  // ★EU v2 (S3): 候補の euBreakdown(model='v2')から関税行の表示文言を作る。v1・内訳なしは null(表示は従来どおり)
+  //   line = 「EU関税 €3×n + 手数料 €2×n（+OC手数料2.1%）= ¥x」(>€150 は関税なし・11/1前は手数料なし)
+  //   hint = 申告行数 n≥2 のとき「同梱 n 行: 同じ HS コードの品目にまとめると €5×(n−1) 節約」
+  _euBreakdownText(c) {
+    const b = c && c.euBreakdown;
+    if (!b || b.model !== 'v2') return null;
+    const n = b.lines > 0 ? b.lines : 1;
+    const fmt = v => String(Math.round(v * 100) / 100);
+    const dutyUnit = (b.dutyEUR || 0) / n;
+    const handUnit = (b.handlingEUR || 0) / n;
+    const parts = [];
+    if (dutyUnit > 0) parts.push(`EU関税 €${fmt(dutyUnit)}×${n}`);
+    if (handUnit > 0) parts.push(`手数料 €${fmt(handUnit)}×${n}`);
+    if (!parts.length) return null;
+    const base = (b.dutyEUR || 0) + (b.handlingEUR || 0);
+    const pct = (b.ocFeeEUR > 0 && base > 0) ? Math.round(b.ocFeeEUR / base * 1000) / 10 : 0;
+    const line = parts.join(' + ') + (pct > 0 ? `（+OC手数料${pct}%）` : ' ') + `= ¥${Number(c.tariffSeller || 0).toLocaleString()}`;
+    const hint = (n >= 2)
+      ? `同梱 ${n} 行: 同じ HS コードの品目にまとめると €${fmt(dutyUnit + handUnit)}×${n - 1} 節約`
+      : null;
+    return { line, hint };
+  },
+
   _readNum(id) {
     let raw = String(document.getElementById(id).value || '').trim();
     raw = raw.replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
@@ -1000,6 +1023,7 @@ const App = {
       const isRecommended = this.isRecommendedCarrier(c.carrier, recommendedTypes);
 
       let breakdownHtml = '';
+      let euHintHtml = ''; // ★EU v2 (S3): 同梱 n≥2 の一言(内訳行の下に1行)
       if (c.tariffBuyer > 0 && c.tariffSeller === 0) {
         breakdownHtml = `
           <span>送料のみ</span>
@@ -1007,10 +1031,16 @@ const App = {
         `;
       } else {
         const parts = [`送料 ¥${c.basicCost.toLocaleString()}`];
-        if (c.tariffSeller > 0) parts.push(`+ 関税 ¥${c.tariffSeller.toLocaleString()}`);
+        // ★EU v2 (S3): 内訳(申告行数 n・€表記)を関税行に出す。v1 は従来どおり「+ 関税 ¥x」
+        const euText = (c.tariffSeller > 0) ? this._euBreakdownText(c) : null;
+        if (euText) parts.push(`+ ${euText.line}`);
+        else if (c.tariffSeller > 0) parts.push(`+ 関税 ¥${c.tariffSeller.toLocaleString()}`);
         if (c.usFees > 0) parts.push(`+ 通関費 ¥${c.usFees.toLocaleString()}`);
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
+        if (euText && euText.hint) {
+          euHintHtml = `<div class="eu-decl-hint" style="font-size:11px;color:var(--text-secondary);padding-top:4px;">💡 ${escapeHtml(euText.hint)}</div>`;
+        }
       }
 
       return `
@@ -1030,6 +1060,7 @@ const App = {
           <div class="card-breakdown">
             ${breakdownHtml}
           </div>
+          ${euHintHtml}
         </div>
       `;
     }).join('');

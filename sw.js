@@ -1,5 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-9-0: ★ EU関税コスト v2 の内訳表示: eu_fee_model=v2 のとき候補カードの関税行に「EU関税 €3×n + 手数料 €2×n（+OC手数料2.1%）= ¥x」と
+ *           申告行数 n を表示・n≥2 は同梱まとめの節約額を一言 (app.js)。計算は S1 実装(未デプロイ分を同梱)・既定 v1 (calculator.js)
  * v3-8-2: ★ eBay追跡番号の一括登録: 差出後に「📤eBay登録」→受領証枚数と照合して一括POST (zonos_api.js + GAS)
  * v3-8-1: ★ ラベル発送日の印字位置修正: 署名左横→欄見出しと署名の間(上段)へ。署名左寄り個体での重なり解消 (zonos_api.js)
  * v3-8-0: ★ Zonos APIラベル発行: Zonos送信画面に「⚡APIでラベル発行」— 関税計算→Declaration ID→
@@ -23,7 +25,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-8-14'; // v3.8.14: メルカリ仕入対応: カードに🛍メルカリリンク・印刷ラベル「仕入元商品名」・KPI→costUpsert プッシュ (app.js, cost_upsert.gs)
+const CACHE_NAME = 'ebay-ship-v3-9-0'; // v3.9.0: EU関税コスト v2(€3×n+€2×n+OC2.1%)の内訳表示・申告行数n (app.js) / S1 v2計算(calculator.js・既定v1)
+// 前版: v3.8.14 メルカリ仕入対応: カードに🛍メルカリリンク・印刷ラベル「仕入元商品名」・KPI→costUpsert プッシュ (app.js, cost_upsert.gs)
 
 const STATIC_FILES = [
   './',

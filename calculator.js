@@ -41,6 +41,153 @@ const Calculator = {
     return this._isEuCountry(code) && this._todayYmd(input) >= this._euDdpConf().start;
   },
 
+  // ★EU関税コストモデル v2 (2026-10-17・S1):
+  //   v1 = 1発送ごとに eu_tariff_jpy(¥567) を一律加算(現行・既定)。
+  //   v2 = 暫定フラット関税 €3×申告行(≤€150のみ) + Union handling fee €2×申告行(価額問わず・11/1〜)
+  //        + OC関税処理手数料2.1%(関税+手数料に掛ける)。PDDP(国別・1発送)は郵便DDP(日本郵便+Zonos)のみ。
+  //   アプリ設定 eu_fee_model='v2' のときだけ v2。キー名・既定値は指示書S1の表のとおり。
+  // PDDP手数料(1発送・EUR)。出典: Zonos「EU postal country readiness and declarant tracker」2026-10-16更新
+  //   (Downloads/EU_PID_2EUR_PDDP_検証メモ.md ③)。gt150=null は「DAPのみ」(>€150はDDP不可)。
+  //   DK: DKK10 ≒ €1.34 / SE: SEK10 ≒ €0.90 で換算。
+  //   表に無いEU国(BG/HR/CZ/GR/HU/IE/LV/LT/PL/RO/SI)は郵便DDP未対応 → le150も null。
+  EU_PDDP_DEFAULTS: {
+    DE: { le150: 0.5, gt150: 2 },
+    ES: { le150: 0.5, gt150: null },
+    AT: { le150: 0.6, gt150: 5 },
+    FR: { le150: 1, gt150: 1 },
+    MC: { le150: 1, gt150: 1 },
+    AD: { le150: 1, gt150: 1 },
+    BE: { le150: 1, gt150: 5 },
+    IT: { le150: 1, gt150: 15 },
+    NL: { le150: 1, gt150: 5 },
+    MT: { le150: 1, gt150: 10 },
+    EE: { le150: 1.15, gt150: null },
+    FI: { le150: 1.5, gt150: null },
+    SK: { le150: 2, gt150: 10 },
+    CY: { le150: 3.5, gt150: 3.5 },
+    PT: { le150: 4, gt150: 15 },
+    LU: { le150: 5, gt150: null },
+    DK: { le150: 1.34, gt150: 1.34 }, // DKK 10
+    SE: { le150: 0.90, gt150: 0.90 }, // SEK 10
+    BG: { le150: null, gt150: null }, HR: { le150: null, gt150: null }, CZ: { le150: null, gt150: null },
+    GR: { le150: null, gt150: null }, HU: { le150: null, gt150: null }, IE: { le150: null, gt150: null },
+    LV: { le150: null, gt150: null }, LT: { le150: null, gt150: null }, PL: { le150: null, gt150: null },
+    RO: { le150: null, gt150: null }, SI: { le150: null, gt150: null }
+  },
+  // 日本郵便+Zonos で関税元払いできるEU宛先(Zonos API走査で可の12か国。ADはAPI走査で不可のため含めない)
+  JP_ZONOS_EU: ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK','MC'],
+
+  _cfgStr(key, dflt) {
+    const c = (this.master && this.master.config) || {};
+    const v = c[key];
+    return (v == null || v === '') ? dflt : String(v).trim();
+  },
+  _euFeeConf() {
+    const r = this._rate();
+    const e = this._cfgNum('eur_jpy', NaN);
+    const eurApprox = !(isFinite(e) && e > 0);
+    let table = this.EU_PDDP_DEFAULTS;
+    const c = (this.master && this.master.config) || {};
+    if (c.eu_pddp_table) {
+      try {
+        const t = (typeof c.eu_pddp_table === 'string') ? JSON.parse(c.eu_pddp_table) : c.eu_pddp_table;
+        if (t && typeof t === 'object') table = Object.assign({}, this.EU_PDDP_DEFAULTS, t); // 国単位で上書き
+      } catch (_) { /* JSON不正は既定表 */ }
+    }
+    return {
+      model: this._cfgStr('eu_fee_model', 'v1'),
+      dutyEUR: this._cfgNum('eu_duty_eur', 3),
+      handlingEUR: this._cfgNum('eu_handling_eur', 2),
+      handlingStart: this._cfgYmd('eu_handling_start', '2026-11-01'),
+      thresholdEUR: this._cfgNum('eu_duty_threshold_eur', 150),
+      ocFeePct: this._cfgNum('eu_oc_fee_pct', 2.1),
+      eurJpy: eurApprox ? r * 1.17 : e,
+      eurApprox,
+      usdJpy: r,
+      pddpTable: table
+    };
+  },
+  // 申告行数: input.declLines > input.items.length(異なるSKU数) > 1
+  _declLines(input) {
+    const n = parseInt(input && input.declLines, 10);
+    if (n > 0) return n;
+    if (input && Array.isArray(input.items) && input.items.length > 0) return input.items.length;
+    return 1;
+  },
+  // v2の構成要素(EUR)。pddp は郵便DDPのときだけ呼び出し側で加算する
+  _euV2Parts(code, input) {
+    const conf = this._euFeeConf();
+    const lines = this._declLines(input);
+    const priceEUR = (input && input.itemPriceUSD > 0) ? input.itemPriceUSD * conf.usdJpy / conf.eurJpy : 0;
+    const le = priceEUR <= conf.thresholdEUR; // 価格不明(0)は≤€150とみなす(v1のePacket除外と同じ保守側)
+    const dutyEUR = le ? conf.dutyEUR * lines : 0; // >€150 の実関税は v2 では 0(DDU想定・要判断)
+    const handlingEUR = (this._todayYmd(input) >= conf.handlingStart) ? conf.handlingEUR * lines : 0;
+    const p = conf.pddpTable[code] || null;
+    const pddpRaw = p ? (priceEUR <= 150 ? p.le150 : p.gt150) : null;
+    return { conf, lines, priceEUR, dutyEUR, handlingEUR, pddpRaw, pddpEUR: pddpRaw || 0 };
+  },
+  // OC系(Eco/DHL/FedEx)のEU関税セラー負担。v1=一律¥567 / v2=€3×n+€2×n+OC手数料
+  _euOcTariff(code, input) {
+    const conf = this._euFeeConf();
+    if (conf.model !== 'v2') {
+      const t = this._euDdpConf().tariffJPY;
+      return { tariffJPY: t, reason: null, breakdown: { model: 'v1', tariffJPY: t } };
+    }
+    const v = this._euV2Parts(code, input);
+    const ocFeeEUR = (v.dutyEUR + v.handlingEUR) * conf.ocFeePct / 100;
+    const tariffJPY = Math.round((v.dutyEUR + v.handlingEUR + ocFeeEUR) * conf.eurJpy);
+    const parts = [];
+    if (v.dutyEUR > 0) parts.push('EU関税€' + conf.dutyEUR + '×' + v.lines);
+    if (v.handlingEUR > 0) parts.push('手数料€' + conf.handlingEUR + '×' + v.lines);
+    return {
+      tariffJPY,
+      reason: parts.length ? parts.join(' + ') + ' (セラー負担)' : null,
+      breakdown: { lines: v.lines, dutyEUR: v.dutyEUR, handlingEUR: v.handlingEUR, pddpEUR: 0,
+        ocFeeEUR: Math.round(ocFeeEUR * 10000) / 10000, eurJpy: conf.eurJpy, model: 'v2' }
+    };
+  },
+
+  // ★試算専用(候補一覧には出さない): 日本郵便(ePacketライト運賃)+Zonos でEU宛てDDPした場合のセラー負担額。
+  //   運賃 = ePacket料金表 / Zonos手数料 = zonos_fee_jpy(既定760) / + €3×n(≤€150) + €2×n(11/1〜) + PDDP(国別)。
+  //   country は国コード文字列または国オブジェクト。ePacket料金が引けない(地帯未設定・サイズ超過)ときは null。
+  //   JP_ZONOS_EU 以外の国も試算値は返すが available:false・ddpNote に「対象外」を付ける(比較用)。
+  estimateJpZonosEU(input, country) {
+    if (!this.master) throw new Error('Master data not loaded');
+    const code = (country && typeof country === 'object') ? country.code : String(country || input.country || '');
+    const available = this.JP_ZONOS_EU.indexOf(code) !== -1;
+    const ctry = (country && typeof country === 'object') ? country : (this.master.countries || []).find(c => c.code === code);
+    if (!ctry || !ctry.epacketZone) return null;
+    const dims = [input.lengthCm, input.widthCm, input.heightCm].sort((a, b) => b - a);
+    if (input.weightG > 2000 || dims[0] > 60 || dims[0] + dims[1] + dims[2] > 90) return null;
+    const w100 = Math.ceil(input.weightG / 100) * 100;
+    const row = (this.master.rates.epacket || []).find(r => r[0] === w100);
+    const freightJPY = row ? row[ctry.epacketZone] : null;
+    if (!freightJPY) return null;
+
+    const v = this._euV2Parts(code, input);
+    const zonosFeeJPY = this._cfgNum('zonos_fee_jpy', 760);
+    const euJPY = Math.round((v.dutyEUR + v.handlingEUR + v.pddpEUR) * v.conf.eurJpy);
+    const notes = [];
+    if (!available) notes.push('日本郵便+Zonosの対象外(参考試算)');
+    if (v.pddpRaw == null) {
+      notes.push(v.priceEUR > 150
+        ? '>€150 は郵便DDP不可(DAPのみ)・PDDP手数料は0として試算'
+        : 'PDDP手数料が未登録の国・0として試算');
+    }
+    return {
+      carrier: '日本郵便+Zonos(試算)',
+      country: code,
+      available,
+      ddpNote: notes.length ? notes.join(' / ') : null,
+      freightJPY,
+      zonosFeeJPY,
+      euJPY,
+      totalCost: freightJPY + zonosFeeJPY + euJPY,
+      euBreakdown: { lines: v.lines, dutyEUR: v.dutyEUR, handlingEUR: v.handlingEUR, pddpEUR: v.pddpEUR,
+        ocFeeEUR: 0, eurJpy: v.conf.eurJpy, model: 'v2' }
+    };
+  },
+
   // 為替レート（USD→JPY）。マスタ「アプリ設定」シートの usd_jpy_rate を優先し、
   // 未設定・旧マスタの場合は 150 にフォールバック(後方互換)
   exchangeRate: 150,
@@ -124,6 +271,12 @@ const Calculator = {
     if (fedex) candidates.push(fedex);
 
     candidates.sort((a, b) => a.totalCost - b.totalCost);
+    // ★EU v2: EUR→JPY を USDレート×1.17 で近似したときは注記を残す
+    let euRateNote = null;
+    if (this._euDdpActive(country.code, input)) {
+      const ec = this._euFeeConf();
+      if (ec.model === 'v2' && ec.eurApprox) euRateNote = '近似: eur_jpy未設定のため usd_jpy_rate×1.17 (=' + ec.eurJpy.toFixed(2) + ')';
+    }
     return {
       candidates,
       excluded, // v3.11
@@ -134,7 +287,8 @@ const Calculator = {
         country: country.name,
         tariffJPY: tariffJPY,
         tariffRate: input.tariffRate || 0,
-        euDdp: this._euDdpActive(country.code, input) // ★EU関税DDP適用中か(UI推奨表示用)
+        euDdp: this._euDdpActive(country.code, input), // ★EU関税DDP適用中か(UI推奨表示用)
+        euRateNote: euRateNote
       }
     };
   },
@@ -219,15 +373,18 @@ const Calculator = {
     // 米国向け関税＋通関手数料（Orange Connex経由はセラー負担）
     let usFees = 0;
     let tariffSeller = 0;
+    let euBreakdown;
     if (country.code === 'US') {
       tariffSeller = tariffJPY;
       usFees = 245 + Math.round(tariffJPY * 0.021); // 米国輸入通関手数料 + 関税処理手数料2.1%
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
       if (usFees > 0) surchargeReasons.push('米国通関手数料');
     } else if (this._euDdpActive(country.code, input)) {
-      // ★EU関税DDP(10/1〜): SpeedPAKはDDP自動適用 → 3€+手数料2.1%の概算をセラー負担で加算
-      tariffSeller = this._euDdpConf().tariffJPY;
-      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
+      // ★EU関税DDP(10/1〜): SpeedPAKはDDP自動適用 → v1=3€+手数料2.1%の概算 / v2=€3×n+€2×n+2.1% をセラー負担で加算
+      const eu = this._euOcTariff(country.code, input);
+      tariffSeller = eu.tariffJPY;
+      euBreakdown = eu.breakdown;
+      if (tariffSeller > 0) surchargeReasons.push(eu.reason || 'EU関税DDP(セラー負担・概算)');
     }
 
     const totalCost = row[1] + surcharge + tariffSeller + usFees;
@@ -238,6 +395,7 @@ const Calculator = {
       basicCost: row[1],
       surcharge,
       surchargeReasons,
+      euBreakdown,
       tariffSeller,
       usFees,
       totalCost,
@@ -331,14 +489,17 @@ const Calculator = {
     // 米国向け関税（Orange Connex経由はセラー負担、関税処理手数料2.1%含む）
     let tariffSeller = 0;
     let usFees = 0;
+    let euBreakdown;
     if (country.code === 'US') {
       tariffSeller = tariffJPY;
       usFees = Math.round(tariffJPY * 0.021); // 関税処理手数料2.1%（DHLは通関手数料は別途）
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
     } else if (this._euDdpActive(country.code, input)) {
-      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → 概算をセラー負担で加算
-      tariffSeller = this._euDdpConf().tariffJPY;
-      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
+      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → v1概算 / v2分解 をセラー負担で加算
+      const eu = this._euOcTariff(country.code, input);
+      tariffSeller = eu.tariffJPY;
+      euBreakdown = eu.breakdown;
+      if (tariffSeller > 0) surchargeReasons.push(eu.reason || 'EU関税DDP(セラー負担・概算)');
     }
 
     // ★v3.6.1: 燃料割増金 = 実効率(公表×0.75=SpeedPAK 25%OFF) × (運賃+対象サーチャージ)。
@@ -360,6 +521,7 @@ const Calculator = {
       basicCost: cost,
       surcharge,
       surchargeReasons,
+      euBreakdown,
       tariffSeller,
       usFees,
       totalCost,
@@ -439,6 +601,7 @@ const Calculator = {
     // 米国向け関税：FICPは米国輸入手続き手数料が無料、関税転送も無料
     let tariffSeller = 0;
     let usFees = 0;
+    let euBreakdown;
     if (country.code === 'US') {
       tariffSeller = tariffJPY;
       // 関税処理手数料 2.1% のみ加算（FICPは他の通関手数料が無料）
@@ -451,9 +614,11 @@ const Calculator = {
       }
       if (tariffSeller > 0) surchargeReasons.push('米国関税(セラー負担)');
     } else if (this._euDdpActive(country.code, input)) {
-      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → 概算をセラー負担で加算
-      tariffSeller = this._euDdpConf().tariffJPY;
-      if (tariffSeller > 0) surchargeReasons.push('EU関税DDP(セラー負担・概算)');
+      // ★EU関税DDP(10/1〜): OC経由はDDP自動適用 → v1概算 / v2分解 をセラー負担で加算
+      const eu = this._euOcTariff(country.code, input);
+      tariffSeller = eu.tariffJPY;
+      euBreakdown = eu.breakdown;
+      if (tariffSeller > 0) surchargeReasons.push(eu.reason || 'EU関税DDP(セラー負担・概算)');
     }
 
     const totalCost = cost + surcharge + tariffSeller + usFees;
@@ -464,6 +629,7 @@ const Calculator = {
       basicCost: cost,
       surcharge,
       surchargeReasons,
+      euBreakdown,
       demandJPY,   // ★v3.6.1 内訳(UI/検証用)
       nssdsJPY,
       fuelJPY,
