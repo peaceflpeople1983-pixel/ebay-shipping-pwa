@@ -34,6 +34,44 @@
     'SpeedPAK Eco'
   ];
 
+  // ★段階C Zonos EU: 対象国(11か国)。正は calculator.js の Calculator.ZONOS_EU_COUNTRIES
+  //   (GAS 側 ZONOS_EU_COUNTRIES とも同値に保つ)。Calculator 未読込時のフォールバック用コピー
+  const ZONOS_EU_COUNTRIES_FALLBACK = ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK'];
+
+  function zonosEuCountries_() {
+    try {
+      if (typeof Calculator !== 'undefined' && Calculator && Array.isArray(Calculator.ZONOS_EU_COUNTRIES)) {
+        return Calculator.ZONOS_EU_COUNTRIES;
+      }
+    } catch (_) {}
+    return ZONOS_EU_COUNTRIES_FALLBACK;
+  }
+
+  /** アプリ設定 zonos_eu_enabled(1/true で有効・既定無効)。Calculator のマスタから読む */
+  function isZonosEuEnabled() {
+    try {
+      if (typeof Calculator !== 'undefined' && Calculator && typeof Calculator._zonosEuEnabled === 'function') {
+        return Calculator._zonosEuEnabled();
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /** 注文行の IOSS 参照値(getOrders が返すキー名の揺れを吸収) */
+  function orderIoss_(o) {
+    if (!o) return '';
+    const v = (o.ioss != null && o.ioss !== '') ? o.ioss : (o.IOSS != null ? o.IOSS : '');
+    return String(v == null ? '' : v).trim();
+  }
+
+  /** EU の Zonos 対象か = フラグ ∧ 対象国 ∧ 注文行の IOSS 列が空でない(ポリシー条件は見ない・GAS と同じ) */
+  function isZonosEuTargetOrder(o) {
+    if (!o || !isZonosEuEnabled()) return false;
+    const cc = String(o.country || '').toUpperCase();
+    if (zonosEuCountries_().indexOf(cc) === -1) return false;
+    return orderIoss_(o) !== '';
+  }
+
   const DEADLINE_THRESHOLDS = {
     red:    24 * 60 * 60 * 1000,
     orange: 48 * 60 * 60 * 1000,
@@ -50,6 +88,8 @@
   function isZonosTargetOrder(o) {
     if (!o) return false;
     if (o.isZonosTarget === true || o.isZonosTarget === 'true') return true;
+    // ★段階C Zonos EU: EU 対象は国と IOSS で判定(Economy 系ポリシー条件は US のみ)
+    if (isZonosEuTargetOrder(o)) return true;
     // フォールバック判定
     if (String(o.country || '').toUpperCase() !== 'US') return false;
     const p = String(o.shippingPolicy || '');
@@ -134,6 +174,7 @@
       return '<span class="badge zonos-done">✓ Zonos済</span>';
     }
     // 未送信
+    if (o.cancelledAt) return ''; // v3-10-1: キャンセル済には「Zonos未」を出さない
     if (role === 'sub') {
       return '<span class="badge zonos-pending">🆕 Zonos未 (代表へ)</span>';
     }
@@ -147,6 +188,10 @@
     if (isZonosTargetOrder(o)) return '';
     if (!o.country || !o.shippingPolicy) return '';
     if (String(o.country).toUpperCase() !== 'US') {
+      // ★段階C Zonos EU: フラグ有効時だけ EU の対象外理由を細分化(無効時は従来の文言)
+      if (isZonosEuEnabled() && zonosEuCountries_().indexOf(String(o.country).toUpperCase()) !== -1) {
+        return '<span class="sub-note zonos-na">⚖ IOSS参照なしのためZonos対象外</span>';
+      }
       return '<span class="sub-note zonos-na">⚖ 米国以外のためZonos対象外</span>';
     }
     return '<span class="sub-note zonos-na">⚖ ' + escapeHtmlZ_(o.shippingPolicy) + 'のためZonos対象外</span>';
@@ -257,6 +302,9 @@
       const r = d.recipient;
       const isDoukon = d.isDoukon && d.doukonCount > 1;
       const existingDdp = d.existingDeclaration && d.existingDeclaration.declarationId;
+      // ★段階C Zonos EU: 州(STATE)は US のときだけ必須。EU は値があれば表示・無ければ欄ごと出さない
+      const rcc = String((r && r.countryCode) || 'US').toUpperCase();
+      const stateRequired = (rcc === 'US');
 
       // 各コピペフィールドのHTML
       const fields = [
@@ -265,7 +313,7 @@
         { key: 'addrLine1', label: 'STREET ADDRESS', value: r.addrLine1, required: true },
         { key: 'addrLine2', label: 'STREET ADDRESS 2', value: r.addrLine2, required: false, skipIfEmpty: true },
         { key: 'city', label: 'CITY', value: r.city, required: true },
-        { key: 'state', label: 'STATE', value: r.state, required: true },
+        { key: 'state', label: 'STATE', value: r.state, required: stateRequired, skipIfEmpty: !stateRequired },
         { key: 'postalCode', label: 'POSTAL CODE', value: r.postalCode, required: true },
         { key: 'country', label: 'COUNTRY', value: r.countryFull, required: true }
       ];
@@ -751,6 +799,8 @@
   // ============================================================
   window.Zonos = {
     isZonosTargetOrder: isZonosTargetOrder,
+    isZonosEuTargetOrder: isZonosEuTargetOrder, // ★段階C Zonos EU
+    isZonosEuEnabled: isZonosEuEnabled,
     computeZonosDeadlineMeta: computeZonosDeadlineMeta,
     buildZonosBadge: buildZonosBadge,
     buildZonosScopeNote: buildZonosScopeNote,

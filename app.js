@@ -584,7 +584,7 @@ const App = {
       orders = orders.filter(function(o) {
         // Zonos未送信判定 (Zonos対象 + DDP未取得 + 未発送 + 代表/単独)
         if (zonosPendingOnly && window.Zonos && window.Zonos.isZonosTargetOrder(o)
-            && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub'
+            && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub' && !o.cancelledAt
             && (!packedWaitMode || o.selectedCarrier === 'ePacketライト')) {
           return true;
         }
@@ -707,7 +707,7 @@ const App = {
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
           ${shippingInfoHtml}
-          ${(window.Zonos && window.Zonos.isZonosTargetOrder(o) && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub')
+          ${(window.Zonos && window.Zonos.isZonosTargetOrder(o) && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub' && !o.cancelledAt)
             ? `<button class="zonos-card-btn" data-zonos-order-id="${escapeAttr(o.orderId)}">📦 Zonosへ送信${(o.doukonRole === 'lead' && o.doukonCount > 1) ? ' (' + o.doukonCount + '点まとめて)' : ''}</button>`
             : ''}
           ${(window.Zonos && !window.Zonos.isZonosTargetOrder(o) && o.country && o.shippingPolicy) ? window.Zonos.buildZonosScopeNote(o) : ''}
@@ -869,11 +869,17 @@ const App = {
     document.getElementById('input-height').value = order && order.heightCm ? order.heightCm : '';
     document.getElementById('input-title').textContent = order ? '発送情報入力' : '手動入力';
     const tariffCard = document.getElementById('input-tariff-card');
-    if (order && order.country === 'US' && (order.customsName || order.hsCode)) {
+    // ★段階C Zonos EU: 関税カードは「Zonos 対象（US or EU eligible）」で表示。EU は関税率を Zonos 算出と表示
+    const zonosEuCard = !!(order && order.country !== 'US' && this._isZonosEuOrder(order));
+    if (order && (order.country === 'US' || zonosEuCard) && (order.customsName || order.hsCode)) {
       tariffCard.classList.remove('hidden');
       document.getElementById('t-customs-name').textContent = order.customsName || '—';
       document.getElementById('t-hs-code').textContent = order.hsCode || '—';
-      document.getElementById('t-tariff-rate').textContent = order.tariffRate ? order.tariffRate.toFixed(1) + '%' : '0.0%';
+      document.getElementById('t-tariff-rate').textContent = zonosEuCard
+        ? 'Zonos算出（EU）'
+        : (order.tariffRate ? order.tariffRate.toFixed(1) + '%' : '0.0%');
+      const head = tariffCard.querySelector('.muted');
+      if (head) head.textContent = zonosEuCard ? '通関情報（EU・日本郵便+Zonos DDP）' : '通関情報（米国向け）';
     } else {
       tariffCard.classList.add('hidden');
     }
@@ -904,10 +910,26 @@ const App = {
     } catch (_) { return 1; }
   },
 
+  // ★段階C Zonos EU: 注文が Zonos EU 対象か(フラグ∧対象国∧IOSS)。判定は calculator.js に一本化
+  _isZonosEuOrder(order) {
+    try {
+      if (!order || typeof Calculator === 'undefined' || !Calculator._isZonosEuEligible) return false;
+      return Calculator._isZonosEuEligible({ ioss: order.ioss || '', itemPriceUSD: order.itemPrice }, order.country);
+    } catch (_) { return false; }
+  },
+
   // ★EU v2 (S3): 候補の euBreakdown(model='v2')から関税行の表示文言を作る。v1・内訳なしは null(表示は従来どおり)
+  //   ★段階C Zonos EU: zonosBreakdown(model='zonos')があれば Zonos 内訳を同じ場所に出す
   //   line = 「EU関税 €3×n + 手数料 €2×n（+OC手数料2.1%）= ¥x」(>€150 は関税なし・11/1前は手数料なし)
   //   hint = 申告行数 n≥2 のとき「同梱 n 行: 同じ HS コードの品目にまとめると €5×(n−1) 節約」
   _euBreakdownText(c) {
+    const z = c && c.zonosBreakdown;
+    if (z && z.model === 'zonos') {
+      const r2 = v => String(Math.round(v * 100) / 100);
+      const zl = `Zonos関税 €${r2(z.dutyEUR || 0)}` + ((z.pddpEUR > 0) ? ` + PDDP €${r2(z.pddpEUR)}` : '')
+        + ` + 送金手数料 ¥${Number(z.remittanceJPY || 0).toLocaleString()} + 立替手数料 ¥${Number(z.disbursementJPY || 0).toLocaleString()} = ¥${Number(c.tariffSeller || 0).toLocaleString()}`;
+      return { line: zl, hint: null };
+    }
     const b = c && c.euBreakdown;
     if (!b || b.model !== 'v2') return null;
     const n = b.lines > 0 ? b.lines : 1;
@@ -972,7 +994,9 @@ const App = {
       heightCm: heightCm,
       itemPriceUSD: order ? order.itemPrice : 0,
       tariffRate: order ? order.tariffRate : 0,
-      declLines: this._euDeclLines(order) // ★EU v2: 申告行数(同梱は異なるASIN数・取れなければ1)
+      declLines: this._euDeclLines(order), // ★EU v2: 申告行数(同梱は異なるASIN数・取れなければ1)
+      ioss: order ? (order.ioss || '') : '', // ★段階C Zonos EU: 注文行の IOSS 列(空なら Zonos EU 対象外)
+      manual: !order                         // ★段階C Zonos EU: 注文に紐付かない手動入力
     };
     this.state.currentInput = input;
     const result = Calculator.calculate(input);
@@ -1000,7 +1024,8 @@ const App = {
     const shippingPolicy = order ? order.shippingPolicy : '';
     let recommendedTypes = this.getRecommendedCarrierTypes(shippingPolicy);
     // ★EU関税DDP(10/1〜): EU宛てEconomy帯はePacket除外 → 推奨をSpeedPAK Ecoに差し替える
-    if (result.context && result.context.euDdp && recommendedTypes.indexOf('epacket') !== -1) {
+    //   ★段階C Zonos EU: 日本郵便+Zonos DDP が候補に戻った(context.zonosEu)ときは差し替えない
+    if (result.context && result.context.euDdp && !result.context.zonosEu && recommendedTypes.indexOf('epacket') !== -1) {
       recommendedTypes = recommendedTypes.filter(t => t !== 'epacket');
       if (recommendedTypes.indexOf('speedpak') === -1) recommendedTypes.push('speedpak');
     }
@@ -2346,14 +2371,14 @@ const App = {
       lengthCm: i.lengthCm,
       widthCm: i.widthCm,
       heightCm: i.heightCm,
-      carrier: c.carrier,
+      carrier: c.sheetCarrier || c.carrier, // ★段階C: Zonos DDP 候補もシートには 'ePacketライト' で書く
       cost: c.totalCost,
       alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
     };
     TodayGroup.remove(orderId);
     const localOrder = this.state.orders.find(o => o.orderId === orderId);
     if (localOrder) {
-      localOrder.selectedCarrier = c.carrier;
+      localOrder.selectedCarrier = c.sheetCarrier || c.carrier;
       localOrder.shippingCost = c.totalCost;
     }
     showToast('Sheetsへ書込み中... ホームへ戻ります');
