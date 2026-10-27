@@ -926,9 +926,15 @@ const App = {
     const z = c && c.zonosBreakdown;
     if (z && z.model === 'zonos') {
       const r2 = v => String(Math.round(v * 100) / 100);
-      const zl = `Zonos関税 €${r2(z.dutyEUR || 0)}` + ((z.pddpEUR > 0) ? ` + PDDP €${r2(z.pddpEUR)}` : '')
+      // ★v3.10.2: EU €2 手数料(11/1〜・申告行ごと)を内訳に表示（合計には calculator 側で加算済み）
+      const zn = z.lines > 0 ? z.lines : 1;
+      const zl = `Zonos関税 €${r2(z.dutyEUR || 0)}` + ((z.handlingEUR > 0) ? ` + EU手数料 €${r2(z.handlingEUR)}` : '')
+        + ((z.pddpEUR > 0) ? ` + PDDP €${r2(z.pddpEUR)}` : '')
         + ` + 送金手数料 ¥${Number(z.remittanceJPY || 0).toLocaleString()} + 立替手数料 ¥${Number(z.disbursementJPY || 0).toLocaleString()} = ¥${Number(c.tariffSeller || 0).toLocaleString()}`;
-      return { line: zl, hint: null };
+      const zh = (zn >= 2 && (z.dutyEUR > 0 || z.handlingEUR > 0))
+        ? `同梱 ${zn} 行: 同じ HS コードの品目にまとめると €${r2(((z.dutyEUR || 0) + (z.handlingEUR || 0)) / zn)}×${zn - 1} 節約`
+        : null;
+      return { line: zl, hint: zh };
     }
     const b = c && c.euBreakdown;
     if (!b || b.model !== 'v2') return null;

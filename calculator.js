@@ -77,6 +77,99 @@ const Calculator = {
   // 日本郵便+Zonos で関税元払いできるEU宛先(Zonos API走査で可の12か国。ADはAPI走査で不可のため含めない)
   JP_ZONOS_EU: ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK','MC'],
 
+  // ★段階C Zonos EU (2026-10-22・ZONOS_EU_PLAN_v1 §0/§2):
+  //   日本郵便(ePacketライト)+Zonos で EU 宛てを DDP 発送する対象国(11か国)。
+  //   ※GAS側 apps_script_v3.17.0 の ZONOS_EU_COUNTRIES と同じ値に保つこと(変更時は両方を同時に直す)。
+  //   MC は本番マスタで epacketZone=null のため除外 / AD・仏海外県は未検証のため除外 / DE は Zonos 不可。
+  ZONOS_EU_COUNTRIES: ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK'],
+  // Zonos 実測モデル(2026-10-27 Zonos サポート回答 + landedCost 実測で更新)。
+  //   GAS は EU のとき endUse: NOT_FOR_RESALE で見積る → 商品合計 ≤ €150(eu_duty_threshold_eur) なら
+  //   duty = €3(eu_duty_eur) × 申告行数 ("Europe Reformed Duty 3 EUR")。価格不明(0)も ≤€150 とみなす(保守側)。
+  //   商品合計 > €150 は従来式 duty = Σ品目 clamp(dutyRate×CIF_item, dutyMinEUR, dutyMaxEUR)
+  //   (IOSS 対象は ≤€150 のみなので実際はほぼ使われない)。
+  //   €2(eu_handling_eur) × 申告行数 を eu_handling_start(既定 2026-11-01) 以降に加算(全 B2C・価額問わず)。
+  //   ※€2 は 10/27 時点の Zonos 見積には出ない(arrivalDate 11/5 でも出ない)が EU が課すため、コスト比較は保守的に含める。
+  //     Zonos 見積に載ったら実額と照合すること。
+  //   PDDP = EU_PDDP_DEFAULTS[cc].le150 / remittance = remittanceJPY(固定円・実測 266)
+  //   disbursement = disbursementRate×(duty + €2分 + PDDP)
+  //   ※€2 を disbursement の基数に入れるかは不明(実測は duty+PDDP の 10%)。保守側で入れている。
+  ZONOS_EU_MODEL: { dutyRate: 0.045, dutyMinEUR: 0.30, dutyMaxEUR: 0.80, remittanceJPY: 266, disbursementRate: 0.10 },
+  // アプリ設定 zonos_eu_enabled(1/true で有効)。既定は無効=挙動不変
+  _zonosEuEnabled() {
+    const c = (this.master && this.master.config) || {};
+    const v = c.zonos_eu_enabled;
+    if (v === true || v === 1) return true;
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return s === '1' || s === 'true';
+  },
+  // Zonos EU 対象か = フラグ ∧ 対象11か国 ∧ (注文の IOSS 参照あり、または手動入力で 0 < 価格 ≤ eu_ddp_threshold_usd)
+  //   input.ioss = 注文行の IOSS 列 / input.manual = 注文に紐付かない手動入力(app.js が付与)
+  _isZonosEuEligible(input, country) {
+    if (!this._zonosEuEnabled()) return false;
+    const code = (country && typeof country === 'object') ? country.code : String(country || (input && input.country) || '');
+    if (this.ZONOS_EU_COUNTRIES.indexOf(code) === -1) return false;
+    if (input && String(input.ioss == null ? '' : input.ioss).trim() !== '') return true;
+    const p = input ? input.itemPriceUSD : 0;
+    return !!(input && input.manual && p > 0 && p <= this._euDdpConf().thresholdUSD);
+  },
+  // Zonos EU のセラー負担額(円)と内訳。freightJPY = ePacket運賃(CIF の運賃按分に使う)
+  _zonosEuTariff(code, input, freightJPY) {
+    const M = this.ZONOS_EU_MODEL;
+    const conf = this._euFeeConf();
+    const eurJpy = conf.eurJpy;
+    const usdJpy = conf.usdJpy;
+    // 品目: input.items に priceUSD があればそれを使い、無ければ 申告行数 n で価格を均等割り
+    let prices = null;
+    if (Array.isArray(input.items) && input.items.length > 0 && input.items.every(it => it && isFinite(parseFloat(it.priceUSD)))) {
+      prices = input.items.map(it => Math.max(0, parseFloat(it.priceUSD)));
+    } else {
+      const n = this._declLines(input);
+      const total = input.itemPriceUSD > 0 ? input.itemPriceUSD : 0;
+      prices = [];
+      for (let i = 0; i < n; i++) prices.push(total / n);
+    }
+    const sumPrice = prices.reduce((a, b) => a + b, 0);
+    const lines = prices.length;
+    const freightEUR = (freightJPY > 0 ? freightJPY : 0) / eurJpy;
+    const priceEUR = sumPrice * usdJpy / eurJpy;          // 商品合計(運賃を含まない)
+    const le150 = priceEUR <= conf.thresholdEUR;
+    let dutyEUR = 0;
+    if (le150) {
+      dutyEUR = conf.dutyEUR * lines;                     // €3 × 申告行数 (NOT_FOR_RESALE・≤€150)
+    } else {
+      prices.forEach(pUSD => {
+        const share = sumPrice > 0 ? pUSD / sumPrice : 1 / prices.length; // 運賃按分(価格比・価格不明は均等)
+        const cifEUR = pUSD * usdJpy / eurJpy + freightEUR * share;
+        dutyEUR += Math.min(M.dutyMaxEUR, Math.max(M.dutyMinEUR, M.dutyRate * cifEUR));
+      });
+    }
+    dutyEUR = Math.round(dutyEUR * 10000) / 10000;
+    // €2 × 申告行数 (eu_handling_start 以降・価額問わず)。Zonos 見積に載ったら実額と照合
+    const handlingEUR = (this._todayYmd(input) >= conf.handlingStart) ? conf.handlingEUR * lines : 0;
+    const p = conf.pddpTable[code] || null;
+    // FI は表上 le150=1.5 だが指示書§2-3 により 0(Zonos 実測で PDDP が出ない)
+    const pddpUse = (code === 'FI') ? 0 : ((p && p.le150) ? p.le150 : 0);
+    const dutyJPY = Math.round(dutyEUR * eurJpy);
+    const handlingJPY = Math.round(handlingEUR * eurJpy);
+    const pddpJPY = Math.round(pddpUse * eurJpy);
+    const remittanceJPY = M.remittanceJPY;
+    // €2 分も基数に含める(保守側・Zonos の扱いは未確認)
+    const disbursementJPY = Math.round(M.disbursementRate * (dutyJPY + handlingJPY + pddpJPY));
+    const tariffJPY = dutyJPY + handlingJPY + pddpJPY + remittanceJPY + disbursementJPY;
+    const note = 'Zonos DDP: 関税€' + (Math.round(dutyEUR * 100) / 100) + '(¥' + dutyJPY + ')'
+      + (handlingEUR > 0 ? ' + EU手数料€' + (Math.round(handlingEUR * 100) / 100) + '(¥' + handlingJPY + ')' : '')
+      + ' + PDDP€' + pddpUse + '(¥' + pddpJPY + ')'
+      + ' + 送金手数料¥' + remittanceJPY
+      + ' + 立替手数料' + Math.round(M.disbursementRate * 100) + '%(¥' + disbursementJPY + ')'
+      + ' = ¥' + tariffJPY + ' (セラー負担・概算)';
+    return {
+      tariffJPY,
+      note,
+      breakdown: { model: 'zonos', lines, dutyEUR, handlingEUR, pddpEUR: pddpUse, dutyJPY, handlingJPY, pddpJPY,
+        remittanceJPY, disbursementJPY, eurJpy, eurApprox: conf.eurApprox }
+    };
+  },
+
   _cfgStr(key, dflt) {
     const c = (this.master && this.master.config) || {};
     const v = c[key];
@@ -148,6 +241,8 @@ const Calculator = {
   },
 
   // ★試算専用(候補一覧には出さない): 日本郵便(ePacketライト運賃)+Zonos でEU宛てDDPした場合のセラー負担額。
+  //   ※段階C(2026-10-22)以降、候補一覧の Zonos EU は _zonosEuTariff(Zonos 実測モデル)を使う。
+  //     本関数は tests/eu_cost_sim.js の比較試算用に残置(v2 €3/€2 前提の旧試算)。
   //   運賃 = ePacket料金表 / Zonos手数料 = zonos_fee_jpy(既定760) / + €3×n(≤€150) + €2×n(11/1〜) + PDDP(国別)。
   //   country は国コード文字列または国オブジェクト。ePacket料金が引けない(地帯未設定・サイズ超過)ときは null。
   //   JP_ZONOS_EU 以外の国も試算値は返すが available:false・ddpNote に「対象外」を付ける(比較用)。
@@ -277,19 +372,22 @@ const Calculator = {
       const ec = this._euFeeConf();
       if (ec.model === 'v2' && ec.eurApprox) euRateNote = '近似: eur_jpy未設定のため usd_jpy_rate×1.17 (=' + ec.eurJpy.toFixed(2) + ')';
     }
+    const context = {
+      actualG: input.weightG,
+      vol8000G: Math.ceil(vol8000 * 1000),
+      vol5000G: Math.ceil(vol5000 * 1000),
+      country: country.name,
+      tariffJPY: tariffJPY,
+      tariffRate: input.tariffRate || 0,
+      euDdp: this._euDdpActive(country.code, input), // ★EU関税DDP適用中か(UI推奨表示用)
+      euRateNote: euRateNote
+    };
+    // ★段階C Zonos EU: 日本郵便+Zonos DDP が候補に戻ったときだけキーを足す(フラグ無効時の出力は現行と同一)
+    if (ep && ep.zonosEu) context.zonosEu = true;
     return {
       candidates,
       excluded, // v3.11
-      context: {
-        actualG: input.weightG,
-        vol8000G: Math.ceil(vol8000 * 1000),
-        vol5000G: Math.ceil(vol5000 * 1000),
-        country: country.name,
-        tariffJPY: tariffJPY,
-        tariffRate: input.tariffRate || 0,
-        euDdp: this._euDdpActive(country.code, input), // ★EU関税DDP適用中か(UI推奨表示用)
-        euRateNote: euRateNote
-      }
+      context
     };
   },
 
@@ -298,8 +396,11 @@ const Calculator = {
     const NAME = 'ePacketライト';
     const ex = (reason) => ({ _excluded: true, name: NAME, reason });
 
+    // ★段階C Zonos EU: フラグ∧対象国∧IOSS(または手動入力の価格≤閾値)なら日本郵便+Zonos DDP で候補に戻す
+    const zonosEu = this._euDdpActive(country.code, input) && this._isZonosEuEligible(input, country.code);
+
     // ★EU関税DDP(10/1〜): 150€以下(価格不明含む)はDDPラベル必須のため日本郵便は使えない
-    if (this._euDdpActive(country.code, input)) {
+    if (!zonosEu && this._euDdpActive(country.code, input)) {
       const conf = this._euDdpConf();
       const p = input.itemPriceUSD;
       if (!(p > conf.thresholdUSD)) {
@@ -320,6 +421,28 @@ const Calculator = {
     if (!row) return ex(`料金表に ${w100}g 行が見つからない`);
     const cost = row[country.epacketZone];
     if (cost == null || cost === '' || cost === 0) return ex(`料金表 ${w100}g × 第${country.epacketZone}地帯 の値が空（row=${JSON.stringify(row)}）`);
+
+    if (zonosEu) {
+      // ★段階C Zonos EU: 関税・PDDP・Zonos手数料をセラー負担で加算(Zonos 実測モデル)
+      const z = this._zonosEuTariff(country.code, input, cost);
+      return {
+        carrier: 'ePacketライト（Zonos DDP）',
+        sheetCarrier: NAME,        // シートM列へは従来どおり 'ePacketライト' を書く(差出票・発送待ちフィルタが完全一致で判定するため)
+        detail: '第' + country.epacketZone + '地帯',
+        basicCost: cost,
+        surcharge: 0,
+        tariffSeller: z.tariffJPY,
+        tariffBuyer: 0,
+        totalCost: cost + z.tariffJPY,
+        zonosEu: true,
+        zonosBreakdown: z.breakdown,
+        billableG: input.weightG,
+        estimatedDays: '5〜21日',
+        tracking: true,
+        insurance: false,
+        tariffNote: z.note
+      };
+    }
 
     return {
       carrier: NAME,

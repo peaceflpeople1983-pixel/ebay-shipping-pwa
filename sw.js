@@ -27,7 +27,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-1'; // v3.10.1: キャンセル行の Zonos 表示抑止: cancelledAt ありの注文に Zonos未バッジ・送信ボタンを出さず Zonos未送信フィルタからも除外 (zonos.js, app.js)
+const CACHE_NAME = 'ebay-ship-v3-10-2'; // v3.10.2: Zonos EU モデルを 10/27 Zonos 回答+実測に合わせる: ≤€150 は €3×申告行数・€2×申告行数を eu_handling_start 以降に加算・送金手数料 266 (calculator.js)
+// 前版: v3.10.1 キャンセル行の Zonos 表示抑止: cancelledAt ありの注文に Zonos未バッジ・送信ボタンを出さず Zonos未送信フィルタからも除外 (zonos.js, app.js)
 // 前版: v3.10.0 日本郵便+Zonos の EU 対応(段階C・アプリ設定 zonos_eu_enabled・既定無効): IOSS 付き EU11か国で ePacketライト（Zonos DDP）を候補に戻す (calculator.js, zonos.js, app.js)
 // 前々版: v3.9.0 EU関税コスト v2(€3×n+€2×n+OC2.1%)の内訳表示・申告行数n (app.js) / S1 v2計算(calculator.js・既定v1)
 
