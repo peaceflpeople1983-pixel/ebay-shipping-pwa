@@ -102,12 +102,34 @@ const Calculator = {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     return s === '1' || s === 'true';
   },
+  // ★v3.10.3: Zonos 対象の Economy 系発送ポリシー(完全一致リスト)。
+  //   ※zonos.js の ECONOMY_POLICIES・GAS zonos_integration.gs の ECONOMY_POLICIES と同じ値に保つこと(変更時は3か所同時に直す)。
+  ZONOS_ECONOMY_POLICIES: [
+    'ePacketライト',
+    'Economy International Shipping',
+    'Economy Shipping from outside US',
+    'SpeedPAK Economy',
+    'eBay SpeedPAK Economy',
+    'SpeedPAK Eco'
+  ],
+  // ★v3.10.3: Economy 系ポリシーか(GAS zonosIsEconomyPolicy_ / zonos.js isEconomyPolicy_ と同じロジック)。
+  //   完全一致 → 部分一致(小文字で economy を含み expedited を含まない / epacket を含む)。空は false
+  _isEconomyPolicy(policy) {
+    if (!policy) return false;
+    if (this.ZONOS_ECONOMY_POLICIES.indexOf(policy) !== -1) return true;
+    const p = String(policy).toLowerCase();
+    if (p.indexOf('economy') !== -1 && p.indexOf('expedited') === -1) return true;
+    if (p.indexOf('epacket') !== -1) return true;
+    return false;
+  },
   // Zonos EU 対象か = フラグ ∧ 対象11か国 ∧ (注文の IOSS 参照あり、または手動入力で 0 < 価格 ≤ eu_ddp_threshold_usd)
   //   input.ioss = 注文行の IOSS 列 / input.manual = 注文に紐付かない手動入力(app.js が付与)
+  //   ★v3.10.3: 注文に紐付く計算(manual が偽)は input.shippingPolicy が Economy 系でなければ対象外。手動入力はポリシー不問
   _isZonosEuEligible(input, country) {
     if (!this._zonosEuEnabled()) return false;
     const code = (country && typeof country === 'object') ? country.code : String(country || (input && input.country) || '');
     if (this.ZONOS_EU_COUNTRIES.indexOf(code) === -1) return false;
+    if (!(input && input.manual) && !this._isEconomyPolicy(input ? input.shippingPolicy : '')) return false;
     if (input && String(input.ioss == null ? '' : input.ioss).trim() !== '') return true;
     const p = input ? input.itemPriceUSD : 0;
     return !!(input && input.manual && p > 0 && p <= this._euDdpConf().thresholdUSD);

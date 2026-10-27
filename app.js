@@ -910,11 +910,11 @@ const App = {
     } catch (_) { return 1; }
   },
 
-  // ★段階C Zonos EU: 注文が Zonos EU 対象か(フラグ∧対象国∧IOSS)。判定は calculator.js に一本化
+  // ★段階C Zonos EU: 注文が Zonos EU 対象か(フラグ∧対象国∧IOSS∧★v3.10.3 Economy 系ポリシー)。判定は calculator.js に一本化
   _isZonosEuOrder(order) {
     try {
       if (!order || typeof Calculator === 'undefined' || !Calculator._isZonosEuEligible) return false;
-      return Calculator._isZonosEuEligible({ ioss: order.ioss || '', itemPriceUSD: order.itemPrice }, order.country);
+      return Calculator._isZonosEuEligible({ ioss: order.ioss || '', itemPriceUSD: order.itemPrice, shippingPolicy: order.shippingPolicy }, order.country);
     } catch (_) { return false; }
   },
 
@@ -1002,6 +1002,7 @@ const App = {
       tariffRate: order ? order.tariffRate : 0,
       declLines: this._euDeclLines(order), // ★EU v2: 申告行数(同梱は異なるASIN数・取れなければ1)
       ioss: order ? (order.ioss || '') : '', // ★段階C Zonos EU: 注文行の IOSS 列(空なら Zonos EU 対象外)
+      shippingPolicy: order ? (order.shippingPolicy || '') : '', // ★v3.10.3: Economy 系でなければ Zonos EU 対象外(手動入力は不問)
       manual: !order                         // ★段階C Zonos EU: 注文に紐付かない手動入力
     };
     this.state.currentInput = input;

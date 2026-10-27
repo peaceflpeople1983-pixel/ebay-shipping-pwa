@@ -64,12 +64,27 @@
     return String(v == null ? '' : v).trim();
   }
 
-  /** EU の Zonos 対象か = フラグ ∧ 対象国 ∧ 注文行の IOSS 列が空でない(ポリシー条件は見ない・GAS と同じ) */
+  /**
+   * ★v3.10.3: Economy 系の発送ポリシーか(US・EU 共通。GAS zonosIsEconomyPolicy_ /
+   * calculator.js Calculator._isEconomyPolicy と同じロジック)。空は false
+   */
+  function isEconomyPolicy_(policy) {
+    const p = String(policy == null ? '' : policy);
+    if (!p) return false;
+    if (ECONOMY_POLICIES.indexOf(p) !== -1) return true;
+    const lp = p.toLowerCase();
+    if (lp.indexOf('economy') !== -1 && lp.indexOf('expedited') === -1) return true;
+    if (lp.indexOf('epacket') !== -1) return true;
+    return false;
+  }
+
+  /** EU の Zonos 対象か = フラグ ∧ 対象国 ∧ 注文行の IOSS 列が空でない ∧ ★v3.10.3 Economy 系ポリシー(GAS と同じ) */
   function isZonosEuTargetOrder(o) {
     if (!o || !isZonosEuEnabled()) return false;
     const cc = String(o.country || '').toUpperCase();
     if (zonosEuCountries_().indexOf(cc) === -1) return false;
-    return orderIoss_(o) !== '';
+    if (orderIoss_(o) === '') return false;
+    return isEconomyPolicy_(o.shippingPolicy);
   }
 
   const DEADLINE_THRESHOLDS = {
@@ -88,16 +103,11 @@
   function isZonosTargetOrder(o) {
     if (!o) return false;
     if (o.isZonosTarget === true || o.isZonosTarget === 'true') return true;
-    // ★段階C Zonos EU: EU 対象は国と IOSS で判定(Economy 系ポリシー条件は US のみ)
+    // ★段階C Zonos EU: EU 対象は国と IOSS で判定 (★v3.10.3 Economy 系ポリシー条件も US と同じく見る)
     if (isZonosEuTargetOrder(o)) return true;
     // フォールバック判定
     if (String(o.country || '').toUpperCase() !== 'US') return false;
-    const p = String(o.shippingPolicy || '');
-    if (ECONOMY_POLICIES.indexOf(p) !== -1) return true;
-    const lp = p.toLowerCase();
-    if (lp.indexOf('economy') !== -1 && lp.indexOf('expedited') === -1) return true;
-    if (lp.indexOf('epacket') !== -1) return true;
-    return false;
+    return isEconomyPolicy_(o.shippingPolicy || '');
   }
 
   // ============================================================
@@ -190,6 +200,10 @@
     if (String(o.country).toUpperCase() !== 'US') {
       // ★段階C Zonos EU: フラグ有効時だけ EU の対象外理由を細分化(無効時は従来の文言)
       if (isZonosEuEnabled() && zonosEuCountries_().indexOf(String(o.country).toUpperCase()) !== -1) {
+        // ★v3.10.3: IOSS はあるがポリシーが Economy 系でない → US と同じ「<policy>のため」文言
+        if (orderIoss_(o) !== '' && !isEconomyPolicy_(o.shippingPolicy)) {
+          return '<span class="sub-note zonos-na">⚖ ' + escapeHtmlZ_(o.shippingPolicy) + 'のためZonos対象外</span>';
+        }
         return '<span class="sub-note zonos-na">⚖ IOSS参照なしのためZonos対象外</span>';
       }
       return '<span class="sub-note zonos-na">⚖ 米国以外のためZonos対象外</span>';
