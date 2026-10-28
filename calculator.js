@@ -88,8 +88,9 @@ const Calculator = {
   //   商品合計 > €150 は従来式 duty = Σ品目 clamp(dutyRate×CIF_item, dutyMinEUR, dutyMaxEUR)
   //   (IOSS 対象は ≤€150 のみなので実際はほぼ使われない)。
   //   €2(eu_handling_eur) × 申告行数 を eu_handling_start(既定 2026-11-01) 以降に加算(全 B2C・価額問わず)。
-  //   ※€2 は 10/27 時点の Zonos 見積には出ない(arrivalDate 11/5 でも出ない)が EU が課すため、コスト比較は保守的に含める。
-  //     Zonos 見積に載ったら実額と照合すること。
+  //   ※€2 は Zonos 見積にも出る(10/28 実測: endUse NOT_FOR_RESALE かつ arrivalDate 2026-11-01 以降で
+  //     fees に "EU customs handling fee" 353円=€2×1行。arrivalDate 未指定は 11/1 の 72 時間前から自動)。
+  //     GAS は fees 合計を AV に書くので実額側にも乗る。PWA は AU/AV を読まず自前モデルのみ → 二重計上なし。
   //   PDDP = EU_PDDP_DEFAULTS[cc].le150 / remittance = remittanceJPY(固定円・実測 266)
   //   disbursement = disbursementRate×(duty + €2分 + PDDP)
   //   ※€2 を disbursement の基数に入れるかは不明(実測は duty+PDDP の 10%)。保守側で入れている。
@@ -352,6 +353,29 @@ const Calculator = {
     const n = parseFloat(v);
     return isFinite(n) ? n : null;
   },
+  // ★P2 (2026-10-28) DHL 繁忙期追加金の国別単価(円/kg)。master.peakSurcharge.dhl = { perKg:{US:207,...,'*':162}, from, to }。
+  //   from/to(yyyy-MM-dd・両端含む)のどちらかが空、または範囲外なら null。perKg[code] が 0 なら 0(課されない)、未掲載は '*'。
+  //   旧マスタ(peakSurcharge 無し)は null = 加算しない
+  _dhlPeakConf() {
+    const ps = this.master && this.master.peakSurcharge;
+    const d = ps && ps.dhl;
+    if (!d || !d.perKg) return null;
+    const ymd = (v) => { const s = (v == null) ? '' : String(v).trim().slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
+    const from = ymd(d.from), to = ymd(d.to);
+    if (!from || !to) return null;
+    return { perKg: d.perKg, from, to };
+  },
+  _dhlPeakPerKg(code, input) {
+    const c = this._dhlPeakConf();
+    if (!c) return null;
+    const today = this._todayYmd(input);
+    if (today < c.from || today > c.to) return null;
+    let v = c.perKg[code];
+    if (v == null || v === '') v = c.perKg['*'];
+    if (v == null || v === '') return null;
+    const n = parseFloat(v);
+    return isFinite(n) ? n : null;
+  },
 
   calculate(input) {
     if (!this.master) throw new Error('Master data not loaded');
@@ -456,6 +480,7 @@ const Calculator = {
         tariffSeller: z.tariffJPY,
         tariffBuyer: 0,
         totalCost: cost + z.tariffJPY,
+        peakJPY: 0,                // ★P2 繁忙期追加金は DHL のみ(全候補で同じキーを返す)
         zonosEu: true,
         zonosBreakdown: z.breakdown,
         billableG: input.weightG,
@@ -474,6 +499,7 @@ const Calculator = {
       tariffSeller: 0,           // セラー負担なし
       tariffBuyer: tariffJPY,    // 買い手負担として表示
       totalCost: cost,           // セラーが支払う総額（関税抜き）
+      peakJPY: 0,                // ★P2 繁忙期追加金は DHL のみ
       billableG: input.weightG,
       estimatedDays: '5〜21日',
       tracking: true,
@@ -544,6 +570,7 @@ const Calculator = {
       tariffSeller,
       usFees,
       totalCost,
+      peakJPY: 0,  // ★P2 繁忙期追加金は DHL のみ
       billableG: Math.ceil(billableKg * 1000),
       estimatedDays: this._ecoDays(country.code),
       tracking: true,
@@ -647,6 +674,18 @@ const Calculator = {
       if (tariffSeller > 0) surchargeReasons.push(eu.reason || 'EU関税DDP(セラー負担・概算)');
     }
 
+    // ★P2 (2026-10-28): 繁忙期追加金 = 国別円/kg × 請求重量(0.5kg 切り上げ・OC の請求重量と同じ刻み)。
+    //   燃料の前に surcharge へ足す → 燃料割増金の基礎に含まれる(DHL ガイドの燃料対象 SC)。旧マスタ・期間外は 0
+    let peakJPY = 0;
+    const pk = this._dhlPeakPerKg(country.code, input);
+    if (pk != null && pk > 0) {
+      const to = this._dhlPeakConf().to;
+      const kgStep = Math.ceil(billableKg * 2 - 1e-9) / 2;   // 0.5kg 切り上げ（OC の請求重量と同じ刻み）
+      peakJPY = Math.round(pk * kgStep);
+      surcharge += peakJPY;
+      surchargeReasons.push('繁忙期追加金(¥' + pk + '/kg×' + kgStep + 'kg・〜' + to + ')');
+    }
+
     // ★v3.6.1: 燃料割増金 = 実効率(公表×0.75=SpeedPAK 25%OFF) × (運賃+対象サーチャージ)。
     //   OC実請求の逆算で検証済み(IE: 2265×0.75×42.50%=722円一致)。旧マスタは加算なし
     let fuelJPY = 0;
@@ -662,6 +701,7 @@ const Calculator = {
     return {
       carrier: 'eBay SpeedPAK Ship via DHL',
       fuelJPY,
+      peakJPY,     // ★P2 繁忙期追加金(surcharge の内数・燃料の基礎に含む)
       detail: 'Zone ' + country.dhlZone,
       basicCost: cost,
       surcharge,
@@ -778,6 +818,7 @@ const Calculator = {
       demandJPY,   // ★v3.6.1 内訳(UI/検証用)
       nssdsJPY,
       fuelJPY,
+      peakJPY: 0,  // ★P2 繁忙期追加金は DHL のみ
       tariffSeller,
       usFees,
       totalCost,

@@ -1069,6 +1069,11 @@ const App = {
         else if (c.tariffSeller > 0) parts.push(`+ 関税 ¥${c.tariffSeller.toLocaleString()}`);
         if (c.usFees > 0) parts.push(`+ 通関費 ¥${c.usFees.toLocaleString()}`);
         if (c.surcharge > 0) parts.push(`+ サーチャージ ¥${c.surcharge.toLocaleString()}`);
+        // ★P2 (2026-10-28): 繁忙期追加金はサーチャージの内数(合計には既に含まれる)。マスタに期間終了日が無ければ出さない
+        if (c.peakJPY > 0) {
+          const peakTo = this._peakToMD();
+          if (peakTo) parts.push(`　└ 内 繁忙期追加金 ¥${c.peakJPY.toLocaleString()}（DHL・〜${peakTo}）`);
+        }
         breakdownHtml = parts.map(p => `<span>${escapeHtml(p)}</span>`).join('');
         if (euText && euText.hint) {
           euHintHtml = `<div class="eu-decl-hint" style="font-size:11px;color:var(--text-secondary);padding-top:4px;">💡 ${escapeHtml(euText.hint)}</div>`;
@@ -1133,6 +1138,14 @@ const App = {
         ).join('');
       list.appendChild(exDiv);
     }
+  },
+
+  // ★P2 (2026-10-28): master.peakSurcharge.dhl.to('yyyy-MM-dd') → 'M/D'。無い・読めなければ null(行を出さない)
+  _peakToMD() {
+    const m = this.state && this.state.masterData;
+    const to = m && m.peakSurcharge && m.peakSurcharge.dhl && m.peakSurcharge.dhl.to;
+    const mt = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(to || '').trim());
+    return mt ? (parseInt(mt[2], 10) + '/' + parseInt(mt[3], 10)) : null;
   },
 
   getCarrierColorClass(carrier) {
