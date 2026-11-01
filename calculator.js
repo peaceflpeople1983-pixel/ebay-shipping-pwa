@@ -81,7 +81,11 @@ const Calculator = {
   //   日本郵便(ePacketライト)+Zonos で EU 宛てを DDP 発送する対象国(11か国)。
   //   ※GAS側 apps_script_v3.17.0 の ZONOS_EU_COUNTRIES と同じ値に保つこと(変更時は両方を同時に直す)。
   //   MC は本番マスタで epacketZone=null のため除外 / AD・仏海外県は未検証のため除外 / DE は Zonos 不可。
+  //   BE は続報5で日本郵便「IOSS あり DDP 〇」になったが、2026-11-02 の Zonos API 走査で
+  //   「DDP unavailable for country BE」(japan_post_air_packet)のため追加を見送り。
   ZONOS_EU_COUNTRIES: ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK'],
+  // ★続報5(2026-10-30): 日本郵便は DE 宛て BtoC をこの日以降、全価格帯・IOSS 有無を問わず受け付けない
+  JP_POST_DE_STOP_START: '2026-11-01',
   // Zonos 実測モデル(2026-10-27 Zonos サポート回答 + landedCost 実測で更新)。
   //   GAS は EU のとき endUse: NOT_FOR_RESALE で見積る → 商品合計 ≤ €150(eu_duty_threshold_eur) なら
   //   duty = €3(eu_duty_eur) × 申告行数 ("Europe Reformed Duty 3 EUR")。価格不明(0)も ≤€150 とみなす(保守側)。
@@ -444,6 +448,11 @@ const Calculator = {
 
     // ★段階C Zonos EU: フラグ∧対象国∧IOSS(または手動入力の価格≤閾値)なら日本郵便+Zonos DDP で候補に戻す
     const zonosEu = this._euDdpActive(country.code, input) && this._isZonosEuEligible(input, country.code);
+
+    // ★続報5(2026-10-30・v3.10.5): DE 宛ては 11/1 以降、価格・IOSS 有無を問わず日本郵便 BtoC 不可(DDU も DDP も)
+    if (country.code === 'DE' && this._todayYmd(input) >= this.JP_POST_DE_STOP_START) {
+      return ex('日本郵便はDE宛てBtoC不可(11/1〜・価格/IOSS問わず) → SpeedPAK/DHL/FedExを使う');
+    }
 
     // ★EU関税DDP(10/1〜): 150€以下(価格不明含む)はDDPラベル必須のため日本郵便は使えない
     if (!zonosEu && this._euDdpActive(country.code, input)) {
