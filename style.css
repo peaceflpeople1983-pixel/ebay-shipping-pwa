@@ -1737,3 +1737,23 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   font-family: monospace;
   font-weight: 700;
 }
+
+/* ★ 2026-11-03 Phase 3a: AU 宛て A$1,000 以下の ABN 記載注意 (注文カード / ピックアップシート) */
+.badge.au-abn { background: #E6F0FB; color: #0B4A8B; border: 0.5px solid #8DB7E6; }
+.order-item .order-au-abn {
+  font-size: 12px;
+  color: #0B4A8B;
+  background: #F1F6FD;
+  border-left: 3px solid #3A7BD5;
+  padding: 3px 6px;
+  margin-top: 4px;
+}
+.pp-au-abn {
+  border: 1.5px solid #000;
+  padding: 3px 6px;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+}

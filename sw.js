@@ -27,7 +27,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-5'; // v3.10.5: 続報5 — DE 宛ては 11/1 以降 日本郵便(ePacketライト)を全価格帯で候補外 (calculator.js) / v3.10.4: DHL 繁忙期追加金(マスタ peakSurcharge・国別円/kg×0.5kg 切り上げ・燃料の基礎に含む)を送料に加算・内訳に「└ 内 繁忙期追加金」 (calculator.js, app.js)
+const CACHE_NAME = 'ebay-ship-v3-10-6'; // v3.10.6: AU 宛て A$1,000 以下に eBay ABN 記載の注意(注文カード・ピックアップシート)・キャンセル通知の VALUE を通貨列で A$ … AUD 表示 (app.js, cancel_notice.js, style.css)
+// 前版: v3.10.5: 続報5 — DE 宛ては 11/1 以降 日本郵便(ePacketライト)を全価格帯で候補外 (calculator.js) / v3.10.4: DHL 繁忙期追加金(マスタ peakSurcharge・国別円/kg×0.5kg 切り上げ・燃料の基礎に含む)を送料に加算・内訳に「└ 内 繁忙期追加金」 (calculator.js, app.js)
 // 前版: v3.10.3: Zonos EU 対象判定に Economy 系ポリシー条件を追加(US と同じ判定・Expedited の EU 注文は対象外・手動入力は不問) (calculator.js, zonos.js, app.js)
 // 前版: v3.10.2:Zonos EU モデルを 10/27 Zonos 回答+実測に合わせる: ≤€150 は €3×申告行数・€2×申告行数を eu_handling_start 以降に加算・送金手数料 266 (calculator.js)
 // 前版: v3.10.1 キャンセル行の Zonos 表示抑止: cancelledAt ありの注文に Zonos未バッジ・送信ボタンを出さず Zonos未送信フィルタからも除外 (zonos.js, app.js)

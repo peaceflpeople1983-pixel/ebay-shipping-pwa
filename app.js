@@ -31,6 +31,40 @@
  *  - 入力画面のアカウントカードに商品サムネ表示
  *  - 同期時の新規注文に Browse API で画像URL自動付与（バックエンド側）
  */
+
+// ★ 2026-11-03 Phase 3a: 注文の通貨(getOrders の currency 列。空 = 旧注文 = USD)と AU 宛て ABN 注意の判定。
+//   AU 宛て かつ 同じ注文 ID の商品価格(G列)合計 ≤ 1,000 → eBay が GST を徴収済み → 包装に ABN 記載が必要。
+//   通貨は換算しない(AUD なら A$、USD なら $ の数字のまま 1,000 と比べる)。cancel_notice.js からも使う。
+const OrderCurrency = {
+  ABN_TEXT: "eBay's ABN # 64 652 016 681 Code: PAID",
+  AU_ABN_LIMIT: 1000,
+  SYMBOLS: { USD: '$', AUD: 'A$', CAD: 'C$', GBP: '£', EUR: '€' },
+  code(o) {
+    const c = String((o && o.currency) || '').trim().toUpperCase();
+    return c || 'USD';
+  },
+  // 例: format(80.46, 'AUD') → 'A$80.46 AUD' / format(80.46, 'USD') → '$80.46 USD'
+  format(amount, code) {
+    const c = String(code || 'USD').toUpperCase();
+    return (this.SYMBOLS[c] || '') + String(amount == null || amount === '' ? 0 : amount) + ' ' + c;
+  },
+  // 同じ注文 ID の行の G 列合計 (orders が無ければ o 自身の値)
+  orderTotal(o, orders) {
+    if (!o) return 0;
+    const rows = Array.isArray(orders) ? orders.filter(x => x && x.orderId === o.orderId) : [];
+    const src = rows.length ? rows : [o];
+    return src.reduce((s, x) => s + (parseFloat(x.itemPrice) || 0), 0);
+  },
+  // キャンセル済み・発送済みは出さない (印刷物は opts.ignoreShipped で発送状態を見ない)
+  needsAuAbn(o, orders, opts) {
+    if (!o || String(o.country || '').trim().toUpperCase() !== 'AU') return false;
+    if (o.cancelledAt) return false;
+    if (!(opts && opts.ignoreShipped) && (o.trackingNumber || o.fulfillmentStatus === 'FULFILLED')) return false;
+    return this.orderTotal(o, orders) <= this.AU_ABN_LIMIT;
+  }
+};
+window.OrderCurrency = OrderCurrency;
+
 const App = {
   state: {
     masterData: null,
@@ -654,6 +688,10 @@ const App = {
       const printedBadge = o.printedAt ? '<span class="badge printed">🖨 印刷済</span>' : '';
       // v3.17: 発送期日バッジ (緊急度4段階 + 期限不明)。発送済はバッジ非表示。v3.18.16: キャンセル済も非表示
       const deadlineBadge = (!isShipped && !o.cancelledAt) ? this._buildDeadlineBadge(o.shipByDate) : '';
+      // ★ Phase 3a: AU 宛て A$1,000 以下 → 包装に eBay の ABN 記載 (未発送・未キャンセルのみ)
+      const auAbn = OrderCurrency.needsAuAbn(o, this.state.orders);
+      const auAbnBadge = auAbn ? '<span class="badge au-abn">🇦🇺 ABN記載</span>' : '';
+      const auAbnNote = auAbn ? `<div class="order-au-abn">📝 包装に ${escapeHtml(OrderCurrency.ABN_TEXT)} を記載</div>` : '';
       const shippingInfoHtml = isShipped ? `
           <div class="order-shipping-info">
             <div class="ship-date">📮 ${escapeHtml(this.formatShippedAt(o.shippedAt))} 発送</div>
@@ -700,11 +738,13 @@ const App = {
             ${dk.badgeHtml}
             ${dk.subTagHtml}
             ${deadlineBadge}
+            ${auAbnBadge}
             ${(window.Zonos && window.Zonos.buildZonosBadge) ? window.Zonos.buildZonosBadge(o) : ''}
           </div>
           ${dk.warningBarHtml}
           ${orderIdHtml}
           <div class="order-meta">${escapeHtml(o.country || '?')} / ${escapeHtml(o.itemTitle || '')}</div>
+          ${auAbnNote}
           ${o.selectedCarrier ? `<div class="order-cost">${escapeHtml(o.selectedCarrier)} ¥${o.shippingCost}</div>` : ''}
           ${shippingInfoHtml}
           ${(window.Zonos && window.Zonos.isZonosTargetOrder(o) && !o.declarationId && !o.trackingNumber && o.doukonRole !== 'sub' && !o.cancelledAt)
@@ -2322,6 +2362,12 @@ const App = {
 
     const posCls = positionClass ? (' ' + positionClass) : '';
 
+    // ★ Phase 3a: AU 宛て A$1,000 以下は ABN 記載の注意 (印刷データに価格が無いので state.orders から合計を引く)
+    const stateOrders = (this.state && Array.isArray(this.state.orders)) ? this.state.orders : [];
+    const auAbnPrintHtml = OrderCurrency.needsAuAbn(stateOrders.find(x => x && x.orderId === o.orderId) || o, stateOrders, { ignoreShipped: true })
+      ? '<div class="pp-au-abn">AU: 包装に ' + escapeHtml(OrderCurrency.ABN_TEXT) + ' を記載</div>'
+      : '';
+
     const dp = this._buildPrintDoukonElements(o);
     const defaultMeasure =
       '<div class="pp-measure">' +
@@ -2358,6 +2404,7 @@ const App = {
           cpassBlock +
           (dp.measureHtml || defaultMeasure) +
           '<div class="pp-meta-info">\u{1F4E6} ' + carrier + ' / HS ' + (hsCode || '-') + ' / 関税 ' + tariffRate + '</div>' +
+          auAbnPrintHtml +
           '<div class="pp-buyer">' +
             '<div class="pp-buyer-label">SHIP TO</div>' +
             '<div class="pp-buyer-addr">' + (buyerAddrHtml || (buyer + '<br>' + country)) + '</div>' +

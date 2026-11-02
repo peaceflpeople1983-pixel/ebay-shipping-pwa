@@ -312,6 +312,13 @@
 
       const addr = [o.city, o.state, o.postalCode].filter(Boolean).join(', ');
 
+      // ★ Phase 3a: 通貨は getOrders の currency 列 (App.state.orders から注文 ID で引く)。空・見つからない = USD
+      const stOrders = (typeof App !== 'undefined' && App.state && Array.isArray(App.state.orders)) ? App.state.orders : [];
+      const stRow = stOrders.find(x => x && x.orderId === o.orderId);
+      const valueText = window.OrderCurrency
+        ? OrderCurrency.format(o.itemPrice || 0, OrderCurrency.code(o.currency ? o : stRow))
+        : '$' + (o.itemPrice || 0) + ' USD';
+
       // 同梱グループ内で この order がキャンセル対象 か 巻込まれただけ か
       let warningInner;
       let instruction;
@@ -350,7 +357,7 @@
               '<div class="label">ITEM</div><div>' + escapeHtmlC_(o.itemTitle) + '</div>' +
               '<div class="label">BUYER</div><div>' + escapeHtmlC_(o.buyerName) + '</div>' +
               '<div class="label">SHIPPING</div><div>' + escapeHtmlC_(addr || o.country || '') + '</div>' +
-              '<div class="label">VALUE</div><div>$' + escapeHtmlC_(o.itemPrice || 0) + ' USD</div>' +
+              '<div class="label">VALUE</div><div>' + escapeHtmlC_(valueText) + '</div>' +
             '</div>' +
           '</div>' +
           '<div class="cancel-slip-times">' +
