@@ -218,6 +218,9 @@ const App = {
       this._bind('card-action-cancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, true));
       this._bind('card-action-uncancelmark', 'onclick', () => this.markCancelledAndReload(this.state.longPressOrderId, false));
       this._bind('card-action-cancel', 'onclick', () => this.closeCardActionMenu());
+      // ★ 2026-11-05 同梱グループ分割: この注文を同梱から外す / 分割を元に戻す
+      this._bind('card-action-doukon-split', 'onclick', () => this.doukonSplitAndReload(this.state.longPressOrderId));
+      this._bind('card-action-doukon-unsplit', 'onclick', () => this.doukonUnsplitAndReload(this.state.longPressOrderId));
 
       // ★ Zonos: 送信画面の戻る / Declaration ID 解除
       this._bind('btn-back-zonos', 'onclick', () => this.goHome());
@@ -2569,6 +2572,13 @@ const App = {
     if (cancelMarkBtn) cancelMarkBtn.style.display = isCancelled ? 'none' : '';
     if (uncancelBtn) uncancelBtn.style.display = isCancelled ? '' : 'none';
 
+    // ★ 2026-11-05 同梱グループ分割: 「同梱から外す」「分割を元に戻す」の表示制御
+    const dsState = this.doukonSplitMenuState(order, this.state.orders);
+    const dsSplitBtn = document.getElementById('card-action-doukon-split');
+    const dsUnsplitBtn = document.getElementById('card-action-doukon-unsplit');
+    if (dsSplitBtn) dsSplitBtn.style.display = dsState.canSplit ? '' : 'none';
+    if (dsUnsplitBtn) dsUnsplitBtn.style.display = dsState.canUnsplit ? '' : 'none';
+
     // ★ Zonos: Declaration ID 解除ボタンの表示制御 (取得済のみ表示)
     const zonosClearBtn = document.getElementById('card-action-zonos-clear');
     if (zonosClearBtn) {
@@ -2584,6 +2594,77 @@ const App = {
     overlay.onclick = (e) => {
       if (e.target === overlay) this.closeCardActionMenu();
     };
+  },
+
+  /**
+   * ★ 2026-11-05 同梱グループ分割: 長押しメニューの 2 ボタンの表示条件(純関数・tests/test_doukon_split.js で単体テスト)
+   *  - canSplit  : 買い手同梱(P2)に入っていて、同じグループに別の注文があり、未発送・未キャンセル・Declaration ID なし
+   *  - canUnsplit: 同じアカウント×同じ買い手に、doukonSplit の入った未発送・未キャンセルの行が 1 つでもある
+   */
+  doukonSplitMenuState(order, orders) {
+    const res = { canSplit: false, canUnsplit: false };
+    if (!order) return res;
+    const list = Array.isArray(orders) ? orders : [];
+    const gid = String(order.doukonGroupId || '');
+    if (gid.indexOf('P2-') === 0 && !order.trackingNumber && !order.cancelledAt && !order.declarationId) {
+      res.canSplit = list.some(x => x && String(x.doukonGroupId || '') === gid && x.orderId !== order.orderId);
+    }
+    if (order.account && order.buyerUsername) {
+      res.canUnsplit = list.some(x => x && x.account === order.account && x.buyerUsername === order.buyerUsername &&
+        String(x.doukonSplit || '') && !x.trackingNumber && !x.cancelledAt);
+    }
+    return res;
+  },
+
+  // ★ 2026-11-05 同梱グループ分割: この注文を同梱から外す(残りは今の箱のまま固定)
+  async doukonSplitAndReload(orderId) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    const orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+    const order = orders.find(o => o && o.orderId === orderId);
+    if (!order) return;
+    const gid = String(order.doukonGroupId || '');
+    const rest = orders.filter(x => x && String(x.doukonGroupId || '') === gid && x.orderId !== orderId).length;
+    const label = order.doukonGroupLabel || '';
+    let msg = orderId + ' を同梱グループ ' + label + ' から外します。\n残りの ' + rest +
+      ' 点は今の箱のまま固定され、今後この買い手の新しい注文は入りません。\n外した注文は単独(または新しい注文との同梱)として計測・印刷します。';
+    if (order.doukonRole === 'lead') {
+      msg += '\n\n※ 代表を外すと、残りの注文の中で新しい代表が決まり、計測・印刷はやり直しになります。';
+    }
+    if (!window.confirm(msg)) return;
+    try {
+      const r = await API.doukonSplit(orderId);
+      if (r && r.ok) {
+        showToast('✂ 同梱から外しました');
+        this.loadAll();
+      } else {
+        showToast('失敗: ' + ((r && (r.reason || r.error)) || 'unknown'));
+      }
+    } catch (e) {
+      showToast('エラー: ' + (e.message || e));
+    }
+  },
+
+  // ★ 2026-11-05 同梱グループ分割: この買い手の分割を元に戻す(自動の同梱判定に戻る)
+  async doukonUnsplitAndReload(orderId) {
+    this.closeCardActionMenu();
+    if (!orderId) return;
+    const orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+    const order = orders.find(o => o && o.orderId === orderId);
+    const buyer = (order && order.buyerUsername) || '';
+    const msg = '買い手 ' + buyer + ' の同梱の分割を元に戻します。\nこの買い手の未発送の注文は、自動の同梱判定(同じ買い手の未発送はまとめて同梱)に戻ります。';
+    if (!window.confirm(msg)) return;
+    try {
+      const r = await API.doukonUnsplit(orderId);
+      if (r && r.ok) {
+        showToast('↺ 同梱の分割を元に戻しました');
+        this.loadAll();
+      } else {
+        showToast('失敗: ' + ((r && (r.reason || r.error)) || 'unknown'));
+      }
+    } catch (e) {
+      showToast('エラー: ' + (e.message || e));
+    }
   },
 
   closeCardActionMenu() {

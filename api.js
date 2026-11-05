@@ -232,6 +232,17 @@ const API = {
     });
   },
 
+  /**
+   * ★ 2026-11-05 同梱グループ分割: 注文を同梱から外す / その買い手の分割を元に戻す (GAS doukon.gs)
+   */
+  async doukonSplit(orderId) {
+    return this._post({ action: 'doukonSplit', secret: this.config.secret, orderId: orderId });
+  },
+
+  async doukonUnsplit(orderId) {
+    return this._post({ action: 'doukonUnsplit', secret: this.config.secret, orderId: orderId });
+  },
+
   async _get(query) {
     const res = await fetch(this.config.url + query, { method: 'GET' });
     if (!res.ok) throw new Error('API error: ' + res.status);
