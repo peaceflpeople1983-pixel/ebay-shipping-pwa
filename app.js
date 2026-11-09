@@ -2428,6 +2428,15 @@ const App = {
     }
   },
 
+  // ★v3.10.8(T1-3 残件⑩): シート送料欄(N列)へ書く金額。
+  //   EU 日本郵便+Zonos DDP(zonosEu)は totalCost に Zonos 見込みを含むが、Zonos 関税・手数料は AU/AV 列に入り
+  //   KPI が別費用にするため、送料欄は郵送料のみ(basicCost + surcharge)にする(US Zonos と同じ流れ)。
+  //   それ以外の候補は従来どおり totalCost。候補一覧の表示・並び順・alternatives には使わない。
+  _sheetShippingCost(c) {
+    if (c && c.zonosEu) return (Number(c.basicCost) || 0) + (Number(c.surcharge) || 0);
+    return c.totalCost;
+  },
+
   confirmShipment() {
     const c = this.state.currentResult.candidates[this.state.selectedCarrierIndex];
     if (!c) return;
@@ -2442,14 +2451,14 @@ const App = {
       widthCm: i.widthCm,
       heightCm: i.heightCm,
       carrier: c.sheetCarrier || c.carrier, // ★段階C: Zonos DDP 候補もシートには 'ePacketライト' で書く
-      cost: c.totalCost,
+      cost: this._sheetShippingCost(c), // ★v3.10.8: EU Zonos は郵送料のみ(Zonos 分は AU/AV)
       alternatives: this.state.currentResult.candidates.slice(1).map(x => x.carrier + ' ¥' + x.totalCost).join(' / ')
     };
     TodayGroup.remove(orderId);
     const localOrder = this.state.orders.find(o => o.orderId === orderId);
     if (localOrder) {
       localOrder.selectedCarrier = c.sheetCarrier || c.carrier;
-      localOrder.shippingCost = c.totalCost;
+      localOrder.shippingCost = this._sheetShippingCost(c); // ★v3.10.8: シート送料欄と同じ値
     }
     showToast('Sheetsへ書込み中... ホームへ戻ります');
     this.state.pendingWrites++;
