@@ -28,7 +28,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-8'; // v3.10.8: EU 日本郵便+Zonos DDP の確定時、シート送料欄を郵送料のみに(Zonos 分は AU/AV 列・KPI 二重計上の是正) (app.js)
+const CACHE_NAME = 'ebay-ship-v3-10-9'; // v3.10.9: 差出票の再発防止 — 同じ追跡番号の行は1個に統合・一個の料金は料金表で検算し違えば料金表の額で記載＋⚠ ・境目(上限まで10g以内)の量り直し注意を確定画面と差出票の選択画面に表示・重量を1g単位(kg小数3桁)で保存 (sashidashi.js v1.7, app.js)。印刷する差出票の様式は変更なし
+// (旧) const CACHE_NAME = 'ebay-ship-v3-10-8'; // v3.10.8: EU 日本郵便+Zonos DDP の確定時、シート送料欄を郵送料のみに(Zonos 分は AU/AV 列・KPI 二重計上の是正) (app.js)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-7'; // v3.10.7: 同梱グループ分割 — 長押しメニューに「✂ この注文を同梱から外す」「↺ 同梱の分割を元に戻す」(app.js, api.js, index.html)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-6'; // v3.10.6: AU 宛て A$1,000 以下に eBay ABN 記載の注意(注文カード・ピックアップシート)・キャンセル通知の VALUE を通貨列で A$ … AUD 表示 (app.js, cancel_notice.js, style.css)
 // 前版: v3.10.5: 続報5 — DE 宛ては 11/1 以降 日本郵便(ePacketライト)を全価格帯で候補外 (calculator.js) / v3.10.4: DHL 繁忙期追加金(マスタ peakSurcharge・国別円/kg×0.5kg 切り上げ・燃料の基礎に含む)を送料に加算・内訳に「└ 内 繁忙期追加金」 (calculator.js, app.js)

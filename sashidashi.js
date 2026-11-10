@@ -1,5 +1,15 @@
 /**
- * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.6)
+ * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.7)
+ *
+ * v1.7 (2026-11-10): 窓口での金額不一致(11/9)の再発防止ガード 2 点
+ *   (a) 同じ小包の二重計上防止: 追跡番号(無ければ Zonos declarationId)が同じ候補は 1 個に統合する。
+ *       Zonos ラベル発行で追跡番号が入ると doukon.gs が「発送済は同梱にしない」で AC/AD を消すため、
+ *       同梱の 2 注文が別々の小包として数えられていた(11/9 LX337383346JP: ¥2,250 × 2)。
+ *   (b) 運賃の料金表照合: 一個の料金は料金表(料金_ePacket の 量目100g切上げ × 地帯)で検算し、
+ *       シートの運賃と違えば料金表の額で記載して ⚠ を出す。日本郵便が請求するのは料金表の額。
+ *       (11/9 EU Zonos の FR/IT はシート運賃に Zonos 見込み ¥1,428 が入っていた: v3.10.8 で確定処理は是正済み)
+ *   (c) 境目注意: 量目の上限まで残り 10g 以内の小包に「差し出す前に量り直し」を選択画面に表示
+ *   ※ (a)(b)(c) の注意・件数は選択画面(モーダル)だけ。印刷する差出票(郵便局への提出書類)には何も加えない
  *
  * v1.6: 「その他の郵便物」に ＋注文から引用 を追加 — Hirogete分等をシートの注文データ
  *       (国・重量・運賃・同梱)からプリフィルして手入力の手間を削減。
@@ -49,6 +59,15 @@
 
   // 1ページの明細行数 (原本様式は12行 + 合計行)
   const ROWS_PER_PAGE = 12;
+
+  // v1.7: 量目(帯の上限)まで残りこの g 以内の小包は、選択画面に「境目注意(量り直し)」を出す。
+  //   app.js の BOUNDARY_WARN_G と同じ値。印刷する差出票(提出書類)には何も加えない
+  const BOUNDARY_WARN_G = 10;
+  function boundaryLeft(it) {
+    if (!it.weightG || !it.w100) return null;
+    const left = it.w100 - it.weightG;
+    return (left >= 0 && left <= BOUNDARY_WARN_G) ? left : null;
+  }
 
   // ============================================================
   // ヘルパー
@@ -122,25 +141,102 @@
     );
   }
 
+  /**
+   * v1.7: 料金表(料金_ePacket)の一個の料金。行 = [量目100g, 第1地帯, 第2地帯, ...]。
+   * calculator.js _epacket と同じ引き方。マスタ未読込・該当行なし・空欄は null(照合しない)
+   */
+  function rateOf(w100, zone) {
+    try {
+      const m = (typeof App !== 'undefined' && App.state && App.state.masterData) || null;
+      const rows = m && m.rates && m.rates.epacket;
+      if (!Array.isArray(rows) || !w100 || !zone) return null;
+      const row = rows.find(r => Number(r[0]) === w100);
+      const v = row ? Number(row[zone]) : NaN;
+      return (v > 0) ? v : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * v1.7 (b): 一個の料金と量目を決める。シートの重量は kg 小数2桁(10g 単位)に丸めて保存されるため
+   * (app.js の確定処理)、実重量は g-5 〜 g+4.99。この範囲で取りうる帯のどれかの料金表の額とシート運賃が
+   * 一致すればシートを正とし、量目もその帯にする(例: 0.40kg・¥2,040 = 401〜404g の 500g 帯)。
+   * どの帯とも一致しなければ、丸め重量の帯の料金表の額で記載し fixed=true(⚠ 表示)。
+   * 料金表が引けない(マスタ未読込等)ときはシート運賃のまま。
+   */
+  function resolveRate(g, zone, sheetCost) {
+    const sheet = (sheetCost && sheetCost > 0) ? sheetCost : null;
+    if (!g) return { cost: sheet, w100: null, fixed: false };
+    const base = w100Of(g);
+    const bands = [base, w100Of(Math.max(1, g - 5)), w100Of(g + 4.99)]
+      .filter((b, i, a) => a.indexOf(b) === i);
+    if (sheet) {
+      for (const b of bands) {
+        if (rateOf(b, zone) === sheet) return { cost: sheet, w100: b, fixed: false };
+      }
+    }
+    const rate = rateOf(base, zone);
+    if (rate) return { cost: rate, w100: base, fixed: !!sheet };
+    return { cost: sheet, w100: base, fixed: false };
+  }
+
   /** 注文1件 → 明細計算用の行データ */
   function toItem(o) {
     const g = weightToG(o.weightG);
-    const cost = (typeof o.shippingCost === 'number') ? o.shippingCost
+    const sheetCost = (typeof o.shippingCost === 'number') ? o.shippingCost
                : (o.shippingCost ? parseInt(String(o.shippingCost).replace(/[^\d]/g, ''), 10) : null);
+    const zone = zoneOf(o.country);
+    // v1.7 (b): 料金表で検算。シート運賃と違えば料金表の額で記載し rateFixed で ⚠ 表示
+    const r = resolveRate(g, zone, sheetCost);
+    const w100 = r.w100;
+    const cost = r.cost;
     return {
       orderId: o.orderId,
+      orderIds: [o.orderId],                    // v1.7: 同じ小包に統合された注文(印刷済みマーク用)
       country: o.country || '',
       doukonCount: (o.doukonRole === 'lead' && o.doukonCount > 1) ? o.doukonCount : 1,
       weightG: g,
-      w100: g ? w100Of(g) : null,
-      zone: zoneOf(o.country),
-      cost: (cost && cost > 0) ? cost : null,
+      w100: w100,
+      zone: zone,
+      cost: cost,
+      sheetCost: (sheetCost && sheetCost > 0) ? sheetCost : null,
+      rateFixed: r.fixed,
+      mergedCount: 1,                           // v1.7: 統合した候補行の数(2以上=同じ小包が複数行あった)
       shipDate: String(o.zonosShipDate || ''),  // API発行時の発送日 (日付指定フィルタ用 v1.3)
       printed: !!o.sashidashiPrintedAt,         // 差出票印刷済み (追加分のみ発行用 v1.4)
       tracking: String(o.trackingNumber || ''), // v1.6: 引用時の種別自動判定 (RN…=印刷物/小形包装物)
+      decl: String(o.declarationId || ''),
       hasDecl: !!o.declarationId,               // v1.6: Zonos分の目印 (無し=Hirogete等の手動発行分)
       ok: !!(g && cost && cost > 0)
     };
+  }
+
+  /**
+   * v1.7 (a): 同じ小包の候補を 1 個に統合する。キー = 追跡番号 > Zonos declarationId > 注文ID。
+   * 同梱グループが生きていれば sub は collectCandidates で既に除外されているので、ここで統合されるのは
+   * 「追跡番号が入って同梱 ID が消えた」行(または同梱判定漏れ)だけ。量目・料金は 1 個分(最大値)を採る。
+   */
+  function mergeByParcel(items) {
+    const out = [];
+    const byKey = new Map();
+    for (const it of items) {
+      const key = it.tracking ? 'T:' + it.tracking.toUpperCase() : (it.decl ? 'D:' + it.decl : 'O:' + it.orderId);
+      const cur = byKey.get(key);
+      if (!cur) { byKey.set(key, it); out.push(it); continue; }
+      it.orderIds.forEach(id => { if (cur.orderIds.indexOf(id) === -1) cur.orderIds.push(id); });
+      cur.mergedCount += it.mergedCount;
+      cur.doukonCount = Math.max(cur.doukonCount, cur.orderIds.length);
+      if ((it.weightG || 0) > (cur.weightG || 0)) cur.weightG = it.weightG;
+      const sheet = Math.max(cur.sheetCost || 0, it.sheetCost || 0) || null;
+      const r = resolveRate(cur.weightG, cur.zone, sheet);
+      cur.sheetCost = sheet;
+      cur.w100 = r.w100;
+      cur.cost = r.cost;
+      cur.rateFixed = r.fixed;
+      cur.printed = cur.printed && it.printed;
+      cur.shipDate = cur.shipDate || it.shipDate;
+      cur.ok = !!(cur.weightG && cur.cost && cur.cost > 0);
+    }
+    return out;
   }
 
   /** チェック済みitem群 → (地帯, 量目, 料金) でグループ化した明細行 */
@@ -166,7 +262,7 @@
 
   function openModal() {
     closeModal();
-    const cands = collectCandidates().map(toItem);
+    const cands = mergeByParcel(collectCandidates().map(toItem)); // v1.7: 同じ小包は1個に統合・運賃は料金表で検算
     const wrap = document.createElement('div');
     wrap.id = MODAL_ID;
     wrap.className = 'sashidashi-overlay';
@@ -180,6 +276,13 @@
           '<span class="sashidashi-warn">⚠ ' + (!it.weightG ? '重量未入力' : '料金なし') + '（出力対象外）</span>';
         const doukon = it.doukonCount > 1 ? ' <span class="sashidashi-doukon">' + it.doukonCount + '点同梱</span>' : '';
         const printedBadge = it.printed ? ' <span class="sashidashi-printed">票印刷済</span>' : '';
+        // v1.7: 統合・料金表置換の注意 (出力対象のまま・内容を窓口前に確認できるように)
+        const notes = [];
+        if (it.mergedCount > 1) notes.push('同じ追跡番号の ' + it.orderIds.length + ' 注文（' + it.orderIds.join(' / ') + '）を 1 個として数えます');
+        if (it.rateFixed) notes.push('シートの運賃 ¥' + yen(it.sheetCost) + ' は料金表と違うため、料金表の ¥' + yen(it.cost) + ' で記載します');
+        const bl = boundaryLeft(it);
+        if (bl !== null) notes.push('境目注意: ' + it.w100 + 'gまで残り' + bl + 'g。窓口で' + (it.w100 + 1) + 'g以上だと料金が変わるため、差し出す前に量り直してください');
+        const note = notes.length ? '<span class="sashidashi-warn">⚠ ' + notes.map(esc).join('<br>⚠ ') + '</span>' : '';
         return '<label class="sashidashi-row' + (it.ok ? '' : ' ng') + '">' +
           '<input type="checkbox" data-idx="' + i + '" data-oid="' + esc(it.orderId) + '" data-shipdate="' + esc(it.shipDate) + '" data-printed="' + (it.printed ? '1' : '') + '"' + (it.ok ? '' : ' disabled') + '>' +
           '<span class="sashidashi-oid">' + esc(it.orderId) + '</span>' + doukon + printedBadge +
@@ -187,7 +290,7 @@
             (it.weightG ? it.weightG + 'g → ' + it.w100 + 'gまで' : '重量?') + ' / ' +
             (it.cost ? '¥' + yen(it.cost) : '¥?') +
             (it.shipDate ? ' / 発送日 ' + esc(it.shipDate) : '') + '</span>' +
-          warn +
+          warn + note +
         '</label>';
       }).join('');
     }
@@ -359,9 +462,19 @@
       const rows2 = buildRows();
       const totalCount = rows2.reduce((s, r) => s + r.count, 0);
       const totalYen = rows2.reduce((s, r) => s + r.total, 0);
+      // v1.7: チェック中の小包に統合・料金表置換があれば件数を併記 (窓口前に気づけるように)
+      const checked = getCheckedItems(cands);
+      const nMerged = checked.filter(it => it.mergedCount > 1).length;
+      const nFixed = checked.filter(it => it.rateFixed).length;
+      const flags = [];
+      if (nMerged) flags.push('同じ小包の統合 ' + nMerged + '件');
+      if (nFixed) flags.push('運賃を料金表で記載 ' + nFixed + '件');
+      const nEdge = checked.filter(it => boundaryLeft(it) !== null).length;
+      if (nEdge) flags.push('境目注意 ' + nEdge + '件');
       document.getElementById('sashidashi-summary').textContent =
         rows2.length === 0 ? '' :
-        '合計 ' + totalCount + '個 / ' + rows2.length + '行 / ¥' + yen(totalYen);
+        '合計 ' + totalCount + '個 / ' + rows2.length + '行 / ¥' + yen(totalYen) +
+        (flags.length ? '（⚠ ' + flags.join('・') + '）' : '');
     };
     // 差出日に応じてチェックを付け直す (発送日一致 or 発送日なし×今日)
     const applyDateSelection = () => {
@@ -405,7 +518,11 @@
           const p = parseInt(div.querySelector('.m-p').value, 10);
           if (wG > 0 && n > 0 && p > 0) quotedOk.push(div.dataset.oid);
         });
-        const ids = getCheckedItems(cands).map(it => it.orderId).concat(quotedOk);
+        // v1.7: 統合した小包は全注文にマーク (引用行も代表注文IDから統合分を引く)
+        const allOf = (oid) => { const c = cands.find(x => x.orderId === oid); return c ? c.orderIds : [oid]; };
+        const ids = [];
+        getCheckedItems(cands).forEach(it => it.orderIds.forEach(id => ids.push(id)));
+        quotedOk.forEach(oid => allOf(oid).forEach(id => ids.push(id)));
         if (ids.length && window.API && API._post) {
           API._post({ action: 'zonosMarkSashidashiPrinted', secret: API.config.secret, orderIds: ids })
             .then(r => { if (r && r.success && typeof App !== 'undefined' && App.loadAll) App.loadAll(); })
@@ -704,5 +821,7 @@
     init();
   }
 
-  window.Sashidashi = { open: openModal, collectCandidates, groupItems, _print: openPrintWindow };
+  window.Sashidashi = { open: openModal, collectCandidates, groupItems, _print: openPrintWindow,
+    _toItem: toItem, _mergeByParcel: mergeByParcel, _rateOf: rateOf, _resolveRate: resolveRate,
+    _boundaryLeft: boundaryLeft };  // v1.7: テスト用
 })();

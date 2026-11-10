@@ -1122,6 +1122,12 @@ const App = {
           euHintHtml = `<div class="eu-decl-hint" style="font-size:11px;color:var(--text-secondary);padding-top:4px;">💡 ${escapeHtml(euText.hint)}</div>`;
         }
       }
+      // ★v3.10.9: ePacket(日本郵便)は料金帯の境目注意(窓口計量で帯が変わるのを防ぐ)
+      let boundaryHtml = '';
+      if (/^ePacketライト/.test(c.carrier)) {
+        const note = this._epacketBoundaryNote(result.context.actualG, (this.state.currentInput || {}).country);  // context.country は国名なので入力の国コードを使う
+        if (note) boundaryHtml = `<div class="epacket-boundary-note" style="font-size:12px;color:#c62828;font-weight:600;padding-top:4px;">${escapeHtml(note)}</div>`;
+      }
 
       return `
         <div class="result-card${isRecommended ? ' recommended' : ''}" data-idx="${i}">
@@ -1141,6 +1147,7 @@ const App = {
             ${breakdownHtml}
           </div>
           ${euHintHtml}
+          ${boundaryHtml}
         </div>
       `;
     }).join('');
@@ -2428,6 +2435,28 @@ const App = {
     }
   },
 
+  // ★v3.10.9: ePacket(日本郵便)の料金帯の境目注意。窓口の計量で帯の上限を数 g 超えると料金が変わるため、
+  //   上限まで残り BOUNDARY_WARN_G g 以内なら「ラベル等を付けた後に量り直す」を促す。表示のみ(計算は変えない)
+  BOUNDARY_WARN_G: 10,
+  _epacketBoundaryNote(weightG, countryCode) {
+    const g = Math.round(Number(weightG) || 0);
+    if (!(g > 0)) return null;
+    const w100 = Math.ceil(g / 100) * 100;
+    const left = w100 - g;
+    if (left > this.BOUNDARY_WARN_G) return null;
+    let nextCost = null;
+    try {
+      const m = this.state.masterData || {};
+      const c = (m.countries || []).find(x => x.code === countryCode);
+      const row = c && c.epacketZone && m.rates && Array.isArray(m.rates.epacket)
+        ? m.rates.epacket.find(r => Number(r[0]) === w100 + 100) : null;
+      const v = row ? Number(row[c.epacketZone]) : NaN;
+      if (v > 0) nextCost = v;
+    } catch (e) { /* 料金が引けなくても注意文は出す */ }
+    return '⚠ 境目注意: ' + w100 + 'gまで残り' + left + 'g。ラベル・書類を付けた後に量り直してください' +
+      '（' + (w100 + 1) + 'g以上は' + (w100 + 100) + 'gまで' + (nextCost ? '・¥' + nextCost.toLocaleString() : '') + '）';
+  },
+
   // ★v3.10.8(T1-3 残件⑩): シート送料欄(N列)へ書く金額。
   //   EU 日本郵便+Zonos DDP(zonosEu)は totalCost に Zonos 見込みを含むが、Zonos 関税・手数料は AU/AV 列に入り
   //   KPI が別費用にするため、送料欄は郵送料のみ(basicCost + surcharge)にする(US Zonos と同じ流れ)。
@@ -2443,7 +2472,9 @@ const App = {
     const orderId = document.getElementById('input-order-id').value.trim();
     if (!orderId) return showToast('注文IDを入力してください');
     const i = this.state.currentInput;
-    const weightKg = Math.round((i.weightG / 1000) * 100) / 100;
+    // ★v3.10.9: 1g 単位で保存(kg 小数 3 桁)。以前は 10g 単位(小数 2 桁)に丸めていたため、
+    //   0.40kg が 395〜404g のどれか分からず、差出票の量目が確定時の料金帯とずれることがあった
+    const weightKg = Math.round(i.weightG) / 1000;
     const data = {
       orderId,
       weightKg: weightKg,
