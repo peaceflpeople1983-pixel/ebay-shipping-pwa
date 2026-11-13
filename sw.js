@@ -1,5 +1,7 @@
 /**
  * Service Worker - 静的ファイルのオフラインキャッシュ
+ * v3-10-10: ★ Economy の注文で ePacketライトが最小サイズ未満で外れたとき「あと何cmで使える・測り直すといくら安い」ヒントを提案結果の上に表示 /
+ *            Economy の注文では DHL/FedEx をゴールドにせず、DHL/FedEx のカードを押したら差額つきの確認ポップアップ (calculator.js 純関数追加・app.js, style.css)
  * v3-10-7: ★ 同梱グループ分割: 長押しメニューから注文を同梱から外す / 分割を元に戻す (app.js, api.js, index.html・GAS doukon.gs)
  * v3-10-1: ★ キャンセル行の Zonos 表示抑止: cancelledAt ありの注文に「🆕 Zonos未」バッジ・「📦 Zonosへ送信」ボタンを出さず、
  *           Zonos未送信フィルタからも除外 (zonos.js, app.js)
@@ -28,7 +30,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-9'; // v3.10.9: 差出票の再発防止 — 同じ追跡番号の行は1個に統合・一個の料金は料金表で検算し違えば料金表の額で記載＋⚠ ・境目(上限まで10g以内)の量り直し注意を確定画面と差出票の選択画面に表示・重量を1g単位(kg小数3桁)で保存 (sashidashi.js v1.7, app.js)。印刷する差出票の様式は変更なし
+const CACHE_NAME = 'ebay-ship-v3-10-10'; // v3.10.10: ePacketライトのサイズ不足ヒント(Economy の注文・実額)・Economy の注文で DHL/FedEx のゴールドを外し、押したら差額つき確認ポップアップ (calculator.js は純関数の追加のみ・app.js, style.css)
+// (旧) const CACHE_NAME = 'ebay-ship-v3-10-9'; // v3.10.9: 差出票の再発防止 — 同じ追跡番号の行は1個に統合・一個の料金は料金表で検算し違えば料金表の額で記載＋⚠ ・境目(上限まで10g以内)の量り直し注意を確定画面と差出票の選択画面に表示・重量を1g単位(kg小数3桁)で保存 (sashidashi.js v1.7, app.js)。印刷する差出票の様式は変更なし
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-8'; // v3.10.8: EU 日本郵便+Zonos DDP の確定時、シート送料欄を郵送料のみに(Zonos 分は AU/AV 列・KPI 二重計上の是正) (app.js)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-7'; // v3.10.7: 同梱グループ分割 — 長押しメニューに「✂ この注文を同梱から外す」「↺ 同梱の分割を元に戻す」(app.js, api.js, index.html)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-6'; // v3.10.6: AU 宛て A$1,000 以下に eBay ABN 記載の注意(注文カード・ピックアップシート)・キャンセル通知の VALUE を通貨列で A$ … AUD 表示 (app.js, cancel_notice.js, style.css)

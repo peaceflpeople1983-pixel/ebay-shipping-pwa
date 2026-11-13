@@ -1079,9 +1079,13 @@ const App = {
       recommendedTypes = recommendedTypes.filter(t => t !== 'epacket');
       if (recommendedTypes.indexOf('speedpak') === -1) recommendedTypes.push('speedpak');
     }
-    const hintHtml = (recommendedTypes.length > 0)
+    // ★v3.10.10: ゴールドのカードが 1 枚も無いときは案内バーを出さない(Economy で ePacket 除外時など)
+    const hintHtml = (recommendedTypes.length > 0 && result.candidates.some(c => this.isRecommendedCarrier(c.carrier, recommendedTypes)))
       ? '<div class="shipping-hint"><b>ゴールド色のカード</b>から安い方を選択</div>'
       : '';
+    // ★v3.10.10: ePacketライトの最小サイズ不足ヒント(案内バーの下・カードの前)。確認ポップアップの「進める」記録は計算し直したら消す
+    const sizeHintHtml = this._sizeHintHtml();
+    this.state.econWarnAccepted = {};
 
     const legendHtml = `
       <div class="legend">
@@ -1091,7 +1095,7 @@ const App = {
         <div class="legend-item"><span class="carrier-circle c-fedex"></span>Ship via FedEx</div>
       </div>
     `;
-    list.innerHTML = hintHtml + legendHtml + result.candidates.map((c, i) => {
+    list.innerHTML = hintHtml + sizeHintHtml + legendHtml + result.candidates.map((c, i) => {
       const colorClass = this.getCarrierColorClass(c.carrier);
       const carrierShort = this.shortenCarrier(c.carrier);
       const trackingNote = [c.tracking ? '追跡あり' : '', c.insurance ? '補償あり' : ''].filter(Boolean).join('・');
@@ -1153,9 +1157,10 @@ const App = {
     }).join('');
     list.querySelectorAll('.result-card').forEach(el => {
       el.onclick = () => {
-        list.querySelectorAll('.result-card').forEach(x => x.classList.remove('selected'));
-        el.classList.add('selected');
-        this.state.selectedCarrierIndex = parseInt(el.dataset.idx, 10);
+        const idx = parseInt(el.dataset.idx, 10);
+        // ★v3.10.10: Economy の注文で DHL/FedEx を押したら差額つきの確認(選ぶのはポップアップの答えのあと)
+        if (this._needEconomyExpressWarn(idx)) { this._openEconomyWarn(idx); return; }
+        this._selectResultCard(idx);
       };
     });
     const first = list.querySelector('.result-card');
@@ -1216,13 +1221,148 @@ const App = {
    *   ['epacket','dhl','fedex']      → Economy International Shipping
    *   []                              → policy 不明・未定義 → ハイライトしない (現状維持)
    * 判定順序: SpeedPAK Economy（完全一致）→ Expedited（含む）→ Economy（含む）
+   * ★v3.10.10 (2026-11-13 ユーザー決定): Economy の注文では DHL/FedEx をゴールドにしない
+   *   ['speedpak']  → eBay SpeedPAK Economy
+   *   ['epacket']   → Economy を含むポリシー(Economy International Shipping 等)
+   *   Expedited と policy 不明は従来どおり
    */
   getRecommendedCarrierTypes(shippingPolicy) {
     const policy = String(shippingPolicy || '');
-    if (policy === 'eBay SpeedPAK Economy') return ['speedpak', 'dhl', 'fedex'];
+    if (policy === 'eBay SpeedPAK Economy') return ['speedpak'];
     if (policy.indexOf('Expedited') !== -1) return ['dhl', 'fedex'];
-    if (policy.indexOf('Economy') !== -1) return ['epacket', 'dhl', 'fedex'];
+    if (policy.indexOf('Economy') !== -1) return ['epacket'];
     return [];
+  },
+
+  /** ★v3.10.10: 候補が DHL/FedEx なら 'dhl' / 'fedex'、それ以外は null */
+  _expressType(carrier) {
+    const c = String(carrier || '');
+    if (c.indexOf('Ship via DHL') !== -1) return 'dhl';
+    if (c.indexOf('Ship via FedEx') !== -1) return 'fedex';
+    return null;
+  },
+
+  /** ★v3.10.10: 今の提案結果が「Economy の注文」(注文あり・ポリシー名に Economy) か */
+  _isEconomyOrderNow() {
+    const order = this.state.currentOrder;
+    return !!order && Calculator.isEconomyOrderPolicy(order.shippingPolicy);
+  },
+
+  /** ★v3.10.10: 候補カードを選ぶ(見た目と selectedCarrierIndex をそろえる) */
+  _selectResultCard(idx) {
+    const list = document.getElementById('result-list');
+    if (!list) return;
+    list.querySelectorAll('.result-card').forEach(x => {
+      x.classList.toggle('selected', parseInt(x.dataset.idx, 10) === idx);
+    });
+    this.state.selectedCarrierIndex = idx;
+  },
+
+  /**
+   * ★v3.10.10: Economy の注文で DHL/FedEx のカードを押したとき、確認ポップアップを出すべきか。
+   *   出さない: 注文なし/Economy 以外/押したのが DHL・FedEx 以外/最安が DHL・FedEx 自身/
+   *            同じ提案結果で同じ運送会社を「このまま進める」にした後
+   */
+  _needEconomyExpressWarn(idx) {
+    const r = this.state.currentResult;
+    if (!r || !r.candidates || !r.candidates[idx]) return false;
+    if (!this._isEconomyOrderNow()) return false;
+    const type = this._expressType(r.candidates[idx].carrier);
+    if (!type) return false;
+    if (this._expressType(r.candidates[0].carrier)) return false;
+    if (this.state.econWarnAccepted && this.state.econWarnAccepted[type]) return false;
+    return true;
+  },
+
+  /** ★v3.10.10: 確認ポップアップの枠(初回だけ body に作る。index.html は変えない) */
+  _ensureEconomyWarnDom() {
+    let ov = document.getElementById('econ-warn-overlay');
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.id = 'econ-warn-overlay';
+    ov.className = 'econ-warn-overlay hidden';
+    ov.innerHTML = `
+      <div class="econ-warn-dialog" role="dialog" aria-modal="true" aria-labelledby="econ-warn-title">
+        <div class="econ-warn-title" id="econ-warn-title">⚠ Economy の注文です</div>
+        <div class="econ-warn-body" id="econ-warn-body"></div>
+        <table class="econ-warn-table"><tbody id="econ-warn-rows"></tbody></table>
+        <div class="econ-warn-buttons">
+          <button class="primary" id="econ-warn-back">Economy に戻す</button>
+          <button class="secondary" id="econ-warn-go"></button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    // 枠の外を押したら「Economy に戻す」と同じ
+    ov.addEventListener('click', (e) => { if (e.target === ov) this._closeEconomyWarn(false); });
+    document.getElementById('econ-warn-back').onclick = () => this._closeEconomyWarn(false);
+    document.getElementById('econ-warn-go').onclick = () => this._closeEconomyWarn(true);
+    // 戻る操作(端末の戻る・Esc)も「Economy に戻す」と同じ
+    window.addEventListener('popstate', () => {
+      if (this._econWarn && this._econWarn.open) this._closeEconomyWarn(false, true);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this._econWarn && this._econWarn.open) this._closeEconomyWarn(false);
+    });
+    return ov;
+  },
+
+  /** ★v3.10.10: 確認ポップアップを開く(idx = 押した DHL/FedEx のカード) */
+  _openEconomyWarn(idx) {
+    const r = this.state.currentResult;
+    const picked = r.candidates[idx];
+    const cheapest = r.candidates[0];
+    const type = this._expressType(picked.carrier);
+    const label = type === 'dhl' ? 'DHL' : 'FedEx';
+    const ov = this._ensureEconomyWarnDom();
+    const yen = (n) => '¥' + Number(n).toLocaleString();
+    document.getElementById('econ-warn-body').textContent =
+      `買い手が選んだ発送方法は Economy です。${label} で送りますか。`;
+    document.getElementById('econ-warn-rows').innerHTML = `
+      <tr><th>最安: ${escapeHtml(this.shortenCarrier(cheapest.carrier))}</th><td>${yen(cheapest.totalCost)}</td></tr>
+      <tr><th>${escapeHtml(this.shortenCarrier(picked.carrier))}</th><td>${yen(picked.totalCost)}</td></tr>
+      <tr class="econ-warn-diff"><th>差額</th><td>+${yen(picked.totalCost - cheapest.totalCost)}</td></tr>`;
+    document.getElementById('econ-warn-go').textContent = `このまま ${label} で進める`;
+    this._econWarn = { open: true, idx, type };
+    ov.classList.remove('hidden');
+    try { history.pushState({ econWarn: 1 }, ''); this._econWarn.pushed = true; } catch (e) { /* 履歴が使えなくても動く */ }
+  },
+
+  /** ★v3.10.10: 閉じる。proceed=true → 押したカードのまま / false → 最安(先頭)を選び直す */
+  _closeEconomyWarn(proceed, fromPopstate) {
+    const w = this._econWarn;
+    if (!w || !w.open) return;
+    w.open = false;
+    const ov = document.getElementById('econ-warn-overlay');
+    if (ov) ov.classList.add('hidden');
+    if (proceed) {
+      this.state.econWarnAccepted = this.state.econWarnAccepted || {};
+      this.state.econWarnAccepted[w.type] = true;
+      this._selectResultCard(w.idx);
+    } else {
+      this._selectResultCard(0);
+    }
+    if (w.pushed && !fromPopstate) { try { history.back(); } catch (e) { /* noop */ } }
+  },
+
+  /**
+   * ★v3.10.10: ePacketライトの最小サイズ不足ヒント(青い 1 枚)。出さないときは ''。
+   *   判定と金額は Calculator.epacketMinSizeHint(純関数)。表示だけで他のカードの額は変えない
+   */
+  _sizeHintHtml() {
+    let h = null;
+    try { h = Calculator.epacketMinSizeHint(this.state.currentInput); } catch (e) { h = null; }
+    if (!h) return '';
+    const n1 = (x) => String(Math.round(x * 10) / 10);
+    const yen = (n) => '¥' + Number(n).toLocaleString();
+    const edgeName = (s) => s.edge === 'max' ? '最大辺' : '2 番目の辺';
+    const head = h.shortBy.length === 1
+      ? `あと ${n1(h.shortBy[0].cm)}cm で ePacketライトが使えます`
+      : `あと ${h.shortBy.map(s => (s.edge === 'max' ? '最大辺 ' : '2 番目 ') + n1(s.cm) + 'cm').join('・')} で ePacketライトが使えます`;
+    const body = h.shortBy.map(s => `${edgeName(s)}が ${n1(s.current)}cm(基準 ${n1(s.min)}cm)`).join('・') +
+      `。少し大きめの封筒に入れて測り直すと ${yen(h.totalCost)}(今の最安より ${yen(h.saveVsCheapest)} 安い)です。`;
+    const note = h.zonosEu ? '<div class="size-hint-note">※ 日本郵便+Zonos DDP・Zonos の関税見込みを含む額</div>' : '';
+    return `<div class="size-hint"><div class="size-hint-head">📏 ${escapeHtml(head)}</div>` +
+      `<div class="size-hint-body">${escapeHtml(body)}</div>${note}</div>`;
   },
 
   /** v3.10: carrier 名と推奨タイプ群から、ハイライト対象か判定 */

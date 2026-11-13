@@ -1757,3 +1757,43 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   color: #000;
   text-align: center;
 }
+
+/* ★ v3.10.10 (2026-11-13): ePacketライトの最小サイズ不足ヒント(提案結果の案内バーの下・カードの前) */
+.size-hint {
+  background: #E8F1FC;
+  border-left: 3px solid #3A7BD5;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #0B3D7A;
+  line-height: 1.55;
+}
+.size-hint .size-hint-head { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.size-hint .size-hint-body { color: #18406E; }
+.size-hint .size-hint-note { font-size: 11px; color: #4A6A90; margin-top: 3px; }
+
+/* ★ v3.10.10: Economy の注文で DHL/FedEx を押したときの確認ポップアップ */
+.econ-warn-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.econ-warn-dialog {
+  background: var(--surface);
+  border-radius: 14px;
+  width: 100%; max-width: 360px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+}
+.econ-warn-title { font-size: 17px; font-weight: 700; color: var(--warning); margin-bottom: 8px; }
+.econ-warn-body { font-size: 14px; color: var(--text); line-height: 1.55; margin-bottom: 10px; }
+.econ-warn-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
+.econ-warn-table th { text-align: left; font-weight: 500; color: var(--text-secondary); padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.econ-warn-table td { text-align: right; font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.econ-warn-table .econ-warn-diff th, .econ-warn-table .econ-warn-diff td { color: var(--danger); font-weight: 700; border-bottom: none; }
+.econ-warn-buttons { display: flex; flex-direction: column; gap: 8px; }
+.econ-warn-buttons button { width: 100%; margin: 0; }
+.econ-warn-buttons button.secondary { padding: 12px; font-size: 15px; }

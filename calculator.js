@@ -836,5 +836,63 @@ const Calculator = {
       tracking: true,
       insurance: true
     };
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // ★v3.10.10 (2026-11-13): 表示専用の純関数(既存の calculate / 各キャリア関数の出力は変えない)
+  // ─────────────────────────────────────────────────────────────
+
+  // ePacketライトの最小サイズ(最大辺・2番目の辺)。_epacket の判定と同じ値
+  EPACKET_MIN_DIMS: [14.8, 10.5],
+
+  // 「Economy の注文」か = 発送ポリシー名に Economy を含む(Expedited を含むものは除く)。
+  //   app.js getRecommendedCarrierTypes の判定順(Expedited → Economy)と同じ。空・未設定は false
+  isEconomyOrderPolicy(policy) {
+    const p = String(policy || '');
+    if (p.indexOf('Expedited') !== -1) return false;
+    return p.indexOf('Economy') !== -1;
+  },
+
+  // ePacketライトの「最小サイズ未満」ヒント。条件をすべて満たすときだけオブジェクト、それ以外は null。
+  //   条件: 注文あり(manual でない) ∧ Economy の注文 ∧ ePacketライトの除外理由が「最小サイズ未満」
+  //        ∧ 足りない辺だけ基準まで広げると ePacketライトが候補に入る ∧ その合計が今の最安より安い
+  //   金額は calculate() をそのまま使う(EU 日本郵便+Zonos は Zonos 見込み込みの totalCost)。
+  //   戻り値: { shortBy:[{edge:'max'|'second', cm, current, min}], dimsNeeded:[a,b,c], currentDims:[a,b,c],
+  //            carrier, zonosEu, totalCost, cheapestCarrier, cheapestCost, saveVsCheapest }
+  epacketMinSizeHint(input) {
+    if (!input || input.manual) return null;
+    if (!this.isEconomyOrderPolicy(input.shippingPolicy)) return null;
+    const base = this.calculate(input);
+    const exEp = (base.excluded || []).find(e => e && e.name === 'ePacketライト');
+    if (!exEp || !/^最小サイズ未満/.test(String(exEp.reason || ''))) return null;
+    if (!base.candidates || base.candidates.length === 0) return null;
+
+    const dims = [input.lengthCm, input.widthCm, input.heightCm].sort((a, b) => b - a);
+    const min = this.EPACKET_MIN_DIMS;
+    const r1 = (x) => Math.round(x * 10) / 10;
+    const shortBy = [];
+    if (dims[0] < min[0]) shortBy.push({ edge: 'max', cm: r1(min[0] - dims[0]), current: dims[0], min: min[0] });
+    if (dims[1] < min[1]) shortBy.push({ edge: 'second', cm: r1(min[1] - dims[1]), current: dims[1], min: min[1] });
+    if (shortBy.length === 0) return null;
+    const dimsNeeded = [Math.max(dims[0], min[0]), Math.max(dims[1], min[1]), dims[2]];
+
+    const grown = Object.assign({}, input, { lengthCm: dimsNeeded[0], widthCm: dimsNeeded[1], heightCm: dimsNeeded[2] });
+    const res2 = this.calculate(grown);
+    const ep = (res2.candidates || []).find(c => /^ePacketライト/.test(String(c.carrier || '')));
+    if (!ep) return null;
+
+    const cheapest = base.candidates[0];
+    if (!(ep.totalCost < cheapest.totalCost)) return null;
+    return {
+      shortBy,
+      dimsNeeded,
+      currentDims: dims,
+      carrier: ep.carrier,
+      zonosEu: !!ep.zonosEu,
+      totalCost: ep.totalCost,
+      cheapestCarrier: cheapest.carrier,
+      cheapestCost: cheapest.totalCost,
+      saveVsCheapest: cheapest.totalCost - ep.totalCost
+    };
   }
 };
