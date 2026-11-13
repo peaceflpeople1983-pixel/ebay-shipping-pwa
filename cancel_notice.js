@@ -212,7 +212,7 @@
         }
         await this.refresh();
         // 既存の注文一覧も再描画
-        if (window.App && typeof App.renderOrders === 'function') {
+        if (typeof App !== 'undefined' && typeof App.renderOrders === 'function') {
           App.renderOrders();
         }
       } catch (e) {
@@ -561,7 +561,7 @@
         this.closePrintScreen();
         // 再取得 + 一覧再描画
         await this.refresh();
-        if (window.App && typeof App.renderOrders === 'function') {
+        if (typeof App !== 'undefined' && typeof App.renderOrders === 'function') {
           App.renderOrders();
         }
       } catch (e) {

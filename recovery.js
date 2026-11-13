@@ -229,7 +229,7 @@
           toastR_('✓ ' + label + ': ' + orderId);
           this._removeCard(orderId);
           this._decrementCount();
-          if (window.App && typeof App.loadAll === 'function') App.loadAll();
+          if (typeof App !== 'undefined' && typeof App.loadAll === 'function') App.loadAll();
         } else {
           const reason = (r && r.reason) || 'unknown';
           toastR_('取込できませんでした (' + reason + ')');
@@ -253,7 +253,7 @@
           toastR_('📧 メール情報で追加しました: ' + orderId);
           this._removeCard(orderId);
           this._decrementCount();
-          if (window.App && typeof App.loadAll === 'function') App.loadAll();
+          if (typeof App !== 'undefined' && typeof App.loadAll === 'function') App.loadAll();
         } else {
           const reason = (r && r.reason) || 'unknown';
           toastR_('追加できませんでした (' + reason + ')');

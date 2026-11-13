@@ -1,5 +1,10 @@
 /**
- * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.7)
+ * sashidashi.js — 料金後納郵便物差出票 出力機能 (PWAクライアント新規ファイル / v1.8)
+ *
+ * v1.8 (2026-11-13): 差出票の印刷済みマーク(シート AX 列)が v1.4 から一度も記録されていなかった不具合を修正。
+ *   原因: 送信の条件を `window.API` で調べていたが、api.js の `const API` は window に載らないため常に偽で、
+ *   GAS zonosMarkSashidashiPrinted を呼んでいなかった(GAS 側は正常)。typeof API で参照し、失敗はトーストで出す。
+ *   (6〜11 月の日本郵便の発送 274 件すべてで AX 空・11/13 に本番 GAS へ直接送ると記録され毎時同期でも消えないことを確認)
  *
  * v1.7 (2026-11-10): 窓口での金額不一致(11/9)の再発防止ガード 2 点
  *   (a) 同じ小包の二重計上防止: 追跡番号(無ければ Zonos declarationId)が同じ候補は 1 個に統合する。
@@ -523,10 +528,23 @@
         const ids = [];
         getCheckedItems(cands).forEach(it => it.orderIds.forEach(id => ids.push(id)));
         quotedOk.forEach(oid => allOf(oid).forEach(id => ids.push(id)));
-        if (ids.length && window.API && API._post) {
+        // v1.8: api.js の `const API` は window に載らない(window.App と同じ)。window.API で調べると常に偽で、
+        // v1.4 からマークを一度も送っていなかった。typeof で参照し、失敗は画面に出す(印刷は止めない)
+        if (ids.length && typeof API !== 'undefined' && API._post) {
+          const warn = (msg) => {
+            console.warn('差出票印刷済みマーク失敗:', msg);
+            if (typeof showToast === 'function') showToast('⚠ 差出票の印刷記録を残せませんでした（印刷はできます）: ' + msg);
+          };
           API._post({ action: 'zonosMarkSashidashiPrinted', secret: API.config.secret, orderIds: ids })
-            .then(r => { if (r && r.success && typeof App !== 'undefined' && App.loadAll) App.loadAll(); })
-            .catch(e => console.warn('差出票印刷済みマーク失敗:', e));
+            .then(r => {
+              if (r && r.success) {
+                if (typeof App !== 'undefined' && App.loadAll) App.loadAll();
+              } else {
+                const f = (r && r.failed && r.failed.length) ? ' ' + r.failed.length + ' 件' : '';
+                warn(((r && r.error) || '一部の注文が見つかりません') + f);
+              }
+            })
+            .catch(e => warn(String((e && e.message) || e)));
         }
       } catch (e) { console.warn('差出票印刷済みマーク失敗:', e); }
       openPrintWindow(rows2);
