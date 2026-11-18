@@ -107,10 +107,10 @@ const MercariTrackUi = {
     if (o.trackingNumber || o.fulfillmentStatus === 'FULFILLED' || o.cancelledAt) return '';
     if (st === 'tracking') return '<span class="badge merc-track" title="メルカリの送り状番号 ' + this.esc(this.formatNo(o.mercariTracking)) + '">📮 末尾 ' + this.esc(this.tail(o.mercariTracking)) + '</span>';
     if (st === 'noTracking') return '<span class="badge merc-notrack" title="追跡の無い配送。届いた荷物は写真と商品名で照合">📮 追跡番号なし</span>';
-    if (st === 'unknown') return '<span class="badge merc-wait" title="送り状番号のデータがまだ届いていません">メルカリ 番号未取得</span>';
-    if (st === 'shipped') return '<span class="badge merc-wait" title="出品者は発送済み。送り状番号は次の取得で入ります">メルカリ 発送済み・番号待ち</span>';
-    if (st === 'received') return '<span class="badge merc-notrack" title="メルカリの受取評価が済んでいます（送り状番号の記録なし）">メルカリ 受取済み</span>';
-    return '<span class="badge merc-wait" title="メルカリの出品者がまだ発送していません">メルカリ 発送待ち</span>';
+    if (st === 'unknown') return '<span class="badge merc-wait" title="送り状番号のデータがまだ届いていません">📮 番号未取得</span>';
+    if (st === 'shipped') return '<span class="badge merc-wait" title="出品者は発送済み。送り状番号は次の取得で入ります">📮 番号待ち</span>';
+    if (st === 'received') return '<span class="badge merc-notrack" title="メルカリの受取評価が済んでいます（送り状番号の記録なし）">📮 受取済み</span>';
+    return '<span class="badge merc-wait" title="メルカリの出品者がまだ発送していません">📮 発送待ち</span>';
   },
   // ピックアップシートの番号ブロック (黒字のみ)
   printNoHtml(o) {
@@ -186,6 +186,113 @@ const MercariTrackUi = {
     const d = new Date(ms + 9 * 3600 * 1000);
     const p = n => (n < 10 ? '0' + n : '' + n);
     return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  },
+
+  // ===== ★ v3.10.14 (2026-11-18): メルカリ未評価の再印刷・入荷照合 =====
+  // バーコードの値 → 数字だけ (ゆうパケットの NW-7 は 'a725457956145a' の形)
+  scanDigits(raw) { return this.digits(raw); },
+  // 発送済み・キャンセル (= もう手元で照合しない行)
+  isDoneRow(o) { return !!(o && (o.trackingNumber || o.fulfillmentStatus === 'FULFILLED' || o.cancelledAt)); },
+  // メルカリの行が 1 つでもあるか (GAS が古く mercariKey が無ければ false = ボタンを出さない)
+  hasMercariRows(orders) { return Array.isArray(orders) && orders.some(o => o && o.mercariKey); },
+  /**
+   * 再印刷の対象: 未発送・メルカリの行・受取評価待ち(STATE_WAITING_BUYER_REVIEW)・番号あり または 追跡の無い配送。
+   * 印刷済みかどうかは問わない。注文番号の配列 (重複なし・渡された順)
+   */
+  reprintTargets(orders) {
+    const out = [];
+    const seen = {};
+    (Array.isArray(orders) ? orders : []).forEach(o => {
+      if (!o || !o.mercariKey || this.isDoneRow(o)) return;
+      if (String(o.mercariOrderState || '') !== 'STATE_WAITING_BUYER_REVIEW') return;
+      if (!(this.digits(o.mercariTracking) || o.mercariNoTracking === true)) return;
+      const id = String(o.orderId || '');
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push(id);
+    });
+    return out;
+  },
+  /**
+   * 入荷照合: 番号 (末尾だけでも可) → 一致した行。数字 4 桁未満は []。
+   * 完全一致があればそれだけ・無ければ末尾一致。未発送の行が先・発送済み/キャンセルは後ろ (shipped:true)。
+   * 同じ行 (orderId + lineItemId) は 1 回。
+   * @return {Array<{order:object, orderId:string, lineItemId:string, shipped:boolean, sameOrderCount:number}>}
+   */
+  findByTracking(orders, input) {
+    const q = this.scanDigits(input);
+    if (q.length < 4) return [];
+    const list = Array.isArray(orders) ? orders : [];
+    const rows = list.filter(o => o && o.mercariKey && this.digits(o.mercariTracking));
+    let hit = rows.filter(o => this.digits(o.mercariTracking) === q);
+    if (!hit.length) hit = rows.filter(o => this.digits(o.mercariTracking).endsWith(q));
+    const seen = {};
+    const res = [];
+    hit.forEach(o => {
+      const k = String(o.orderId || '') + '|' + String(o.lineItemId || '');
+      if (seen[k]) return;
+      seen[k] = true;
+      res.push({
+        order: o,
+        orderId: String(o.orderId || ''),
+        lineItemId: String(o.lineItemId || ''),
+        shipped: this.isDoneRow(o),
+        sameOrderCount: list.filter(x => x && String(x.orderId) === String(o.orderId)).length
+      });
+    });
+    return res.filter(r => !r.shipped).concat(res.filter(r => r.shipped));
+  },
+  // GAS mercariTrackStatus の unmatched から番号の一致するもの (完全一致 → 無ければ末尾一致)
+  matchUnmatched(unmatched, input) {
+    const q = this.scanDigits(input);
+    if (q.length < 4 || !Array.isArray(unmatched)) return [];
+    const rows = unmatched.filter(u => u && this.digits(u.tracking_no));
+    const exact = rows.filter(u => this.digits(u.tracking_no) === q);
+    return exact.length ? exact : rows.filter(u => this.digits(u.tracking_no).endsWith(q));
+  },
+  // 購入日 (ISO・UTC) → JST の 'YYYY/M/D'
+  _fmtJstDate(iso) {
+    const t = Date.parse(iso || '');
+    if (isNaN(t)) return '';
+    const d = new Date(t + 9 * 3600 * 1000);
+    return d.getUTCFullYear() + '/' + (d.getUTCMonth() + 1) + '/' + d.getUTCDate();
+  },
+  // 入荷照合パネルの結果 (一致あり)
+  arrivalResultsHtml(hits) {
+    if (!Array.isArray(hits) || !hits.length) return '';
+    return hits.map((h, i) => {
+      const o = h.order || {};
+      const img = (o.imageUrl && String(o.imageUrl).indexOf('http') === 0)
+        ? '<img class="merc-arr-thumb" src="' + this.esc(o.imageUrl) + '" alt="" loading="lazy">'
+        : '<div class="merc-arr-thumb merc-arr-thumb-ph">📦</div>';
+      const stateBadge = h.shipped
+        ? '<span class="badge merc-notrack">' + (o.cancelledAt ? '⊘ キャンセル' : '✓ 発送済') + '</span>'
+        : this.badgeHtml(o);
+      const same = h.sameOrderCount > 1 ? '<span class="merc-arr-same">同じ注文に ' + h.sameOrderCount + ' 点</span>' : '';
+      const url = this.transactionUrl(o.mercariKey);
+      return '<div class="merc-arr-item' + (h.shipped ? ' done' : '') + '">' +
+          img +
+          '<div class="merc-arr-body">' +
+            '<div class="merc-arr-oid">' + this.esc(h.orderId) + ' ' + same + '</div>' +
+            '<div class="merc-arr-title">' + this.esc(o.itemTitle || '') + '</div>' +
+            '<div class="merc-arr-no">📮 ' + this.esc(this.formatNo(o.mercariTracking)) + ' ' + stateBadge + '</div>' +
+            '<div class="merc-arr-btns">' +
+              '<button type="button" class="merc-arr-btn" data-merc-act="card" data-merc-i="' + i + '">カードを表示</button>' +
+              '<button type="button" class="merc-arr-btn" data-merc-act="print" data-merc-i="' + i + '">個別印刷</button>' +
+              (url ? '<a class="merc-arr-btn" href="' + this.esc(url) + '" target="_blank" rel="noopener">取引画面</a>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  },
+  // 一致なし (unmatched は GAS の応答が来てから足す)
+  arrivalNoHitHtml(unmatchedHits) {
+    let h = '<div class="merc-arr-none">一致する注文がありません</div>';
+    (unmatchedHits || []).forEach(u => {
+      const d = this._fmtJstDate(u.purchased_at);
+      h += '<div class="merc-arr-unmatched">注文に結び付かない購入: ' + this.esc(u.title || u.key || '') + (d ? '（' + this.esc(d) + '）' : '') + '</div>';
+    });
+    return h;
   }
 };
 window.MercariTrackUi = MercariTrackUi;
@@ -329,6 +436,18 @@ const App = {
 
       // v3.16: 印刷機能
       this._bind('btn-bulk-print', 'onclick', () => this.openBulkPrint());
+      // ★ v3.10.14: メルカリ未評価の再印刷・入荷照合
+      this._bind('btn-merc-reprint', 'onclick', () => this.openMercariReprint());
+      this._bind('btn-merc-arrival', 'onclick', () => this.openMercariArrival());
+      this._bind('merc-arrival-close', 'onclick', () => this.closeMercariArrival());
+      this._bind('merc-arrival-input', 'oninput', () => this._mercArrivalSearch());
+      this._bind('merc-arrival-scan', 'onclick', () => this._mercArrivalStartCamera());
+      this._bind('merc-arrival-camera-stop', 'onclick', () => this._mercArrivalStopCamera());
+      this._bind('merc-arrival-overlay', 'onclick', (e) => { if (e && e.target && e.target.id === 'merc-arrival-overlay') this.closeMercariArrival(); });
+      this._bind('merc-arrival-results', 'onclick', (e) => {
+        const b = e && e.target && e.target.closest ? e.target.closest('[data-merc-act]') : null;
+        if (b) this._mercArrivalAction(b.getAttribute('data-merc-act'), parseInt(b.getAttribute('data-merc-i'), 10));
+      });
       this._bind('btn-back-print', 'onclick', () => this.goHome());
       this._bind('btn-home-print', 'onclick', () => this.goHome());
       this._bind('btn-print-cancel', 'onclick', () => this.goHome());
@@ -779,6 +898,9 @@ const App = {
 
     // ★ 2026-11-18: メルカリ発送待ちバナー (件数は前回の getPrintTargets の応答・期日は state.orders)
     this._updateMercariWaitBanner();
+
+    // ★ v3.10.14: 「📮 メルカリ未評価を印刷 (N)」「📮 入荷照合」ボタンの出し分け
+    this._updateMercariArrivalButtons();
 
     // ★ Zonos: 期限切迫バナー更新
     this._updateZonosExpireBanner();
@@ -1923,6 +2045,177 @@ const App = {
     }
   },
 
+  // ============================================================
+  // ★ v3.10.14 (2026-11-18): メルカリ未評価の再印刷・入荷照合
+  // ============================================================
+
+  /** ヘッダの「📮 メルカリ未評価を印刷 (N)」「📮 入荷照合」の出し分け (GAS が古い = mercariKey 無し → 両方出さない) */
+  _updateMercariArrivalButtons() {
+    try {
+      const orders = Array.isArray(this.state.orders) ? this.state.orders : [];
+      const rp = document.getElementById('btn-merc-reprint');
+      if (rp) {
+        const n = MercariTrackUi.reprintTargets(orders).length;
+        const lb = document.getElementById('btn-merc-reprint-label');
+        if (lb) lb.textContent = '未評価を印刷 (' + n + ')';
+        rp.classList.toggle('hidden', n === 0);
+      }
+      const ar = document.getElementById('btn-merc-arrival');
+      if (ar) ar.classList.toggle('hidden', !MercariTrackUi.hasMercariRows(orders));
+    } catch (e) {
+      try { console.warn('_updateMercariArrivalButtons error:', e); } catch (_) {}
+    }
+  },
+
+  /** 受取評価待ちのメルカリ仕入 (番号あり/追跡なし) を、既存の印刷の流れでまとめて刷り直す */
+  async openMercariReprint() {
+    const ids = MercariTrackUi.reprintTargets(this.state.orders);
+    if (ids.length === 0) { showToast('メルカリ未評価の注文はありません'); return; }
+    showToast('印刷データを取得中... (メルカリ未評価 ' + ids.length + '件)');
+    try {
+      const r = await API.getPrintData(ids);
+      const orders = (r && r.orders) || [];
+      if (orders.length === 0) { showToast('印刷データが見つかりません'); return; }
+      this.state.printPreviewOrders = orders;
+      this.renderPrintPreview(orders, { titlePrefix: '📮 メルカリ未評価の再印刷' });
+      this.show('screen-print');
+    } catch (e) {
+      showToast('印刷データ取得失敗: ' + e.message);
+    }
+  },
+
+  openMercariArrival() {
+    const ov = document.getElementById('merc-arrival-overlay');
+    if (!ov) return;
+    this.state.mercArrival = { unmatched: null, unmatchedLoading: false, stream: null, timer: null, hits: [] };
+    const input = document.getElementById('merc-arrival-input');
+    const res = document.getElementById('merc-arrival-results');
+    if (input) input.value = '';
+    if (res) res.innerHTML = '<div class="merc-arr-hint">番号を入れると、その荷物の注文を探します（数字 4 桁以上）</div>';
+    const scanBtn = document.getElementById('merc-arrival-scan');
+    if (scanBtn) scanBtn.classList.toggle('hidden', !('BarcodeDetector' in window));
+    ov.classList.remove('hidden');
+    if (input) { try { input.focus(); } catch (_) {} }
+  },
+
+  closeMercariArrival() {
+    this._mercArrivalStopCamera();
+    const ov = document.getElementById('merc-arrival-overlay');
+    if (ov) ov.classList.add('hidden');
+  },
+
+  _mercArrivalSearch() {
+    const input = document.getElementById('merc-arrival-input');
+    const res = document.getElementById('merc-arrival-results');
+    if (!input || !res) return;
+    const st = this.state.mercArrival || (this.state.mercArrival = { unmatched: null, hits: [] });
+    const raw = input.value;
+    const q = MercariTrackUi.scanDigits(raw);
+    if (q.length < 4) {
+      st.hits = [];
+      res.innerHTML = '<div class="merc-arr-hint">番号を入れると、その荷物の注文を探します（数字 4 桁以上）</div>';
+      return;
+    }
+    const hits = MercariTrackUi.findByTracking(this.state.orders, q);
+    st.hits = hits;
+    if (hits.length) { res.innerHTML = MercariTrackUi.arrivalResultsHtml(hits); return; }
+    res.innerHTML = MercariTrackUi.arrivalNoHitHtml(st.unmatched ? MercariTrackUi.matchUnmatched(st.unmatched, q) : []);
+    // 注文に結び付かない購入を GAS に 1 回だけ聞く (失敗は静かに無視)
+    if (st.unmatched === null && !st.unmatchedLoading && typeof API.getMercariTrackStatus === 'function') {
+      st.unmatchedLoading = true;
+      API.getMercariTrackStatus().then(r => {
+        st.unmatched = (r && Array.isArray(r.unmatched)) ? r.unmatched : [];
+      }).catch(() => { st.unmatched = []; }).then(() => {
+        st.unmatchedLoading = false;
+        const cur = MercariTrackUi.scanDigits(input.value);
+        if (cur === q && !(st.hits && st.hits.length)) {
+          res.innerHTML = MercariTrackUi.arrivalNoHitHtml(MercariTrackUi.matchUnmatched(st.unmatched, q));
+        }
+      });
+    }
+  },
+
+  _mercArrivalAction(act, idx) {
+    const st = this.state.mercArrival || {};
+    const h = (st.hits || [])[idx];
+    if (!h) return;
+    if (act === 'print') {
+      this.closeMercariArrival();
+      this.openIndividualPrint(h.orderId);
+      return;
+    }
+    if (act === 'card') {
+      this.closeMercariArrival();
+      const esc = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/"/g, '\\"');
+      let el = document.querySelector('.order-item[data-id="' + esc(h.orderId) + '"][data-line-item-id="' + esc(h.lineItemId) + '"]')
+        || document.querySelector('.order-item[data-id="' + esc(h.orderId) + '"]');
+      if (!el) { showToast('今の絞り込みでは ' + h.orderId + ' のカードが表示されていません（フィルタを確認）'); return; }
+      try { el.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (_) { el.scrollIntoView(); } // すぐ動かす（smooth は画面が裏にあると動かないことがある）
+      el.classList.add('merc-flash');
+      setTimeout(() => { try { el.classList.remove('merc-flash'); } catch (_) {} }, 3000);
+    }
+  },
+
+  /** 📷 バーコードを読む (BarcodeDetector がある端末だけ・codabar(NW-7)/code_128/itf) */
+  async _mercArrivalStartCamera() {
+    if (!('BarcodeDetector' in window)) return;
+    const st = this.state.mercArrival || (this.state.mercArrival = {});
+    if (st.stream) return;
+    const wrap = document.getElementById('merc-arrival-camera');
+    const video = document.getElementById('merc-arrival-video');
+    if (!wrap || !video) return;
+    let detector;
+    try {
+      const want = ['codabar', 'code_128', 'itf'];
+      let formats = want;
+      try {
+        const sup = await BarcodeDetector.getSupportedFormats();
+        if (Array.isArray(sup)) formats = want.filter(f => sup.indexOf(f) >= 0);
+      } catch (_) {}
+      if (!formats.length) { showToast('この端末ではバーコードを読めません（番号を入力してください）'); return; }
+      detector = new BarcodeDetector({ formats: formats });
+      st.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch (e) {
+      st.stream = null;
+      showToast('カメラを開けません: ' + (e && e.message ? e.message : e));
+      return;
+    }
+    video.srcObject = st.stream;
+    wrap.classList.remove('hidden');
+    try { await video.play(); } catch (_) {}
+    const tick = async () => {
+      if (!st.stream) return;
+      try {
+        const codes = await detector.detect(video);
+        const hit = (codes || []).map(c => MercariTrackUi.scanDigits(c.rawValue)).find(d => d.length >= 4);
+        if (hit) {
+          const input = document.getElementById('merc-arrival-input');
+          if (input) input.value = hit;
+          this._mercArrivalStopCamera();
+          this._mercArrivalSearch();
+          return;
+        }
+      } catch (_) {}
+      st.timer = setTimeout(tick, 250);
+    };
+    st.timer = setTimeout(tick, 300);
+  },
+
+  _mercArrivalStopCamera() {
+    const st = this.state.mercArrival;
+    if (st) {
+      if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+      if (st.stream) {
+        try { st.stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        st.stream = null;
+      }
+    }
+    const video = document.getElementById('merc-arrival-video');
+    if (video) { try { video.pause(); } catch (_) {} video.srcObject = null; }
+    const wrap = document.getElementById('merc-arrival-camera');
+    if (wrap) wrap.classList.add('hidden');
+  },
+
   // ★ Zonos: 期限切迫バナー更新
   _updateZonosExpireBanner() {
     if (!window.Zonos || !window.Zonos.buildZonosExpireBanner) return;
@@ -2325,7 +2618,7 @@ const App = {
    * v3.17: 印刷プレビューを描画 (A4 1枚に 2商品・上下分割)
    * 奇数末尾の最終ペアは上カードのみ・下半分は空白
    */
-  renderPrintPreview(orders) {
+  renderPrintPreview(orders, opts) {
     const area = document.getElementById('print-preview-area');
     const countLabel = document.getElementById('print-count-label');
     const titleEl = document.getElementById('print-title');
@@ -2344,7 +2637,9 @@ const App = {
     const total = orders.length;
     const pageCount = Math.ceil(total / 2);
     if (countLabel) countLabel.textContent = total + ' 件 / ' + pageCount + ' 枚 (1ページ2商品)';
-    if (titleEl) titleEl.textContent = '📦 ピックアップシート印刷 (' + total + '件 / ' + pageCount + '枚)';
+    // ★ v3.10.14: opts.titlePrefix があれば題だけ差し替える (メルカリ未評価の再印刷)。無ければ従来どおり
+    const titlePrefix = (opts && opts.titlePrefix) ? opts.titlePrefix : '📦 ピックアップシート印刷';
+    if (titleEl) titleEl.textContent = titlePrefix + ' (' + total + '件 / ' + pageCount + '枚)';
 
     const dateStr = this._formatPrintDate(new Date());
 

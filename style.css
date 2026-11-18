@@ -1762,6 +1762,10 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .badge.merc-wait    { background: #FFF1E0; color: #8A4310; border: 0.5px solid #E8B27A; }
 .badge.merc-track   { background: #EAF4EA; color: #2F5A1A; border: 0.5px solid #9CC79C; font-family: 'SF Mono', Menlo, Consolas, monospace; }
 .badge.merc-notrack { background: #F0F0F0; color: #444; border: 0.5px solid #BBB; }
+.badge.merc-wait, .badge.merc-track, .badge.merc-notrack { white-space: nowrap; flex-shrink: 0; }
+/* メルカリの札がある見出しは折り返す（狭い画面で札が縦書きに潰れる・右へはみ出すのを防ぐ） */
+.order-item .order-head:has(.badge.merc-wait, .badge.merc-track, .badge.merc-notrack) { flex-wrap: wrap; row-gap: 4px; column-gap: 4px; }
+.cpass-asin .merc-tx-link { white-space: nowrap; }
 .cpass-asin .merc-tx-link {
   font-family: inherit;
   font-size: 12px;
@@ -1777,6 +1781,61 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
 .policy-banner.mercari-wait-banner.urgent .policy-banner-main,
 .policy-banner.mercari-wait-banner.urgent .policy-banner-sub { color: #8A1A1A; font-weight: 700; }
 .policy-banner.mercari-wait-banner .mercari-wait-stale { color: #8A1A1A; font-weight: 700; }
+
+/* ★ v3.10.14 (2026-11-18): 入荷照合パネル・カードを目立たせる */
+.overlay.merc-arrival-overlay {
+  background: rgba(0,0,0,0.45);
+  align-items: center;
+  justify-content: flex-start;   /* 上寄せ (下はスマホのキーボード) */
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+}
+.merc-arrival-panel {
+  background: var(--surface);
+  border-radius: 14px;
+  width: calc(100% - 16px);
+  max-width: 480px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+}
+.merc-arrival-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.merc-arrival-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.merc-arrival-close { color: var(--text-secondary); background: transparent; }
+.merc-arrival-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 22px;
+  letter-spacing: 1px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+}
+.merc-arrival-scan { width: 100%; margin-top: 8px; padding: 10px; font-size: 15px; border-radius: 10px; background: var(--primary); color: #fff; }
+.merc-arrival-camera { margin-top: 8px; text-align: center; }
+.merc-arrival-camera video { width: 100%; max-height: 40vh; background: #000; border-radius: 8px; object-fit: cover; }
+.merc-arrival-camera-stop { margin-top: 6px; padding: 8px 14px; font-size: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.merc-arrival-results { margin-top: 10px; }
+.merc-arr-hint, .merc-arr-none { font-size: 13px; color: var(--text-secondary); padding: 8px 2px; }
+.merc-arr-none { color: var(--text); font-weight: 600; }
+.merc-arr-unmatched { font-size: 13px; color: #8A4310; background: #FFF6EC; border-left: 3px solid #C26A1B; padding: 6px 8px; margin-top: 6px; }
+.merc-arr-item { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+.merc-arr-item.done { opacity: 0.6; }
+.merc-arr-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: #eee; }
+.merc-arr-thumb-ph { display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.merc-arr-body { flex: 1; min-width: 0; }
+.merc-arr-oid { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 14px; font-weight: 700; }
+.merc-arr-same { font-family: inherit; font-size: 11px; font-weight: 600; color: #8A4310; background: #FFF1E0; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+.merc-arr-title { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.merc-arr-no { font-size: 13px; margin-top: 2px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+.merc-arr-no .badge { font-family: inherit; font-size: 11px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
+.merc-arr-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.merc-arr-btn {
+  font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid #185fa5;
+  background: var(--surface); color: #185fa5; text-decoration: none; width: auto; margin: 0;
+}
+.order-item.merc-flash { outline: 3px solid #E8A33C; outline-offset: -3px; background: #FFF6E0 !important; transition: background 0.3s; }
 
 /* ★ v3.10.12: ピックアップシートのメルカリ欄 (黒字のみ・148.5mm に収めるため QR は CPASS/計測欄/発送方法の横) */
 .pp-merc-wrap {

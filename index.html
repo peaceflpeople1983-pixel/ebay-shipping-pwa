@@ -63,6 +63,15 @@
           <span class="scan-pill-label">印刷</span>
           <span class="print-pill-badge hidden" id="bulk-print-badge">0</span>
         </button>
+        <!-- ★ v3.10.14 (2026-11-18): メルカリ未評価(受取評価待ち)の再印刷 / 入荷照合。メルカリの行が無ければ出さない (app.js _updateMercariArrivalButtons) -->
+        <button class="scan-pill hidden" id="btn-merc-arrival" title="届いた荷物のお問い合わせ番号から注文を探す">
+          <span class="scan-pill-icon">📮</span>
+          <span class="scan-pill-label">入荷照合</span>
+        </button>
+        <button class="scan-pill hidden" id="btn-merc-reprint" title="受取評価がまだのメルカリ仕入を、番号と QR 入りのシートで刷り直す">
+          <span class="scan-pill-icon">🖨</span>
+          <span class="scan-pill-label" id="btn-merc-reprint-label">未評価を印刷 (0)</span>
+        </button>
         <button class="scan-pill" id="btn-recovery" title="未取得order を取込">
           <span class="scan-pill-icon">📥</span>
           <span class="scan-pill-label">未取得</span>
@@ -426,6 +435,23 @@
       <button class="primary" id="btn-ocr-capture">撮影</button>
     </div>
   </section>
+
+  <!-- ★ v3.10.14 (2026-11-18): 入荷照合パネル (届いた荷物の番号 → 注文。app.js openMercariArrival) -->
+  <div id="merc-arrival-overlay" class="overlay merc-arrival-overlay hidden">
+    <div class="merc-arrival-panel">
+      <div class="merc-arrival-head">
+        <span class="merc-arrival-title">📮 入荷照合</span>
+        <button class="icon merc-arrival-close" id="merc-arrival-close" title="閉じる">✕</button>
+      </div>
+      <input id="merc-arrival-input" class="merc-arrival-input" type="text" inputmode="numeric" autocomplete="off" placeholder="お問い合わせ番号（末尾 4 桁でも可）">
+      <button type="button" class="merc-arrival-scan hidden" id="merc-arrival-scan">📷 バーコードを読む</button>
+      <div class="merc-arrival-camera hidden" id="merc-arrival-camera">
+        <video id="merc-arrival-video" playsinline muted></video>
+        <button type="button" class="merc-arrival-camera-stop" id="merc-arrival-camera-stop">カメラを止める</button>
+      </div>
+      <div class="merc-arrival-results" id="merc-arrival-results"></div>
+    </div>
+  </div>
 
   <div id="toast" class="toast hidden"></div>
 

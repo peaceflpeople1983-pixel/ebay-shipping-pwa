@@ -30,7 +30,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-13'; // v3.10.13: メルカリ入荷照合の札に「メルカリ 受取済み」を追加（受取評価まで済んだ購入・番号の記録なし）(app.js)
+const CACHE_NAME = 'ebay-ship-v3-10-14'; // v3.10.14: メルカリの入荷照合(届いた荷物のお問い合わせ番号・末尾4桁/バーコード→注文。ヘッダ「📮 入荷照合」)と、受取評価待ちのメルカリ仕入を番号と QR 入りのシートで刷り直す「📮 メルカリ未評価を印刷 (N)」(app.js, style.css, index.html)。GAS は変更なし・mercariKey が無ければ表示は従来どおり
+// (旧) const CACHE_NAME = 'ebay-ship-v3-10-13'; // v3.10.13: メルカリ入荷照合の札に「メルカリ 受取済み」を追加（受取評価まで済んだ購入・番号の記録なし）(app.js)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-12'; // v3.10.12: メルカリ入荷照合 — メルカリ仕入の行のカードに札(メルカリ 発送待ち/📮 末尾 xxxx/📮 追跡番号なし)と「取引画面」リンク、ピックアップシートにお問い合わせ番号(4-4-4・末尾4桁大)と取引画面の QR(自前 qr.js・28mm)、「メルカリ発送待ち N 件」バナー (app.js, style.css, index.html, qr.js 新規・GAS mercari_track.gs)。GAS が古く項目が無ければ表示は従来どおり
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-11'; // v3.10.11: 差出票の印刷済みマーク(AX)が一度も記録されていなかった不具合を修正 — window.API が常に undefined で送信していなかった(sashidashi.js v1.8・失敗はトースト表示)。キャンセル通知・注文取得リカバリの操作後に一覧を描き直す処理も同じ原因で動いていなかったので修正 (cancel_notice.js, recovery.js)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-10'; // v3.10.10: ePacketライトのサイズ不足ヒント(Economy の注文・実額)・Economy の注文で DHL/FedEx のゴールドを外し、押したら差額つき確認ポップアップ (calculator.js は純関数の追加のみ・app.js, style.css)
