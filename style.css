@@ -1758,6 +1758,71 @@ button.scan-pill:active { background: rgba(255,255,255,0.28); }
   text-align: center;
 }
 
+/* ★ v3.10.12 (2026-11-18): メルカリ入荷照合 — カードの札・取引画面リンク・発送待ちバナー */
+.badge.merc-wait    { background: #FFF1E0; color: #8A4310; border: 0.5px solid #E8B27A; }
+.badge.merc-track   { background: #EAF4EA; color: #2F5A1A; border: 0.5px solid #9CC79C; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+.badge.merc-notrack { background: #F0F0F0; color: #444; border: 0.5px solid #BBB; }
+.cpass-asin .merc-tx-link {
+  font-family: inherit;
+  font-size: 12px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid #185fa5;
+  border-radius: 10px;
+}
+.policy-banner.mercari-wait-banner { background: #FFF6EC; border-left-color: #C26A1B; }
+.policy-banner.mercari-wait-banner .policy-banner-main { color: #8A4310; }
+.policy-banner.mercari-wait-banner .policy-banner-sub { color: #A0581A; }
+.policy-banner.mercari-wait-banner.urgent { background: #FDE8E8; border-left-color: #B42318; }
+.policy-banner.mercari-wait-banner.urgent .policy-banner-main,
+.policy-banner.mercari-wait-banner.urgent .policy-banner-sub { color: #8A1A1A; font-weight: 700; }
+.policy-banner.mercari-wait-banner .mercari-wait-stale { color: #8A1A1A; font-weight: 700; }
+
+/* ★ v3.10.12: ピックアップシートのメルカリ欄 (黒字のみ・148.5mm に収めるため QR は CPASS/計測欄/発送方法の横) */
+.pp-merc-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 3mm;
+}
+.pp-merc-main { flex: 1 1 auto; min-width: 0; }
+.pp-merc-top { display: flex; gap: 6px; align-items: stretch; }
+.pp-merc-top > .pp-cpass { flex: 0 0 38%; box-sizing: border-box; }
+.pp-merc-no {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1.5px solid #000;
+  border-radius: 2px;
+  padding: 3px 8px;
+  margin-top: 4px;
+  color: #000;
+  background: white;
+}
+.pp-merc-no-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.3px; }
+.pp-merc-no-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.pp-merc-no-full {
+  font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.pp-merc-no-tail {
+  font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1.05;
+}
+.pp-merc-no.none .pp-merc-no-text { font-size: 11px; font-weight: 800; line-height: 1.3; }
+.pp-merc-qr {
+  flex: 0 0 auto;
+  width: 25mm;
+  margin-top: 4px;
+  text-align: center;
+  color: #000;
+}
+.pp-merc-qr-label { font-size: 8px; font-weight: 700; line-height: 1.2; margin-bottom: 1px; }
+.pp-merc-qr svg { width: 25mm; height: 25mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
 /* ★ v3.10.10 (2026-11-13): ePacketライトの最小サイズ不足ヒント(提案結果の案内バーの下・カードの前) */
 .size-hint {
   background: #E8F1FC;

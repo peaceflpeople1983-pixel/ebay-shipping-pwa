@@ -65,6 +65,127 @@ const OrderCurrency = {
 };
 window.OrderCurrency = OrderCurrency;
 
+// ★ 2026-11-18 メルカリ入荷照合 (GAS mercari_track.gs・指示書 ebay KPI/docs/mercari_arrival/指示書_メルカリ入荷照合_v1.md §4・§5.C)
+//   getOrders / getPrintData の各行の mercariKey / mercariTracking / mercariNoTracking と、
+//   getBulkPrintTargets の excludedNoTrackingOrderIds / mercariPrintWait / mercariTrackUpdatedAt から
+//   カードの札・ピックアップシートのブロック・バナーの中身を作る純関数。
+//   GAS が古く項目が無いときは何も足さない (mercariKey が無い行 = メルカリの行として扱わない)。
+const MercariTrackUi = {
+  STALE_MS: 24 * 3600 * 1000,
+  URGENT_DAYS: 2,
+  esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+  digits(no) { return String(no == null ? '' : no).replace(/[^0-9]/g, ''); },
+  // '725457956145' → '7254-5795-6145' (4 桁ずつハイフン・ラベルの表記)
+  formatNo(no) {
+    const d = this.digits(no);
+    return d ? (d.match(/.{1,4}/g) || []).join('-') : '';
+  },
+  tail(no) { const d = this.digits(no); return d.slice(-4); },
+  transactionUrl(key) {
+    const k = String(key || '').replace(/[^0-9A-Za-z]/g, '');
+    return k ? 'https://jp.mercari.com/transaction/' + k.toLowerCase() : '';
+  },
+  // 'tracking' | 'noTracking' | 'waiting' | '' (メルカリの行でない・GAS が古い)
+  status(o) {
+    if (!o || !o.mercariKey) return '';
+    if (this.digits(o.mercariTracking)) return 'tracking';
+    if (o.mercariNoTracking === true) return 'noTracking';
+    // 追跡シートに行が無い（データがまだ届いていない）ときは「発送待ち」と言い切らない
+    const s = String(o.mercariOrderState || '');
+    if (!s) return 'unknown';
+    if (s === 'STATE_WAITING_BUYER_REVIEW') return 'shipped';
+    return 'waiting';
+  },
+  // カードの札 (発送済・キャンセルは出さない)
+  badgeHtml(o) {
+    const st = this.status(o);
+    if (!st) return '';
+    if (o.trackingNumber || o.fulfillmentStatus === 'FULFILLED' || o.cancelledAt) return '';
+    if (st === 'tracking') return '<span class="badge merc-track" title="メルカリの送り状番号 ' + this.esc(this.formatNo(o.mercariTracking)) + '">📮 末尾 ' + this.esc(this.tail(o.mercariTracking)) + '</span>';
+    if (st === 'noTracking') return '<span class="badge merc-notrack" title="追跡の無い配送。届いた荷物は写真と商品名で照合">📮 追跡番号なし</span>';
+    if (st === 'unknown') return '<span class="badge merc-wait" title="送り状番号のデータがまだ届いていません">メルカリ 番号未取得</span>';
+    if (st === 'shipped') return '<span class="badge merc-wait" title="出品者は発送済み。送り状番号は次の取得で入ります">メルカリ 発送済み・番号待ち</span>';
+    return '<span class="badge merc-wait" title="メルカリの出品者がまだ発送していません">メルカリ 発送待ち</span>';
+  },
+  // ピックアップシートの番号ブロック (黒字のみ)
+  printNoHtml(o) {
+    const st = this.status(o);
+    if (!st) return '';
+    if (st === 'tracking') {
+      return '<div class="pp-merc-no">' +
+        '<div class="pp-merc-no-label">📮 お問い合わせ番号</div>' +
+        '<div class="pp-merc-no-line"><span class="pp-merc-no-full">' + this.esc(this.formatNo(o.mercariTracking)) + '</span>' +
+        '<span class="pp-merc-no-tail">末尾 ' + this.esc(this.tail(o.mercariTracking)) + '</span></div></div>';
+    }
+    const text = (st === 'noTracking') ? '📮 追跡番号なし（写真と商品名で照合）'
+      : (st === 'shipped') ? '📮 発送済み（番号未取得）'
+      : (st === 'unknown') ? '📮 番号未取得'
+      : '📮 発送待ち（番号未取得）';
+    return '<div class="pp-merc-no none"><div class="pp-merc-no-label">メルカリ</div><div class="pp-merc-no-text">' + text + '</div></div>';
+  },
+  // 取引画面の QR (インライン SVG・qr.js が無ければ '')
+  printQrHtml(o, qrLib) {
+    if (!o || !o.mercariKey || !qrLib || typeof qrLib.svg !== 'function') return '';
+    const url = this.transactionUrl(o.mercariKey);
+    if (!url) return '';
+    let svg = '';
+    try { svg = qrLib.svg(url, { sizeMm: 25, margin: 2 }); } catch (e) { return ''; }
+    return '<div class="pp-merc-qr"><div class="pp-merc-qr-label">受取評価 QR</div>' + svg + '</div>';
+  },
+  /**
+   * バナーの中身
+   * @param {object|null} targets getBulkPrintTargets の応答 (古い GAS なら新しい項目が無い)
+   * @param {Array} orders this.state.orders (発送期日を引く)
+   * @param {number} nowMs
+   * @param {function} daysLeftOf shipByDate → 残り日数 (JST 暦日) | null
+   * @return {{show:boolean, count:number, main:string, sub:string, urgent:boolean, urgentIds:string[], stale:boolean, staleText:string}}
+   */
+  bannerInfo(targets, orders, nowMs, daysLeftOf) {
+    const t = targets || {};
+    const ids = Array.isArray(t.excludedNoTrackingOrderIds) ? t.excludedNoTrackingOrderIds.map(String) : [];
+    const count = (typeof t.excludedNoTrackingCount === 'number') ? t.excludedNoTrackingCount : ids.length;
+    const enabled = t.mercariPrintWait === true;
+    const res = { show: false, count: count, main: '', sub: '', urgent: false, urgentIds: [], stale: false, staleText: '' };
+    if (enabled) {
+      const ts = t.mercariTrackUpdatedAt ? Date.parse(t.mercariTrackUpdatedAt) : NaN;
+      res.stale = isNaN(ts) || (nowMs - ts) > this.STALE_MS;
+      if (res.stale) {
+        res.staleText = '⚠ 送り状番号の取得が止まっている可能性（最終受信 ' + (isNaN(ts) ? 'なし' : this._fmtJst(ts)) + '）';
+      }
+    }
+    if (count === 0 && !res.stale) return res;
+    res.show = true;
+    if (count > 0) {
+      res.main = 'メルカリ発送待ち ' + count + ' 件（送り状番号が入ったら一括印刷に出ます）';
+      const list = Array.isArray(orders) ? orders : [];
+      const seen = {};
+      ids.forEach(id => {
+        if (seen[id]) return;
+        seen[id] = true;
+        const rows = list.filter(x => x && String(x.orderId) === id && x.shipByDate);
+        const urgent = rows.some(x => { const d = daysLeftOf ? daysLeftOf(x.shipByDate) : null; return d != null && d <= this.URGENT_DAYS; });
+        if (urgent) res.urgentIds.push(id);
+      });
+      res.urgent = res.urgentIds.length > 0;
+      res.sub = res.urgent
+        ? '⛔ 発送期日まで 2 日以内: ' + res.urgentIds.join(' / ')
+        : 'メルカリの出品者が発送して送り状番号が届くまで待っています（個別印刷は可能）';
+    } else {
+      res.main = 'メルカリ発送待ち 0 件';
+      res.sub = '';
+    }
+    return res;
+  },
+  _fmtJst(ms) {
+    const d = new Date(ms + 9 * 3600 * 1000);
+    const p = n => (n < 10 ? '0' + n : '' + n);
+    return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  }
+};
+window.MercariTrackUi = MercariTrackUi;
+
 const App = {
   state: {
     masterData: null,
@@ -652,6 +773,9 @@ const App = {
     // v3.2.1: 仕入値未取得バナーを更新 (Amazon仕入値が無く一括印刷から除外される件数)
     this._updateNoCostPrintBanner();
 
+    // ★ 2026-11-18: メルカリ発送待ちバナー (件数は前回の getPrintTargets の応答・期日は state.orders)
+    this._updateMercariWaitBanner();
+
     // ★ Zonos: 期限切迫バナー更新
     this._updateZonosExpireBanner();
 
@@ -742,6 +866,7 @@ const App = {
             ${dk.subTagHtml}
             ${deadlineBadge}
             ${auAbnBadge}
+            ${MercariTrackUi.badgeHtml(o)}
             ${(window.Zonos && window.Zonos.buildZonosBadge) ? window.Zonos.buildZonosBadge(o) : ''}
           </div>
           ${dk.warningBarHtml}
@@ -1768,6 +1893,32 @@ const App = {
     }
   },
 
+  /**
+   * ★ 2026-11-18 メルカリ入荷照合: 「メルカリ発送待ち N 件」バナー。
+   *  件数はサーバ getBulkPrintTargets の excludedNoTrackingOrderIds が正(updateBulkPrintBadge で保存)。
+   *  切替(mercari_print_wait)が入で最終受信が 24 時間より古い(または無い)なら「取得が止まっている可能性」を添える。
+   *  件数 0 かつ切替 切(古い GAS で項目が無いときも)は何も出さない。
+   */
+  _updateMercariWaitBanner() {
+    try {
+      const banner = document.getElementById('mercari-wait-banner');
+      if (!banner) return;
+      const info = MercariTrackUi.bannerInfo(this.state.bulkPrintInfo || null, this.state.orders, Date.now(),
+        (s) => { const m = this.computeDeadlineMeta(s); return (m && m.daysLeft != null) ? m.daysLeft : null; });
+      if (!info.show) { banner.classList.add('hidden'); return; }
+      const mainEl = document.getElementById('mercari-wait-main');
+      const subEl = document.getElementById('mercari-wait-sub');
+      const staleEl = document.getElementById('mercari-wait-stale');
+      if (mainEl) mainEl.textContent = info.main;
+      if (subEl) { subEl.textContent = info.sub; subEl.classList.toggle('hidden', !info.sub); }
+      if (staleEl) { staleEl.textContent = info.staleText; staleEl.classList.toggle('hidden', !info.stale); }
+      banner.classList.toggle('urgent', !!info.urgent);
+      banner.classList.remove('hidden');
+    } catch (e) {
+      try { console.warn('_updateMercariWaitBanner error:', e); } catch (_) {}
+    }
+  },
+
   // ★ Zonos: 期限切迫バナー更新
   _updateZonosExpireBanner() {
     if (!window.Zonos || !window.Zonos.buildZonosExpireBanner) return;
@@ -1961,6 +2112,10 @@ const App = {
           '<a href="' + escapeHtml(mercariUrl) + '" target="_blank" rel="noopener">' +
             escapeHtml(String(order.asin).toLowerCase()) +
           '</a>' +
+          // ★ 2026-11-18 メルカリ入荷照合: 取引画面 (受取評価) へのリンク。GAS が mercariKey を返すときだけ
+          ((order && order.mercariKey && MercariTrackUi.transactionUrl(order.mercariKey))
+            ? '<a class="merc-tx-link" href="' + escapeHtml(MercariTrackUi.transactionUrl(order.mercariKey)) + '" target="_blank" rel="noopener">取引画面</a>'
+            : '') +
         '</div>'
       );
     }
@@ -2102,6 +2257,9 @@ const App = {
       const count = (r && typeof r.count === 'number') ? r.count : 0;
       this.state.bulkPrintCount = count;
       this.state.bulkPrintTargets = r.orderIds || [];
+      // ★ 2026-11-18: メルカリ発送待ちバナー用に応答を保存 (古い GAS では新しい項目が無い → バナーは出ない)
+      this.state.bulkPrintInfo = r || null;
+      this._updateMercariWaitBanner();
       if (count > 0) {
         badge.textContent = count;
         badge.classList.remove('hidden');
@@ -2525,6 +2683,24 @@ const App = {
         '重量: <span class="pp-write-box"></span> g 　' +
         '寸法: <span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span>×<span class="pp-write-box tiny"></span> cm' +
       '</div>';
+    const metaInfoHtml = '<div class="pp-meta-info">\u{1F4E6} ' + carrier + ' / HS ' + (hsCode || '-') + ' / 関税 ' + tariffRate + '</div>';
+
+    // ★ 2026-11-18 メルカリ入荷照合: メルカリの行(o.mercariKey)だけ、CPASS の右に送り状番号・右端に取引画面の QR (25mm)。
+    //   148.5mm(A4 の半分)に収めるため、QR は CPASS・計測欄・発送方法の行の横に並べる(縦に積まない)。
+    //   mercariKey が無い行(Amazon・古い GAS)は従来と同じ並び。
+    let midHtml = cpassBlock + (dp.measureHtml || defaultMeasure) + metaInfoHtml;
+    if (o.mercariKey) {
+      const qrHtml = MercariTrackUi.printQrHtml(o, (typeof QR !== 'undefined') ? QR : null);
+      midHtml =
+        '<div class="pp-merc-wrap">' +
+          '<div class="pp-merc-main">' +
+            '<div class="pp-merc-top">' + cpassBlock + MercariTrackUi.printNoHtml(o) + '</div>' +
+            (dp.measureHtml || defaultMeasure) +
+            metaInfoHtml +
+          '</div>' +
+          qrHtml +
+        '</div>';
+    }
 
     return '' +
       '<div class="print-page' + posCls + '">' +
@@ -2551,9 +2727,7 @@ const App = {
               '<div class="pp-amazon"><div class="pp-amazon-label">仕入元商品名 ⭐</div>' + amazonBlock + '</div>' +
             '</div>' +
           '</div>' +
-          cpassBlock +
-          (dp.measureHtml || defaultMeasure) +
-          '<div class="pp-meta-info">\u{1F4E6} ' + carrier + ' / HS ' + (hsCode || '-') + ' / 関税 ' + tariffRate + '</div>' +
+          midHtml +
           auAbnPrintHtml +
           '<div class="pp-buyer">' +
             '<div class="pp-buyer-label">SHIP TO</div>' +

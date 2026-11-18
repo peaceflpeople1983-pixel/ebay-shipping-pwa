@@ -146,6 +146,16 @@
       </div>
     </div>
 
+    <!-- ★ v3.10.12 (2026-11-18): メルカリ発送待ちバナー (送り状番号がまだ無いメルカリ仕入が一括印刷で待っているとき) -->
+    <div class="policy-banner mercari-wait-banner hidden" id="mercari-wait-banner">
+      <span class="policy-banner-icon">📮</span>
+      <div class="policy-banner-body">
+        <div class="policy-banner-main" id="mercari-wait-main"></div>
+        <div class="policy-banner-sub" id="mercari-wait-sub"></div>
+        <div class="policy-banner-sub mercari-wait-stale hidden" id="mercari-wait-stale"></div>
+      </div>
+    </div>
+
     <div class="filter-bar">
       <select id="filter-account">
         <option value="">すべてのアカウント</option>
@@ -435,6 +445,7 @@
 <script src="cancel_notice.js"></script>
 <script src="recovery.js"></script>
 <script src="sashidashi.js"></script>
+<script src="qr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

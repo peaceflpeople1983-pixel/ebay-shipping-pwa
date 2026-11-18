@@ -106,7 +106,18 @@ const API = {
    */
   async getPrintTargets() {
     // バルク印刷対象 (未発送 + CPaSS取込済 + 印刷済でない) の orderIds + count を返す
+    // ★ 2026-11-18: 新しい GAS は excludedNoTrackingCount / excludedNoTrackingOrderIds /
+    //   mercariPrintWait / mercariTrackUpdatedAt も返す (メルカリ発送待ちバナー用・古い GAS では無い)
     return this._get('?action=printGetTargets');
+  },
+
+  /**
+   * ★ 2026-11-18 メルカリ入荷照合: 追跡シートの状態 (GAS mercari_track.gs getMercariTrackStatus_)
+   * 戻り値: { ok, enabled, rows, updatedAt, unmatched:[{key,tracking_no,title,purchased_at,order_state}] }
+   *   ※ 今の画面からは呼んでいない (手動確認・将来用)。古い GAS では { error:'Unknown action: …' }
+   */
+  async getMercariTrackStatus() {
+    return this._get('?action=mercariTrackStatus');
   },
 
   async getPrintData(orderIds) {

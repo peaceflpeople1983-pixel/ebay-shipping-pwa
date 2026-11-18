@@ -30,7 +30,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-11'; // v3.10.11: 差出票の印刷済みマーク(AX)が一度も記録されていなかった不具合を修正 — window.API が常に undefined で送信していなかった(sashidashi.js v1.8・失敗はトースト表示)。キャンセル通知・注文取得リカバリの操作後に一覧を描き直す処理も同じ原因で動いていなかったので修正 (cancel_notice.js, recovery.js)
+const CACHE_NAME = 'ebay-ship-v3-10-12'; // v3.10.12: メルカリ入荷照合 — メルカリ仕入の行のカードに札(メルカリ 発送待ち/📮 末尾 xxxx/📮 追跡番号なし)と「取引画面」リンク、ピックアップシートにお問い合わせ番号(4-4-4・末尾4桁大)と取引画面の QR(自前 qr.js・28mm)、「メルカリ発送待ち N 件」バナー (app.js, style.css, index.html, qr.js 新規・GAS mercari_track.gs)。GAS が古く項目が無ければ表示は従来どおり
+// (旧) const CACHE_NAME = 'ebay-ship-v3-10-11'; // v3.10.11: 差出票の印刷済みマーク(AX)が一度も記録されていなかった不具合を修正 — window.API が常に undefined で送信していなかった(sashidashi.js v1.8・失敗はトースト表示)。キャンセル通知・注文取得リカバリの操作後に一覧を描き直す処理も同じ原因で動いていなかったので修正 (cancel_notice.js, recovery.js)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-10'; // v3.10.10: ePacketライトのサイズ不足ヒント(Economy の注文・実額)・Economy の注文で DHL/FedEx のゴールドを外し、押したら差額つき確認ポップアップ (calculator.js は純関数の追加のみ・app.js, style.css)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-9'; // v3.10.9: 差出票の再発防止 — 同じ追跡番号の行は1個に統合・一個の料金は料金表で検算し違えば料金表の額で記載＋⚠ ・境目(上限まで10g以内)の量り直し注意を確定画面と差出票の選択画面に表示・重量を1g単位(kg小数3桁)で保存 (sashidashi.js v1.7, app.js)。印刷する差出票の様式は変更なし
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-8'; // v3.10.8: EU 日本郵便+Zonos DDP の確定時、シート送料欄を郵送料のみに(Zonos 分は AU/AV 列・KPI 二重計上の是正) (app.js)
@@ -61,6 +62,7 @@ const STATIC_FILES = [
   './cancel_notice.js',
   './recovery.js',
   './sashidashi.js',
+  './qr.js',
   './manifest.webmanifest'
 ];
 
