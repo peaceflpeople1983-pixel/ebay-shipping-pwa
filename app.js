@@ -96,6 +96,8 @@ const MercariTrackUi = {
     const s = String(o.mercariOrderState || '');
     if (!s) return 'unknown';
     if (s === 'STATE_WAITING_BUYER_REVIEW') return 'shipped';
+    // 取引が完了／こちらの受取評価が済んでいる = 商品は手元にある（番号を取れないまま完了した購入）
+    if (s === 'STATE_COMPLETED' || s === 'STATE_WAITING_SELLER_REVIEW') return 'received';
     return 'waiting';
   },
   // カードの札 (発送済・キャンセルは出さない)
@@ -107,6 +109,7 @@ const MercariTrackUi = {
     if (st === 'noTracking') return '<span class="badge merc-notrack" title="追跡の無い配送。届いた荷物は写真と商品名で照合">📮 追跡番号なし</span>';
     if (st === 'unknown') return '<span class="badge merc-wait" title="送り状番号のデータがまだ届いていません">メルカリ 番号未取得</span>';
     if (st === 'shipped') return '<span class="badge merc-wait" title="出品者は発送済み。送り状番号は次の取得で入ります">メルカリ 発送済み・番号待ち</span>';
+    if (st === 'received') return '<span class="badge merc-notrack" title="メルカリの受取評価が済んでいます（送り状番号の記録なし）">メルカリ 受取済み</span>';
     return '<span class="badge merc-wait" title="メルカリの出品者がまだ発送していません">メルカリ 発送待ち</span>';
   },
   // ピックアップシートの番号ブロック (黒字のみ)
@@ -121,6 +124,7 @@ const MercariTrackUi = {
     }
     const text = (st === 'noTracking') ? '📮 追跡番号なし（写真と商品名で照合）'
       : (st === 'shipped') ? '📮 発送済み（番号未取得）'
+      : (st === 'received') ? '📮 受取済み（番号の記録なし）'
       : (st === 'unknown') ? '📮 番号未取得'
       : '📮 発送待ち（番号未取得）';
     return '<div class="pp-merc-no none"><div class="pp-merc-no-label">メルカリ</div><div class="pp-merc-no-text">' + text + '</div></div>';
