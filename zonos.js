@@ -34,9 +34,9 @@
     'SpeedPAK Eco'
   ];
 
-  // ★段階C Zonos EU: 対象国(12か国・2026-11-21 BE 追加)。正は calculator.js の Calculator.ZONOS_EU_COUNTRIES
+  // ★段階C Zonos EU: 対象国(9か国・2026-11-21 BE 追加／DK・EE・FI は Zonos 側の受付停止で休止 → calculator.js ZONOS_EU_SUSPENDED)。正は calculator.js の Calculator.ZONOS_EU_COUNTRIES
   //   (GAS 側 ZONOS_EU_COUNTRIES とも同値に保つ)。Calculator 未読込時のフォールバック用コピー
-  const ZONOS_EU_COUNTRIES_FALLBACK = ['FR','IT','ES','NL','DK','SE','FI','EE','LU','MT','SK','BE'];
+  const ZONOS_EU_COUNTRIES_FALLBACK = ['FR','IT','ES','NL','SE','LU','MT','SK','BE'];
 
   function zonosEuCountries_() {
     try {
