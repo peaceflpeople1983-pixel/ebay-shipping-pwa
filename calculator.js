@@ -146,9 +146,21 @@ const Calculator = {
     const code = (country && typeof country === 'object') ? country.code : String(country || (input && input.country) || '');
     if (this.ZONOS_EU_COUNTRIES.indexOf(code) === -1) return false;
     if (!(input && input.manual) && !this._isEconomyPolicy(input ? input.shippingPolicy : '')) return false;
+    if (this._zonosEuOverValue(input)) return false; // ★v3.10.17: 申告合計(同梱の仕入値の合計)が 150€ 超は Zonos DDP 不可
     if (input && String(input.ioss == null ? '' : input.ioss).trim() !== '') return true;
     const p = input ? input.itemPriceUSD : 0;
     return !!(input && input.manual && p > 0 && p <= this._euDdpConf().thresholdUSD);
+  },
+  // ★v3.10.17: Zonos に申告する合計(input.declaredJPY = 仕入値の合計・円。同梱はグループ全件。app.js が付与)が 150€ を超えるか。
+  //   2026-11-22 BE 宛て 同梱 10 件(申告合計 ¥29,217 ≈ €168)がラベル発行で「Delivery Duty Paid unavailable for country BE」。
+  //   以前の 150€ 判定は注文 1 件の販売価格だけで、同梱の合計を見ていなかった。150€ 超は IOSS が使えず、
+  //   BE は Zonos が断る・FR は通るが VAT が課金される(実測)。declaredJPY が無い・0(仕入値が不明)は判定しない(GAS が発行前に見積で止める)。
+  _zonosEuOverValue(input) {
+    const d = input ? Number(input.declaredJPY) : 0;
+    if (!(d > 0)) return null;
+    const conf = this._euFeeConf();
+    const limit = Math.floor(conf.thresholdEUR * conf.eurJpy);
+    return d > limit ? { declaredJPY: Math.round(d), limitJPY: limit } : null;
   },
   // Zonos EU のセラー負担額(円)と内訳。freightJPY = ePacket運賃(CIF の運賃按分に使う)
   _zonosEuTariff(code, input, freightJPY) {
@@ -463,6 +475,14 @@ const Calculator = {
     // ★続報5(2026-10-30・v3.10.5): DE 宛ては 11/1 以降、価格・IOSS 有無を問わず日本郵便 BtoC 不可(DDU も DDP も)
     if (country.code === 'DE' && this._todayYmd(input) >= this.JP_POST_DE_STOP_START) {
       return ex('日本郵便はDE宛てBtoC不可(11/1〜・価格/IOSS問わず) → SpeedPAK/DHL/FedExを使う');
+    }
+
+    // ★v3.10.17: 申告合計が 150€ を超えるだけの理由で Zonos DDP から外れた注文は、その理由を出す(分ければ出せる)
+    if (!zonosEu && this._euDdpActive(country.code, input)) {
+      const over = this._zonosEuOverValue(input);
+      if (over && this._isZonosEuEligible(Object.assign({}, input, { declaredJPY: 0 }), country.code)) {
+        return ex(`【150€超】申告合計 ¥${over.declaredJPY.toLocaleString()}(同梱の仕入値の合計)が 150€(≈¥${over.limitJPY.toLocaleString()})を超えるため、日本郵便+Zonos(関税元払い)は使えない → 荷物を分けてそれぞれ 150€ 以下にするか、CPaSS で SpeedPAK 等を使う`);
+      }
     }
 
     // ★EU関税DDP(10/1〜): 150€以下(価格不明含む)はDDPラベル必須のため日本郵便は使えない

@@ -1208,8 +1208,28 @@ const App = {
   _isZonosEuOrder(order) {
     try {
       if (!order || typeof Calculator === 'undefined' || !Calculator._isZonosEuEligible) return false;
-      return Calculator._isZonosEuEligible({ ioss: order.ioss || '', itemPriceUSD: order.itemPrice, shippingPolicy: order.shippingPolicy }, order.country);
+      return Calculator._isZonosEuEligible({ ioss: order.ioss || '', itemPriceUSD: order.itemPrice, shippingPolicy: order.shippingPolicy, declaredJPY: this._declaredTotalJpy(order) }, order.country);
     } catch (_) { return false; }
+  },
+
+  // ★v3.10.17: Zonos に申告する合計(円) = 仕入値の合計(同梱は同じグループの全件)。1 件でも仕入値が無ければ 0(不明＝判定しない)
+  //   GAS zonosGetData の申告価格(value = Amazon仕入値・数量 1)と同じ数え方
+  _declaredTotalJpy(order) {
+    try {
+      if (!order) return 0;
+      let list = [order];
+      if (order.doukonGroupId && Array.isArray(this.state.orders)) {
+        const m = this.state.orders.filter(x => x && x.doukonGroupId === order.doukonGroupId);
+        if (m.length) list = m;
+      }
+      let sum = 0;
+      for (const x of list) {
+        const c = Number(x.amazonCost);
+        if (!(c > 0)) return 0;
+        sum += c;
+      }
+      return sum;
+    } catch (_) { return 0; }
   },
 
   // ★EU v2 (S3): 候補の euBreakdown(model='v2')から関税行の表示文言を作る。v1・内訳なしは null(表示は従来どおり)
@@ -1297,6 +1317,7 @@ const App = {
       declLines: this._euDeclLines(order), // ★EU v2: 申告行数(同梱は異なるASIN数・取れなければ1)
       ioss: order ? (order.ioss || '') : '', // ★段階C Zonos EU: 注文行の IOSS 列(空なら Zonos EU 対象外)
       shippingPolicy: order ? (order.shippingPolicy || '') : '', // ★v3.10.3: Economy 系でなければ Zonos EU 対象外(手動入力は不問)
+      declaredJPY: this._declaredTotalJpy(order), // ★v3.10.17: 申告合計(同梱の仕入値の合計)。150€ 超は Zonos DDP 不可
       manual: !order                         // ★段階C Zonos EU: 注文に紐付かない手動入力
     };
     this.state.currentInput = input;

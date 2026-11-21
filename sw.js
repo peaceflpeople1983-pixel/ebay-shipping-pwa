@@ -30,7 +30,8 @@
  * v3-18-15-z20: Phase B 発送済(FULFILLED)/キャンセル済 表示 + 手動「発送済にする」
  * v3-18-15-z19: 注文取得リカバリ機能 + ヘッダー縦積み是正
  */
-const CACHE_NAME = 'ebay-ship-v3-10-16'; // v3.10.16: 日本郵便+Zonos DDP の対象から DK・EE・FI を休止(Zonos 側が 11/21 に DDP 受付停止)。候補外(理由)に「【Zonos休止中】」を表示 (calculator.js, zonos.js・GAS zonos_integration.gs)
+const CACHE_NAME = 'ebay-ship-v3-10-17'; // v3.10.17: 同梱の申告合計(仕入値の合計)が 150€ を超える EU 宛ては日本郵便+Zonos DDP を候補から外し「【150€超】」を表示 (calculator.js, app.js)。GAS zonos_api.gs は発行前に見積で確認
+// (旧) const CACHE_NAME = 'ebay-ship-v3-10-16'; // v3.10.16: 日本郵便+Zonos DDP の対象から DK・EE・FI を休止(Zonos 側が 11/21 に DDP 受付停止)。候補外(理由)に「【Zonos休止中】」を表示 (calculator.js, zonos.js・GAS zonos_integration.gs)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-15'; // v3.10.15: 日本郵便+Zonos DDP の対象国にベルギー(BE)を追加(12か国。Zonos が 11/21 に BE の DDP 可を確認) (calculator.js, zonos.js・GAS zonos_integration.gs)
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-14'; // v3.10.14: メルカリの入荷照合(届いた荷物のお問い合わせ番号・末尾4桁/バーコード→注文。ヘッダ「📮 入荷照合」)と、受取評価待ちのメルカリ仕入を番号と QR 入りのシートで刷り直す「📮 メルカリ未評価を印刷 (N)」(app.js, style.css, index.html)。GAS は変更なし・mercariKey が無ければ表示は従来どおり
 // (旧) const CACHE_NAME = 'ebay-ship-v3-10-13'; // v3.10.13: メルカリ入荷照合の札に「メルカリ 受取済み」を追加（受取評価まで済んだ購入・番号の記録なし）(app.js)
